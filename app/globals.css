@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* 1. Modern Purple Design Token Schema */
+@theme {
+  /* Canvas & Surface Layers (With a subtle violet undertone) */
+  --color-surface-main: #f9f8fc;          /* Soft violet-tinted off-white canvas */
+  --color-surface-card: #ffffff;          /* Pure white card/panel background */
+  
+  /* Boundaries and Lines */
+  --color-line-subtle: #e2e0e8;           /* Neutral-grey line with subtle lavender tint */
+  
+  /* Modern Royal Purple / Violet Accents */
+  --color-brand-accent: #7c3aed;          /* Active state / Violet 600 */
+  --color-brand-hover: #6d28d9;           /* Darkened hover state / Violet 700 */
+  --color-brand-subtle: #ede9fe;          /* Soft, cohesive purple background / Violet 100 */
+  
+  /* Typography Roles (Designed with rich obsidian-plum/amethyst deep tones) */
+  --color-content-main: #181124;          /* Deep obsidian-plum heading/body text */
+  --color-content-secondary: #534a60;     /* Muted amethyst-grey for secondary details */
+  --color-content-muted: #8e859c;         /* Light slate-lavender for auxiliary text */
+}
+
+/* 2. Base Element Resets */
+body {
+  color: var(--color-content-main);
+  background: var(--color-surface-main);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  font-weight: 400;
+  overflow-x: hidden;
+}
+
+:root {
+  /* Default professional typography scale */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure headings use consistent weights/sizes */
+h1,
+h2,
+h3 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+p {
+  font-weight: 400;
+}
+
+/* 3. Interactive Component Utilities (Button Schema) */
+
+/* HIGH PROMINENCE - Core brand call-to-action */
+@utility btn-brand-filled {
+  @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
+         bg-brand-accent text-white shadow-sm hover:bg-brand-hover hover:shadow-md hover:-translate-y-0.5
+         focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
+}
+
+/* MEDIUM PROMINENCE - Modern subtle light-violet action background */
+@utility btn-brand-subtle {
+  @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
+         bg-brand-subtle/60 text-brand-accent border border-brand-subtle
+         hover:bg-brand-subtle hover:text-brand-hover hover:shadow-sm hover:-translate-y-0.5
+         focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
+}
+
+/* LOW PROMINENCE - Clean outline style for standard secondary actions */
+@utility btn-outline {
+  @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
+         bg-surface-card text-content-secondary border border-line-subtle shadow-xs
+         hover:bg-surface-main hover:text-content-main hover:border-content-secondary hover:-translate-y-0.5
+         focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
+}
+
+/* MINIMAL PROMINENCE - Borderless hover-reactive button */
+@utility btn-ghost {
+  @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
+         bg-transparent text-content-secondary hover:text-content-main hover:bg-surface-main
+         focus:outline-none focus:ring-2 focus:ring-line-subtle focus:ring-offset-2 focus:ring-offset-surface-main;
+}
