@@ -55,8 +55,8 @@ p {
 /* HIGH PROMINENCE - Core brand call-to-action */
 @utility btn-brand-filled {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
-         bg-brand-accent text-white shadow-sm hover:bg-brand-hover hover:shadow-md hover:-translate-y-0.5
-         focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
+         bg-[var(--color-brand-accent)] text-white shadow-sm hover:bg-[var(--color-brand-hover)] hover:shadow-md hover:-translate-y-0.5
+         focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-main)];
 }
 
 /* MEDIUM PROMINENCE - Modern subtle light-violet action background */
@@ -70,8 +70,8 @@ p {
 /* LOW PROMINENCE - Clean outline style for standard secondary actions */
 @utility btn-outline {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
-         bg-surface-card text-content-secondary border border-line-subtle shadow-xs
-         hover:bg-surface-main hover:text-content-main hover:border-content-secondary hover:-translate-y-0.5
+         bg-[var(--color-surface-card)] text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] shadow-sm
+         hover:bg-[var(--color-surface-main)] hover:text-[var(--color-content-main)] hover:border-[var(--color-content-secondary)] hover:-translate-y-0.5
          focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
 }
 
@@ -80,4 +80,19 @@ p {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
          bg-transparent text-content-secondary hover:text-content-main hover:bg-surface-main
          focus:outline-none focus:ring-2 focus:ring-line-subtle focus:ring-offset-2 focus:ring-offset-surface-main;
+}
+
+/* Unified Form Input Fields matching the Custom Token System */
+@utility form-input {
+  @apply w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-sm text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)];
+}
+
+/* Focus-only variant used by multiple auth/admin forms */
+@utility auth-input-focus {
+  @apply focus:outline-none focus:ring-4 focus:ring-[var(--color-brand-accent)]/15 focus:border-[var(--color-brand-accent)]/90;
+}
+
+/* Variant designed to offset content for left-aligned icons */
+@utility form-input-with-icon {
+  @apply form-input pl-10;
 }

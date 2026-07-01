@@ -27,8 +27,34 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
 
   if (!isOpen || !employee) return null;
 
+  // 1. Robust Join Date Parser with common fallbacks
+  const rawJoinDate = employee.joinDate || (employee as any).joiningDate || (employee as any).startDate || (employee as any).createdAt;
+  let formattedJoinDate = "—";
+  if (rawJoinDate) {
+    const parsedDate = new Date(rawJoinDate);
+    if (!isNaN(parsedDate.getTime())) {
+      formattedJoinDate = parsedDate.toLocaleDateString();
+    }
+  }
+
+  // 2. Safe Salary Parser with conversion for strings (e.g., "50000") and column fallbacks
+  const rawSalary = (employee.salary !== undefined && employee.salary !== null)
+    ? employee.salary 
+    : ((employee as any).basicSalary || (employee as any).baseSalary);
+
+  let formattedSalary = "—";
+  if (rawSalary !== undefined && rawSalary !== null && rawSalary !== "") {
+    const numericSalary = Number(rawSalary);
+    if (!isNaN(numericSalary)) {
+      formattedSalary = new Intl.NumberFormat("en-PK", {
+        style: "currency",
+        currency: "PKR",
+        maximumFractionDigits: 0,
+      }).format(numericSalary);
+    }
+  }
+
   const handleDeleteClick = async () => {
-    // 1. Display styled confirmation modal
     const result = await Swal.fire({
       title: "Delete Employee Profile?",
       text: `Are you sure you want to permanently delete ${employee.name}? This will remove their registration and credential access.`,
@@ -36,8 +62,8 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
       showCancelButton: true,
       confirmButtonText: "Yes, delete profile",
       cancelButtonText: "Cancel",
-      reverseButtons: true, // Puts Cancel on the left, Confirm on the right
-      buttonsStyling: false, // Disables SweetAlert2's default styling to use Tailwind utilities
+      reverseButtons: true, 
+      buttonsStyling: false, 
       customClass: {
         popup: "bg-white border border-slate-150 rounded-2xl shadow-xl p-6 font-sans text-center",
         title: "text-base font-bold text-slate-900",
@@ -48,14 +74,12 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
       },
     });
 
-    // 2. If user confirms, run the delete API logic
     if (result.isConfirmed) {
       setIsDeleting(true);
       try {
         await onDelete(employee.id);
         onClose();
 
-        // 3. Trigger styled deletion success toast
         Toast.fire({
           icon: "success",
           title: "Employee record removed",
@@ -106,7 +130,7 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
         <div className="space-y-4 py-6">
           <div className="flex items-center gap-4 pb-4 border-b border-slate-50">
             <div className="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-sm uppercase">
-              {employee.name.split(" ").map(n => n[0]).join("")}
+              {employee.name ? employee.name.split(" ").map(n => n[0]).join("") : "EE"}
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">{employee.name}</h3>
@@ -117,17 +141,43 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Department</span>
-              <span className="text-xs font-semibold text-slate-700">{employee.department}</span>
+              <span className="text-xs font-semibold text-slate-700">{employee.department || "—"}</span>
             </div>
             <div>
               <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Status</span>
               <span className={`inline-flex mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 employee.status === "Active" 
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
-                {employee.status}
+                {employee.status || "Inactive"}
               </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Designation</span>
+              <span className="text-xs font-semibold text-slate-700">
+                {(employee as any).designation ?? employee.role}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Join Date</span>
+              <span className="text-xs font-semibold text-slate-700">
+                {formattedJoinDate}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Salary</span>
+              <span className="text-xs font-semibold text-slate-700">
+                {formattedSalary}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Role</span>
+              <span className="text-xs font-semibold text-slate-700">{employee.role}</span>
             </div>
           </div>
 
@@ -135,6 +185,7 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
             <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">System Username / Email</span>
             <span className="text-xs font-semibold text-slate-700 select-all">{employee.email}</span>
           </div>
+
         </div>
 
         {/* Danger/Delete Actions Footer */}

@@ -6,14 +6,15 @@ import { Employee } from "@/modals/Employee";
 
 // PUT: Update Employee profile and sync User Email
 export async function PUT(
-  request: Request, 
+  request: Request,
   { params }: { params: Promise<{ id: string }> } // Typed as Promise in Next.js 15
 ) {
   try {
     await connectDB();
     const { id } = await params; // Awaited in Next.js 15
     const body = await request.json();
-    const { name, email, role: jobTitle, department, status } = body;
+    const { name, email, designation, joinDate, department, status, salary } = body;
+
 
     // 1. Locate the employee profile
     const employee = await Employee.findById(id);
@@ -38,7 +39,23 @@ export async function PUT(
 
     // 3. Update Employee profile details
     employee.name = name || employee.name;
-    employee.jobTitle = jobTitle || employee.jobTitle;
+
+    // new fields
+    employee.designation = designation || employee.designation || employee.jobTitle || "";
+    employee.joinDate = joinDate ? new Date(joinDate) : employee.joinDate;
+    
+    // salary
+    if (salary !== undefined) {
+      const salaryNumber = salary === null || salary === "" ? undefined : Number(salary);
+      if (salaryNumber !== undefined && !Number.isNaN(salaryNumber)) {
+        employee.salary = salaryNumber;
+      }
+    }
+
+    // back-compat jobTitle
+    employee.jobTitle = employee.designation;
+
+
     employee.department = department || employee.department;
     employee.status = status || employee.status;
     await employee.save();
@@ -46,11 +63,15 @@ export async function PUT(
     const updatedEmployee = {
       id: employee._id.toString(),
       name: employee.name,
-      role: employee.jobTitle,
+      role: employee.designation ?? employee.jobTitle,
       email: email ? email.toLowerCase() : "",
       department: employee.department,
       status: employee.status,
+      designation: employee.designation,
+      joinDate: employee.joinDate ? employee.joinDate.toISOString() : undefined,
+      salary: employee.salary,
     };
+
 
     return NextResponse.json({
       message: "Employee profile updated successfully",
@@ -82,8 +103,10 @@ export async function DELETE(
       await User.findByIdAndDelete(employee.userId);
     }
 
-    // 2. Remove profile entry from Employees table
-    await Employee.findByIdAndDelete(id);
+    // 2. Soft-delete profile entry (keep employee record, only mark inactive)
+    employee.status = "Inactive";
+    await employee.save();
+
 
     return NextResponse.json({ 
       message: "Employee profile and system credentials deleted successfully" 

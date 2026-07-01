@@ -1,28 +1,31 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import EmployeeCard, { Employee } from "../../../components/employee/EmployeeCard";
-import AddEmployeeModal from "../../../components/employee/AddEmployeeModal";
-import EditEmployeeModal from "../../../components/employee/EditEmployeeModal";
-import ViewEmployeeModal from "../../../components/employee/ViewEmployeeModal";
-// Import the EmptyState component (adjust path if needed)
-import EmptyState from "../../../components/employee/EmptyState";
+import EmployeeCard, { Employee } from "../../../components/admin/EmployeeCard";
+import AddEmployeeModal from "../../../components/admin/AddEmployeeModal";
+import EditEmployeeModal from "../../../components/admin/EditEmployeeModal";
+import ViewEmployeeModal from "../../../components/admin/ViewEmployeeModal";
+import EmptyState from "../../../components/admin/EmptyState";
 
 export default function AdminEmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Modal Triggers
+  // Modal triggers
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   
-  // Selected Employee State
+  // Selected employee data
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  // Loading & Error states
+  // loading & system page states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // local state containers for safe modal form validation errors (stops global alert popups)
+  const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
+  const [editEmployeeError, setEditEmployeeError] = useState<string | null>(null);
 
   const fetchEmployees = async () => {
     setIsLoading(true);
@@ -44,7 +47,16 @@ export default function AdminEmployeesPage() {
   }, []);
 
   // CREATE profile handler
-  const handleCreateEmployee = async (data: Omit<Employee, "id"> & { password?: string }) => {
+  const handleCreateEmployee = async (
+    data: Omit<Employee, "id"> & {
+      password?: string;
+      designation?: string;
+      joinDate?: string;
+      role: "employee" | "admin";
+      salary: number;
+    }
+  ) => {
+    setAddEmployeeError(null);
     try {
       const res = await fetch("/api/admin/employees", {
         method: "POST",
@@ -52,19 +64,36 @@ export default function AdminEmployeesPage() {
         body: JSON.stringify(data),
       });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to create profile");
+      // Robust response parsing: Checks if content is json, otherwise reads raw text
+      let serverErrorMsg = "Failed to create profile.";
+      if (!res.ok) {
+        try {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const result = await res.json();
+            serverErrorMsg = result.error || result.message || serverErrorMsg;
+          } else {
+            const text = await res.text();
+            serverErrorMsg = text || serverErrorMsg;
+          }
+        } catch (_) {}
+        throw new Error(serverErrorMsg);
+      }
 
+      const result = await res.json();
       if (result.employee) {
         setEmployees((prev) => [result.employee, ...prev]);
+        setAddEmployeeError(null);
+        setIsAddModalOpen(false); // Only close the modal on safe database success
       }
     } catch (err: any) {
-      alert(err.message || "An error occurred during registration.");
+      setAddEmployeeError(err.message || "An error occurred during registration.");
     }
   };
 
   // EDIT profile handler
   const handleEditEmployee = async (id: string | number, updatedData: Omit<Employee, "id">) => {
+    setEditEmployeeError(null);
     try {
       const res = await fetch(`/api/admin/employees/${id}`, {
         method: "PUT",
@@ -72,16 +101,32 @@ export default function AdminEmployeesPage() {
         body: JSON.stringify(updatedData),
       });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to edit profile");
+      let serverErrorMsg = "Failed to edit profile.";
+      if (!res.ok) {
+        try {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const result = await res.json();
+            serverErrorMsg = result.error || result.message || serverErrorMsg;
+          } else {
+            const text = await res.text();
+            serverErrorMsg = text || serverErrorMsg;
+          }
+        } catch (_) {}
+        throw new Error(serverErrorMsg);
+      }
 
+      const result = await res.json();
       if (result.employee) {
         setEmployees((prev) => 
           prev.map((emp) => (emp.id === id ? result.employee : emp))
         );
+        setEditEmployeeError(null);
+        setIsEditModalOpen(false);
+        setSelectedEmployee(null);
       }
     } catch (err: any) {
-      alert(err.message || "Could not update user info.");
+      setEditEmployeeError(err.message || "Could not update user info.");
       throw err;
     }
   };
@@ -97,14 +142,16 @@ export default function AdminEmployeesPage() {
       if (!res.ok) throw new Error(result.error || "Failed to delete employee profile");
 
       setEmployees((prev) => prev.filter((emp) => emp.id !== id));
+      setIsViewModalOpen(false);
+      setSelectedEmployee(null);
     } catch (err: any) {
-      alert(err.message || "Could not delete database records.");
-      throw err;
+      setError(err.message || "Could not delete database records.");
     }
   };
 
   const handleOpenEdit = (emp: Employee) => {
     setSelectedEmployee(emp);
+    setEditEmployeeError(null);
     setIsEditModalOpen(true);
   };
 
@@ -132,7 +179,7 @@ export default function AdminEmployeesPage() {
           </p>
         </div>
 
-        {/* Action Panel: Search and Add Button inline */}
+        {/* Action Panel with Purple Styling */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative w-full sm:w-64">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -145,13 +192,16 @@ export default function AdminEmployeesPage() {
               placeholder="Search directory..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+              className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition duration-150"
             />
           </div>
 
           <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
+            onClick={() => {
+              setAddEmployeeError(null);
+              setIsAddModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-sm transition duration-150 active:scale-[0.98]"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -172,25 +222,22 @@ export default function AdminEmployeesPage() {
             <span className="text-slate-500 text-xs animate-pulse">Loading employee data...</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-red-50 rounded-2xl border border-red-200 text-red-600">
+          <div className="flex flex-col items-center justify-center p-12 bg-rose-50 rounded-2xl border border-rose-200 text-rose-600">
             <span className="text-xs font-semibold">Error: {error}</span>
             <button 
               onClick={fetchEmployees}
-              className="mt-3 px-3 py-1 bg-red-600 text-white text-[10px] rounded-lg hover:bg-red-700 font-bold transition"
+              className="mt-3 px-3 py-1 bg-rose-600 text-white text-[10px] rounded-lg hover:bg-rose-700 font-bold transition"
             >
               Retry
             </button>
           </div>
         ) : employees.length === 0 ? (
-          /* Condition 1: Database has no data. Shows the custom EmptyState component. */
           <EmptyState onAddClick={() => setIsAddModalOpen(true)} />
         ) : filteredEmployees.length === 0 ? (
-          /* Condition 2: Database has data, but the search filter yields no matches. */
           <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-dashed border-slate-200">
             <span className="text-slate-500 text-xs">No employees match your search query.</span>
           </div>
         ) : (
-          /* Condition 3: Show employee directory grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEmployees.map((emp) => (
               <EmployeeCard
@@ -207,7 +254,11 @@ export default function AdminEmployeesPage() {
       {/* 1. Add Employee Modal */}
       <AddEmployeeModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setAddEmployeeError(null);
+        }}
+        errorMessage={addEmployeeError} 
         onSave={handleCreateEmployee}
       />
 
@@ -217,7 +268,9 @@ export default function AdminEmployeesPage() {
         onClose={() => {
           setIsEditModalOpen(false);
           setSelectedEmployee(null);
+          setEditEmployeeError(null);
         }}
+        errorMessage={editEmployeeError}
         employee={selectedEmployee}
         onSave={handleEditEmployee}
       />

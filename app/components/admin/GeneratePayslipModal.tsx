@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, DollarSign, Calendar, CreditCard, User } from "lucide-react";
+import { X, DollarSign, Calendar, CreditCard, User, AlertCircle } from "lucide-react";
 
 export interface EmployeeOption {
   _id?: string;
@@ -27,6 +27,7 @@ interface GeneratePayslipModalProps {
     allowances: number;
     deductions: number;
     bonus: number;
+    netPay: number; // Added netPay to meet database requirements
     paymentMethod: string;
     paymentDate: string;
   }) => void;
@@ -67,6 +68,8 @@ export default function GeneratePayslipModal({
     paymentDate: "",
   });
 
+  const [validationError, setValidationError] = useState("");
+
   // Diagnostic log to track passed data in DevTools
   useEffect(() => {
     if (isOpen) {
@@ -76,7 +79,9 @@ export default function GeneratePayslipModal({
 
   useEffect(() => {
     if (isOpen) {
-      setFormData({
+      // Use functional update to avoid setState-in-effect lint issue
+      setFormData((prev) => ({
+        ...prev,
         employeeId: "",
         jobTitle: "",
         period: getDefaultPeriod(),
@@ -86,7 +91,8 @@ export default function GeneratePayslipModal({
         bonus: 0,
         paymentMethod: "Bank Transfer",
         paymentDate: getLocalTodayDateString(),
-      });
+      }));
+      setValidationError(""); // Reset any prior validation errors
     }
   }, [isOpen]);
 
@@ -101,7 +107,7 @@ export default function GeneratePayslipModal({
       return empId === selectedId;
     });
 
-    // IMPROVEMENT: Combines Job Title and Role (e.g., "Designer / Employee")
+    // Combines Job Title and Role (e.g., "Designer / Employee")
     let combinedJobTitle = "";
     if (selectedEmployee) {
       const title = (selectedEmployee.jobTitle || "").trim();
@@ -119,6 +125,7 @@ export default function GeneratePayslipModal({
       employeeId: selectedId,
       jobTitle: combinedJobTitle,
     }));
+    setValidationError(""); // Reset error once an option is selected
   };
 
   const handleChange = (
@@ -134,9 +141,26 @@ export default function GeneratePayslipModal({
     }));
   };
 
+  const netPay =
+    formData.basicSalary +
+    formData.allowances +
+    formData.bonus -
+    formData.deductions;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.employeeId || formData.basicSalary <= 0) return;
+
+    // Visual Validation warnings rather than silent failure
+    if (!formData.employeeId) {
+      setValidationError("Please select an employee.");
+      return;
+    }
+    if (formData.basicSalary <= 0) {
+      setValidationError("Basic Salary must be greater than $0 to record payment.");
+      return;
+    }
+
+    setValidationError("");
 
     onSave({
       employeeId: formData.employeeId,
@@ -145,16 +169,11 @@ export default function GeneratePayslipModal({
       allowances: formData.allowances,
       deductions: formData.deductions,
       bonus: formData.bonus,
+      netPay: netPay, // Submit calculation to database endpoint
       paymentMethod: formData.paymentMethod,
       paymentDate: formData.paymentDate,
     });
   };
-
-  const netPay =
-    formData.basicSalary +
-    formData.allowances +
-    formData.bonus -
-    formData.deductions;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -187,6 +206,15 @@ export default function GeneratePayslipModal({
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          
+          {/* Validation Alert Box */}
+          {validationError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4.5 h-4.5 text-red-500" />
+              <span>{validationError}</span>
+            </div>
+          )}
+
           {/* Section: Employee Selection & Pay Period */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -202,7 +230,7 @@ export default function GeneratePayslipModal({
                   required
                   value={formData.employeeId}
                   onChange={handleEmployeeSelect}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] hover:border-[var(--color-brand-accent)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)] transition cursor-pointer appearance-none"
                 >
                   <option value="" disabled>
                     {isLoading 
@@ -242,7 +270,7 @@ export default function GeneratePayslipModal({
                 disabled
                 placeholder="Auto-populated"
                 value={formData.jobTitle}
-                className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 cursor-not-allowed focus:outline-none"
+                className="form-input disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -254,14 +282,14 @@ export default function GeneratePayslipModal({
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
                   <Calendar className="w-4 h-4" />
                 </span>
-                <input
+                  <input
                   type="text"
                   name="period"
                   required
                   placeholder="e.g. June 2026"
                   value={formData.period}
                   onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  className="form-input-with-icon"
                 />
               </div>
             </div>
@@ -281,7 +309,7 @@ export default function GeneratePayslipModal({
                   name="paymentMethod"
                   value={formData.paymentMethod}
                   onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] hover:border-[var(--color-brand-accent)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)] transition cursor-pointer appearance-none"
                 >
                   <option value="Bank Transfer">Bank Transfer</option>
                   <option value="Direct Deposit">Direct Deposit</option>
@@ -295,13 +323,13 @@ export default function GeneratePayslipModal({
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
                 Payment Date
               </label>
-              <input
+                <input
                 type="date"
                 name="paymentDate"
                 required
                 value={formData.paymentDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="form-input"
               />
             </div>
           </div>
@@ -325,11 +353,11 @@ export default function GeneratePayslipModal({
                     type="number"
                     name="basicSalary"
                     required
-                    min={0}
+                    min={1}
                     value={formData.basicSalary || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                    className="w-full pl-7 pr-3 py-1.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-lg text-xs text-[var(--color-content-main)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)] transition"
                   />
                 </div>
               </div>
@@ -349,7 +377,7 @@ export default function GeneratePayslipModal({
                     value={formData.allowances || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                    className="w-full pl-7 pr-3 py-1.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-lg text-xs text-[var(--color-content-main)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)] transition"
                   />
                 </div>
               </div>
@@ -369,7 +397,7 @@ export default function GeneratePayslipModal({
                     value={formData.bonus || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                    className="w-full pl-7 pr-3 py-1.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-lg text-xs text-[var(--color-content-main)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)] transition"
                   />
                 </div>
               </div>
@@ -389,7 +417,7 @@ export default function GeneratePayslipModal({
                     value={formData.deductions || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                    className="w-full pl-7 pr-3 py-1.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-lg text-xs text-[var(--color-content-main)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)] transition"
                   />
                 </div>
               </div>
@@ -397,10 +425,10 @@ export default function GeneratePayslipModal({
 
             {/* Live Net Calculation Preview */}
             <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-600">
+              <span className="font-semibold text-[var(--color-content-secondary)]">
                 Calculated Net Pay:
               </span>
-              <span className="font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
+              <span className="font-bold text-[var(--color-brand-accent)] bg-[var(--color-brand-subtle)] border border-[var(--color-brand-subtle)] px-2.5 py-1 rounded-lg">
                 $
                 {netPay.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
@@ -421,7 +449,7 @@ export default function GeneratePayslipModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-md transition"
+              className="px-4 py-2 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-md transition"
             >
               Issue Payment Receipt
             </button>

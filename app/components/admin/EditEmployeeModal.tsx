@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2"; // Import SweetAlert2
 import { Employee } from "./EmployeeCard";
@@ -6,7 +8,7 @@ interface EditEmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  onSave: (id: string | number, data: Omit<Employee, "id">) => Promise<void>;
+  onSave: (id: string | number, data: any) => Promise<void>;
 }
 
 // Custom SweetAlert2 Toast configuration matching your design system
@@ -26,36 +28,62 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "",
+    designation: "",
+    joinDate: "",
+    salary: "",
     department: "Engineering",
     status: "Active",
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (employee) {
-      setFormData({
-        name: employee.name,
-        email: employee.email,
-        role: employee.role,
-        department: employee.department,
-        status: employee.status,
-      });
+    if (!employee || !isOpen) return;
+
+    // 1. Convert Database ISO/Time strings into exact 'YYYY-MM-DD' for HTML5 date input
+    const rawDate = employee.joinDate || (employee as any).joiningDate || (employee as any).startDate || (employee as any).createdAt || "";
+    let formattedDate = "";
+    if (rawDate) {
+      const parsedDate = new Date(rawDate);
+      if (!isNaN(parsedDate.getTime())) {
+        formattedDate = parsedDate.toISOString().split("T")[0]; // Extracts only the date portion
+      }
     }
+
+    // 2. Safely parse salary (converting numbers to strings, handling database variation aliases)
+    const rawSalary = employee.salary !== undefined && employee.salary !== null
+      ? employee.salary
+      : ((employee as any).basicSalary || (employee as any).baseSalary);
+    const salaryString = rawSalary !== undefined && rawSalary !== null ? String(rawSalary) : "";
+
+    setFormData({
+      name: employee.name || "",
+      email: employee.email || "",
+      designation: (employee as any).designation || employee.role || "",
+      joinDate: formattedDate,
+      salary: salaryString,
+      department: employee.department || "Engineering",
+      status: employee.status || "Active",
+    });
   }, [employee, isOpen]);
 
   if (!isOpen || !employee) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.role) return;
+    if (!formData.name || !formData.email || !formData.designation) return;
+
+    // 3. Package the payload and parse salary back to a numeric type for database safety
+    const updatedPayload = {
+      ...formData,
+      salary: formData.salary === "" ? null : Number(formData.salary),
+    };
 
     setIsSubmitting(true);
     try {
-      await onSave(employee.id, formData);
+      await onSave(employee.id, updatedPayload);
       onClose();
       
-      // Trigger SweetAlert2 success toast on successful save
       Toast.fire({
         icon: "success",
         title: "Profile updated successfully",
@@ -66,12 +94,11 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
       });
     } catch (error) {
       console.error(error);
-      // Trigger error alert if something goes wrong
       Swal.fire({
         icon: "error",
         title: "Update Failed",
         text: "Could not save the employee details. Please try again.",
-        confirmButtonColor: "#4f46e5", // Match Indigo-600
+        confirmButtonColor: "#4f46e5",
         customClass: {
           popup: "bg-white rounded-2xl border border-slate-100 shadow-xl font-sans",
           title: "text-sm font-bold text-slate-900",
@@ -88,7 +115,9 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
-      <div className="relative bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl z-10">
+      <div className="relative bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150">
+        
+        {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-950">Edit Employee Profile</h2>
@@ -101,6 +130,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
           </button>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Full Name</label>
@@ -109,7 +139,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              className="form-input"
             />
           </div>
 
@@ -120,28 +150,53 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              className="form-input"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Job Title</label>
+            <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Designation</label>
             <input
               type="text"
               required
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              value={formData.designation}
+              onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+              className="form-input"
             />
           </div>
 
+          {/* Grid Layout containing Join Date, Salary, Department, and Status */}
           <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Join Date</label>
+              <input
+                type="date"
+                required
+                value={formData.joinDate}
+                onChange={(e) => setFormData({ ...formData, joinDate: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Salary (PKR)</label>
+              <input
+                type="number"
+                required
+                min="0"
+                placeholder="e.g. 75000"
+                value={formData.salary}
+                onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Department</label>
               <select
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer"
+                className="form-input cursor-pointer"
               >
                 <option value="Engineering">Engineering</option>
                 <option value="Design">Design</option>
@@ -155,7 +210,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer"
+                className="form-input cursor-pointer"
               >
                 <option value="Active">Active</option>
                 <option value="On Leave">On Leave</option>
@@ -163,6 +218,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
             </div>
           </div>
 
+          {/* Footer Actions */}
           <div className="flex justify-end items-center gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"

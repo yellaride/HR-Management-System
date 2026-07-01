@@ -1,13 +1,18 @@
 import React from "react";
 
 export interface Employee {
-  id: number;
+  id: number | string;
   name: string;
   role: string;
   email: string;
   department: string;
   status: string;
+  // Additional employment fields (admin view)
+  designation?: string;
+  joinDate?: string;
+  salary?: number;
 }
+
 
 interface EmployeeCardProps {
   employee: Employee;

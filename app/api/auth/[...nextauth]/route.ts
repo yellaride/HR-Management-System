@@ -20,31 +20,28 @@ export const authOptions: AuthOptions = {
 
         const { email, password } = credentials;
 
-        // 1. Check if login matches Admin credentials in environment variables
-        const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPassword = process.env.ADMIN_PASSWORD;
-
-        if (
-          adminEmail &&
-          adminPassword &&
-          email.toLowerCase() === adminEmail.toLowerCase() &&
-          password === adminPassword
-        ) {
-          return {
-            id: "admin-system-id",
-            name: "System Admin",
-            email: adminEmail,
-            role: "admin",
-          };
-        }
-
-        // 2. Fallback to MongoDB lookup
+        // Always authenticate against MongoDB (admin is also stored in DB)
         await dbConnect();
         const user = await User.findOne({ email: email.toLowerCase() });
+
+
+
+        // Validate role chosen on the login form (admin vs employee)
+
+
+        const expectedRole = credentials.role;
+        if (!expectedRole || (expectedRole !== "admin" && expectedRole !== "employee")) {
+          throw new Error("Invalid role.");
+        }
 
         if (!user) {
           throw new Error("No user found with this email.");
         }
+
+        if (user.role !== expectedRole) {
+          throw new Error("Invalid email or password.");
+        }
+
 
         // Compare password with hashed database password
         const isPasswordCorrect = await bcrypt.compare(password, user.password);
@@ -64,15 +61,20 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
+        const u = user as { id: string; role: "admin" | "employee"; name?: string; email?: string };
+        token.id = u.id;
+        token.role = u.role;
+        token.name = u.name;
+        token.email = u.email;
       }
       return token;
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id;
-        session.user.role = token.role;
+        session.user.id = token.id as string;
+        session.user.role = (token.role as "admin" | "employee") || "employee";
+        session.user.name = token.name as string | undefined;
+        session.user.email = token.email as string | undefined;
       }
       return session;
     },

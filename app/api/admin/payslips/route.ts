@@ -28,32 +28,35 @@ export async function POST(request: Request) {
       allowances,
       bonus,
       deductions,
+      netPay,
       paymentMethod,
       paymentDate,
     } = body;
 
-    if (!employeeId || !period || basicSalary === undefined) {
+    const parsedBasicSalary = Number(basicSalary);
+    const parsedAllowances = Number(allowances || 0);
+    const parsedBonus = Number(bonus || 0);
+    const parsedDeductions = Number(deductions || 0);
+    const parsedNetPay = Number(
+      netPay ?? parsedBasicSalary + parsedAllowances + parsedBonus - parsedDeductions
+    );
+    const parsedPaymentDate = paymentDate ? new Date(paymentDate) : undefined;
+
+    if (!employeeId || !period || Number.isNaN(parsedBasicSalary) || parsedBasicSalary <= 0) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields or invalid salary value" },
         { status: 400 }
       );
     }
 
     // 1. Fetch employee details to save historical snapshot fields
     const employee = await Employee.findById(employeeId).lean();
-    const employeeName = employee 
-      ? (employee.name || `${employee.firstName || ""} ${employee.lastName || ""}`.trim()) 
+    const employeeName = employee && typeof employee === "object" && "name" in employee
+      ? (employee.name || `${(employee as any).firstName || ""} ${(employee as any).lastName || ""}`.trim())
       : "Unknown Employee";
-    const employeeRole = employee 
-      ? (employee.jobTitle || employee.role || "No Specified Title") 
+    const employeeRole = employee && typeof employee === "object"
+      ? ((employee as any).jobTitle || (employee as any).role || "No Specified Title")
       : "No Specified Title";
-
-    // Server-side calculation verification
-    const calculatedNetPay =
-      Number(basicSalary) +
-      Number(allowances || 0) +
-      Number(bonus || 0) -
-      Number(deductions || 0);
 
     // 2. Save the snapshot fields in the database document
     const newPayslip = await Payslip.create({
@@ -61,13 +64,13 @@ export async function POST(request: Request) {
       employeeName, // Saved historically
       employeeRole, // Saved historically
       period,
-      basicSalary: Number(basicSalary),
-      allowances: Number(allowances || 0),
-      bonus: Number(bonus || 0),
-      deductions: Number(deductions || 0),
-      netPay: calculatedNetPay,
+      basicSalary: parsedBasicSalary,
+      allowances: parsedAllowances,
+      bonus: parsedBonus,
+      deductions: parsedDeductions,
+      netPay: parsedNetPay,
       paymentMethod,
-      paymentDate: new Date(paymentDate),
+      paymentDate: parsedPaymentDate,
     });
 
     const populatedPayslip = await Payslip.findById(newPayslip._id)

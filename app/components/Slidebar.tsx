@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 
 // Define TypeScript interfaces for structural safety
-interface UserProfile {
-  name?: string;
-  email?: string;
-  avatarLabel?: string;
-}
-
 interface SidebarProps {
   role?: "admin" | "employee";
-  user?: UserProfile;
 }
 
 // 1. Navigation items with visual SVG icons for both Admin and Employee roles
@@ -105,26 +99,39 @@ const navItems = {
   ],
 };
 
-export default function Sidebar({ role, user }: SidebarProps) {
+export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname() || "";
+  const router = useRouter();
+  const { data: session } = useSession();
 
-  // 1. Detect dynamic active role. 
-  // Evaluates explicit `role` prop first, then falls back to detecting via the URL path structure.
-  const activeRole: "admin" | "employee" =
-    role || (pathname.startsWith("/admin") ? "admin" : "employee");
+  // 1. Safe role detection from session with lowercase conversion (e.g., "ADMIN" -> "admin")
+  const sessionRole = session?.user?.role?.toLowerCase();
+  const isAdminFromSession = sessionRole === "admin";
+  const isEmployeeFromSession = sessionRole === "employee";
 
-  const activeNavItems = navItems[activeRole];
+  // 2. Active fallback role based strictly on the URL path
+  const fallbackPathRole: "admin" | "employee" = 
+    pathname.startsWith("/admin") ? "admin" : "employee";
 
-  // 2. Select visual profile variables based on active roles
+  // 3. Determine final display role
+  // Priority: 1. Current session role -> 2. Optional role prop -> 3. Path prefix fallback
+  const displayRole: "admin" | "employee" =
+    (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
+    role ||
+    fallbackPathRole;
+
+  const activeNavItems = navItems[displayRole];
+
+  // 4. Select visual profile variables based on active roles
   const defaultProfile =
-    activeRole === "admin"
+    displayRole === "admin"
       ? { name: "Admin User", email: "admin@vibeflow.com", avatarLabel: "AD" }
       : { name: "Employee User", email: "employee@vibeflow.com", avatarLabel: "EM" };
 
   const currentProfile = {
-    name: user?.name || defaultProfile.name,
-    email: user?.email || defaultProfile.email,
-    avatarLabel: user?.avatarLabel || defaultProfile.avatarLabel,
+    name: session?.user?.name || defaultProfile.name,
+    email: session?.user?.email || defaultProfile.email,
+    avatarLabel: defaultProfile.avatarLabel,
   };
 
   return (
@@ -133,11 +140,11 @@ export default function Sidebar({ role, user }: SidebarProps) {
       <div className="flex flex-col gap-8">
         
         {/* Dynamic Profile Section */}
-        <div className="flex items-center gap-3.5 p-2 rounded-xl bg-slate-850/50 border border-slate-800/40">
+        <div className="flex items-center gap-3.5 p-2 rounded-xl bg-slate-800/50 border border-slate-800/40">
           <div className="relative">
             {/* Visual Avatar with Status Dot */}
             <div className={`w-11 h-11 rounded-xl bg-gradient-to-tr ${
-              activeRole === "admin" 
+              displayRole === "admin" 
                 ? "from-brand-accent to-purple-600" 
                 : "from-sky-500 to-indigo-600"
             } flex items-center justify-center font-bold text-white shadow-md text-sm border border-white/10`}>
@@ -159,7 +166,7 @@ export default function Sidebar({ role, user }: SidebarProps) {
         {/* Dynamic Category Section */}
         <div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 mb-3">
-            {activeRole === "admin" ? "Core Management" : "Employee Portal"}
+            {displayRole === "admin" ? "Core Management" : "Employee Portal"}
           </div>
 
           {/* Navigation Items */}
@@ -174,8 +181,10 @@ export default function Sidebar({ role, user }: SidebarProps) {
                     <Link
                       href={item.href}
                       className={`flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-150 ${
-                        isActive
-                          ? "bg-brand-accent text-white shadow-sm shadow-brand-accent/20"
+                      isActive
+                          ? displayRole === "admin"
+                            ? "bg-brand-accent text-white shadow-sm shadow-brand-accent/20"
+                            : "bg-sky-500 text-white shadow-sm shadow-sky-500/20"
                           : "text-slate-400 hover:text-white hover:bg-slate-800/60"
                       }`}
                     >
@@ -194,9 +203,11 @@ export default function Sidebar({ role, user }: SidebarProps) {
       <div className="pt-4 border-t border-slate-800">
         <button
           type="button"
-          onClick={() => {
-            // Integrate security/auth logout logic
-            console.log("Logged out successfully");
+          onClick={async () => {
+            // NextAuth logout + redirect to main page
+            await signOut({ redirect: false });
+            router.push("/");
+            router.refresh();
           }}
           className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-150"
         >

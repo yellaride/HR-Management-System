@@ -1,7 +1,7 @@
 import { Schema, model, models } from "mongoose";
 
-const PayslipSchema = new mongoose.Schema({
-  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+const PayslipSchema = new Schema({
+  employeeId: { type: Schema.Types.ObjectId, ref: "Employee", default: null },
   employeeName: { type: String }, // Snapshot of name at creation
   employeeRole: { type: String }, // Snapshot of title at creation
   period: { type: String, required: true },
