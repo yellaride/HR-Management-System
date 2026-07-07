@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PasswordInputWithToggle from "../PasswordInputWithToggle";
+import { X, ChevronDown, AlertTriangle } from "lucide-react";
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
@@ -20,6 +21,13 @@ interface AddEmployeeModalProps {
   }) => void;
 }
 
+const DEPARTMENTS = ["Engineering", "Design", "Operations", "Marketing"];
+const ROLES = [
+  { value: "employee" as const, label: "Employee" },
+  { value: "admin" as const, label: "HR Admin" },
+];
+const STATUSES = ["Active", "On Leave"];
+
 export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage }: AddEmployeeModalProps) {
   const [formData, setFormData] = useState({
     name: "",
@@ -33,16 +41,49 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
     status: "Active",
   });
 
+  // State to handle custom, styled dropdown visibility
+  const [isDeptOpen, setIsDeptOpen] = useState(false);
+  const [isRoleOpen, setIsRoleOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+
+  // Refs for click outside detection
+  const deptRef = useRef<HTMLDivElement>(null);
+  const roleRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
+
   // Local state for field-specific errors and general alerts
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+
+  // Global click-outside listener to close dropdowns
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      
+      if (deptRef.current && !deptRef.current.contains(target)) {
+        setIsDeptOpen(false);
+      }
+      if (roleRef.current && !roleRef.current.contains(target)) {
+        setIsRoleOpen(false);
+      }
+      if (statusRef.current && !statusRef.current.contains(target)) {
+        setIsStatusOpen(false);
+      }
+    }
+
+    if (isDeptOpen || isRoleOpen || isStatusOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDeptOpen, isRoleOpen, isStatusOpen]);
 
   // Sync backend errors into local form state
   useEffect(() => {
     if (errorMessage) {
       setGeneralError(errorMessage);
       
-      // If the backend error indicates an issue with the email, highlight the email field specifically
       if (errorMessage.toLowerCase().includes("email")) {
         setErrors((prev) => ({
           ...prev,
@@ -68,12 +109,15 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
       });
       setErrors({});
       setGeneralError(null);
+      setIsDeptOpen(false);
+      setIsRoleOpen(false);
+      setIsStatusOpen(false);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Handles input updating and clears error indicators dynamically as the user types
+  // Handles input updating and clears error indicators dynamically
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     
@@ -130,7 +174,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
 
     onSave({
@@ -144,51 +187,48 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
       salary: Number(formData.salary) || 0,
       joinDate: formData.joinDate,
     });
-    // handleClose is removed from here. The parent is responsible for closing the modal on success.
   };
 
   const handleClose = () => {
     onClose();
   };
 
-  // Shared dynamic class generation for input fields based on validation state
+  // Shared dynamic class generation for input fields based on global styles
   const getInputClass = (fieldName: string) => {
-    const baseClass = "w-full px-3 py-2 bg-slate-50/50 border rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none transition-all duration-150";
-    const normalClass = "border-slate-200 hover:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500";
-    const errorClass = "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500";
+    const baseClass = "w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+    const normalClass = "border-[var(--color-line-subtle)] hover:border-[var(--color-brand-accent)]/50 focus:ring-2 focus:ring-[var(--color-brand-accent)]/20 focus:border-[var(--color-brand-accent)]";
+    const errorClass = "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500";
     
     return `${baseClass} ${errors[fieldName] ? errorClass : normalClass}`;
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      
+
       {/* Dark backdrop overlay with slight blur */}
       <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
+        className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs transition-opacity z-10" 
         onClick={handleClose} 
       />
 
       {/* White Modal Container */}
-      <div className="relative bg-white border border-slate-100 rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="relative bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh] flex flex-col">
         
         {/* Subtle purple accent line at the top */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-purple-500 to-purple-700" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--color-brand-accent)] to-[var(--color-brand-hover)]" />
         
         {/* Modal Header */}
-        <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
+        <div className="flex items-start justify-between pb-4 border-b border-[var(--color-line-subtle)] shrink-0">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Add New Employee</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">Fill in the fields below to register a new profile in the organization.</p>
+            <h2 className="text-base font-extrabold text-[var(--color-content-main)] tracking-tight">Add New Employee</h2>
+            <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5 font-medium">Fill in the fields below to register a new profile in the organization.</p>
           </div>
           <button 
             type="button"
             onClick={handleClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition"
+            className="p-1.5 rounded-lg text-[var(--color-content-muted)] hover:text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-subtle)] transition"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -198,14 +238,12 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
           {/* Attractive Inline Error Alert Bar (Only shows when needed) */}
           {(generalError || errorMessage) && (
             <div className="flex items-start gap-3 p-3.5 bg-rose-50/75 border border-rose-100 rounded-xl text-rose-800 animate-in fade-in slide-in-from-top-1 duration-200">
-              <svg className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-xs font-semibold">
+                <h4 className="text-xs font-bold">
                   {errorMessage && !generalError ? "Submission Error" : "Validation Notice"}
                 </h4>
-                <p className="text-[11px] text-rose-600/90 mt-0.5">{generalError || errorMessage}</p>
+                <p className="text-[11px] text-rose-600/90 mt-0.5 font-medium">{generalError || errorMessage}</p>
               </div>
             </div>
           )}
@@ -213,8 +251,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3.5">
             
             {/* Full Name */}
-            <div className="sm:col-span-2 space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Full Name
               </label>
               <input
@@ -225,13 +263,13 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
                 className={getInputClass("name")}
               />
               {errors.name && (
-                <p className="text-[10px] text-rose-500 font-medium">{errors.name}</p>
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.name}</p>
               )}
             </div>
 
             {/* Email Address */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Email Address
               </label>
               <input
@@ -242,12 +280,12 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
                 className={getInputClass("email")}
               />
               {errors.email && (
-                <p className="text-[10px] text-rose-500 font-medium">{errors.email}</p>
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.email}</p>
               )}
             </div>
 
             {/* Password */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <PasswordInputWithToggle
                 label="Temp Password"
                 value={formData.password}
@@ -256,13 +294,13 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
                 inputClassName={getInputClass("password")}
               />
               {errors.password && (
-                <p className="text-[10px] text-rose-500 font-medium">{errors.password}</p>
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.password}</p>
               )}
             </div>
 
             {/* Designation */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Designation
               </label>
               <input
@@ -273,30 +311,52 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
                 className={getInputClass("designation")}
               />
               {errors.designation && (
-                <p className="text-[10px] text-rose-500 font-medium">{errors.designation}</p>
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.designation}</p>
               )}
             </div>
 
-            {/* Department Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            {/* Custom Styled Department Dropdown */}
+            <div className="space-y-1.5 relative" ref={deptRef}>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Department
               </label>
-              <select
-                value={formData.department}
-                onChange={(e) => handleInputChange("department", e.target.value)}
-                className={getInputClass("department") + " cursor-pointer"}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeptOpen(!isDeptOpen);
+                  setIsRoleOpen(false);
+                  setIsStatusOpen(false);
+                }}
+                className={`${getInputClass("department")} flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
-                <option value="Operations">Operations</option>
-                <option value="Marketing">Marketing</option>
-              </select>
+                <span>{formData.department}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isDeptOpen ? "rotate-180" : ""}`} />
+              </button>
+              
+              {isDeptOpen && (
+                <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {DEPARTMENTS.map((dept) => (
+                    <button
+                      key={dept}
+                      type="button"
+                      onClick={() => {
+                        handleInputChange("department", dept);
+                        setIsDeptOpen(false);
+                      }}
+                      className={`dropdown-option ${
+                        formData.department === dept ? "dropdown-option-active" : ""
+                      }`}
+                    >
+                      {dept}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Salary */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Salary ($)
               </label>
               <input
@@ -309,70 +369,118 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, errorMessage
                 className={getInputClass("salary")}
               />
               {errors.salary && (
-                <p className="text-[10px] text-rose-500 font-medium">{errors.salary}</p>
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.salary}</p>
               )}
             </div>
 
             {/* Join Date */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Join Date
               </label>
               <input
                 type="date"
                 value={formData.joinDate}
                 onChange={(e) => handleInputChange("joinDate", e.target.value)}
-                className={getInputClass("joinDate") + " cursor-pointer"}
+                className={`${getInputClass("joinDate")} cursor-pointer`}
               />
               {errors.joinDate && (
-                <p className="text-[10px] text-rose-500 font-medium">{errors.joinDate}</p>
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.joinDate}</p>
               )}
             </div>
 
-            {/* Access Role */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            {/* Custom Styled Access Role Dropdown */}
+            <div className="space-y-1.5 relative" ref={roleRef}>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Access Role
               </label>
-              <select
-                value={formData.role}
-                onChange={(e) => handleInputChange("role", e.target.value)}
-                className={getInputClass("role") + " cursor-pointer"}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRoleOpen(!isRoleOpen);
+                  setIsDeptOpen(false);
+                  setIsStatusOpen(false);
+                }}
+                className={`${getInputClass("role")} flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
-                <option value="employee">Employee</option>
-                <option value="admin">HR Admin</option>
-              </select>
+                <span>{ROLES.find(r => r.value === formData.role)?.label || "Employee"}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isRoleOpen ? "rotate-180" : ""}`} />
+              </button>
+              
+              {isRoleOpen && (
+                <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {ROLES.map((role) => (
+                    <button
+                      key={role.value}
+                      type="button"
+                      onClick={() => {
+                        handleInputChange("role", role.value);
+                        setIsRoleOpen(false);
+                      }}
+                      className={`dropdown-option ${
+                        formData.role === role.value ? "dropdown-option-active" : ""
+                      }`}
+                    >
+                      {role.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Status Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            {/* Custom Styled Status Dropdown */}
+            <div className="space-y-1.5 relative" ref={statusRef}>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
                 Initial Status
               </label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleInputChange("status", e.target.value)}
-                className={getInputClass("status") + " cursor-pointer"}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  setIsDeptOpen(false);
+                  setIsRoleOpen(false);
+                }}
+                className={`${getInputClass("status")} flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
-                <option value="Active">Active</option>
-                <option value="On Leave">On Leave</option>
-              </select>
+                <span>{formData.status}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isStatusOpen ? "rotate-180" : ""}`} />
+              </button>
+              
+              {isStatusOpen && (
+                <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {STATUSES.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        handleInputChange("status", status);
+                        setIsStatusOpen(false);
+                      }}
+                      className={`dropdown-option ${
+                        formData.status === status ? "dropdown-option-active" : ""
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>
 
           {/* Actions Bottom Bar */}
-          <div className="flex justify-end items-center gap-2 pt-4 border-t border-slate-100 shrink-0">
+          <div className="flex justify-end items-center gap-2 pt-4 border-t border-[var(--color-line-subtle)] shrink-0">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-slate-700 rounded-lg border border-slate-200 transition"
+              className="px-4.5 py-2.5 text-xs font-bold text-[var(--color-content-secondary)] bg-[var(--color-surface-main)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)] rounded-xl border border-[var(--color-line-subtle)] transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm hover:shadow-purple-100 transition duration-150 active:scale-[0.98]"
+              className="px-4.5 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] cursor-pointer"
             >
               Create Profile
             </button>

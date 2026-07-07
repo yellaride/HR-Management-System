@@ -31,14 +31,12 @@ body {
 }
 
 :root {
-  /* Default professional typography scale */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ensure headings use consistent weights/sizes */
 h1,
 h2,
 h3 {
@@ -50,49 +48,194 @@ p {
   font-weight: 400;
 }
 
-/* 3. Interactive Component Utilities (Button Schema) */
+/* 3. Semantic Landing Layout & Page Utilities */
 
-/* HIGH PROMINENCE - Core brand call-to-action */
+@utility landing-container {
+  @apply min-h-screen flex flex-col justify-between selection:bg-[var(--color-brand-subtle)] selection:text-[var(--color-brand-accent)] bg-[var(--color-surface-main)];
+}
+
+@utility header-nav {
+  @apply w-full py-5 px-6 md:px-12 border-b border-[var(--color-line-subtle)] bg-[var(--color-surface-card)]/80 backdrop-blur-md sticky top-0 z-50;
+}
+
+@utility brand-logo-box {
+  @apply w-9 h-9 rounded-lg bg-[var(--color-brand-accent)] flex items-center justify-center text-white font-bold text-lg shadow-sm;
+}
+
+@utility landing-main-grid {
+  @apply flex-grow flex items-center justify-center px-4 py-8 md:py-16 max-w-7xl mx-auto w-full;
+}
+
+@utility hero-panel {
+  @apply lg:col-span-7 flex flex-col justify-between relative rounded-2xl overflow-hidden min-h-[400px] lg:min-h-[550px] p-8 md:p-12 shadow-sm border border-[var(--color-line-subtle)] bg-[var(--color-surface-card)];
+}
+
+@utility hero-overlay {
+  @apply absolute inset-0 z-0 bg-gradient-to-tr from-[#181124]/95 via-[#534a60]/85 to-[#7c3aed]/40 mix-blend-multiply;
+}
+
+@utility hero-badge {
+  @apply relative z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-[var(--color-brand-accent)]/20 border border-[var(--color-brand-accent)]/35 text-[var(--color-brand-subtle)] backdrop-blur-sm uppercase tracking-widest;
+}
+
+@utility form-side-wrapper {
+  @apply lg:col-span-5 flex flex-col justify-center;
+}
+
+@utility form-card {
+  @apply bg-[var(--color-surface-card)] rounded-2xl border border-[var(--color-line-subtle)] p-8 md:p-10 shadow-sm;
+}
+
+@utility segmented-control {
+  @apply relative flex bg-[var(--color-surface-main)] p-1 rounded-xl mb-8 border border-[var(--color-line-subtle)];
+}
+
+@utility segmented-slider {
+  @apply absolute top-1 bottom-1 rounded-lg bg-[var(--color-surface-card)] shadow-xs border border-[var(--color-line-subtle)]/40 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)];
+}
+
+/* Remove any unintended vertical slider/track UI artifacts (used by segmented control styles) */
+@utility vertical-slider-reset {
+  @apply [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none];
+}
+
+
+@utility segmented-btn {
+  @apply relative z-10 flex-1 py-2.5 text-xs font-semibold rounded-lg transition-colors duration-200 text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)];
+}
+
+@utility segmented-btn-active {
+  @apply text-[var(--color-brand-accent)]!;
+}
+
+@utility footer-container {
+  @apply w-full py-6 px-6 md:px-12 border-t border-[var(--color-line-subtle)] bg-[var(--color-surface-card)]/50;
+}
+
+/* 4. Interactive Component Utilities (Button Schema) */
+
+@utility panel {
+  @apply bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl shadow-sm;
+}
+
+@utility panel-section {
+  @apply p-5;
+}
+
+@utility panel-header {
+  @apply flex items-center gap-2 pb-2 border-b border-[var(--color-line-subtle)];
+}
+
+@utility panel-header-title {
+  @apply text-xs font-bold text-[var(--color-content-main)] tracking-wide uppercase;
+}
+
+@utility field-label {
+  @apply text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)];
+}
+
+@utility section-title {
+  @apply text-xs font-bold text-[var(--color-content-main)] tracking-wide uppercase;
+}
+
+@utility muted-text {
+  @apply text-[var(--color-content-secondary)] font-normal;
+}
+
+@utility icon-button {
+  @apply inline-flex items-center justify-center p-2 rounded-lg transition
+         bg-[var(--color-surface-main)] hover:bg-[var(--color-surface-card)]
+         border border-[var(--color-line-subtle)] text-[var(--color-content-secondary)];
+}
+
+@utility alert-info {
+  @apply w-full flex items-start gap-2 p-2.5 rounded-lg bg-blue-50/50 border border-blue-100 text-left;
+}
+
+@utility alert-warn {
+  @apply w-full flex items-start gap-2 p-2.5 rounded-lg bg-amber-50/50 border border-amber-100 text-left;
+}
+
+@utility table-card {
+  @apply bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl shadow-sm overflow-hidden;
+}
+
+@utility table-head {
+  @apply bg-[var(--color-surface-main)]/60 border-b border-[var(--color-line-subtle)] text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)];
+}
+
+@utility table-row-hover {
+  @apply hover:bg-[var(--color-surface-main)]/50 transition;
+}
+
+@utility table-cell {
+  @apply px-6 py-4;
+}
+
+@utility status-pill {
+  @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border;
+}
+
+@utility btn-table-download {
+  @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition;
+}
+
 @utility btn-brand-filled {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
          bg-[var(--color-brand-accent)] text-white shadow-sm hover:bg-[var(--color-brand-hover)] hover:shadow-md hover:-translate-y-0.5
          focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-main)];
 }
 
-/* MEDIUM PROMINENCE - Modern subtle light-violet action background */
 @utility btn-brand-subtle {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
-         bg-brand-subtle/60 text-brand-accent border border-brand-subtle
-         hover:bg-brand-subtle hover:text-brand-hover hover:shadow-sm hover:-translate-y-0.5
-         focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
+         bg-[var(--color-brand-subtle)]/60 text-[var(--color-brand-accent)] border border-[var(--color-brand-subtle)]
+         hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-hover)] hover:shadow-sm hover:-translate-y-0.5
+         focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-main)];
 }
 
-/* LOW PROMINENCE - Clean outline style for standard secondary actions */
 @utility btn-outline {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
-         bg-[var(--color-surface-card)] text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] shadow-sm
+         bg-[var(--color-surface-card)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] shadow-sm
          hover:bg-[var(--color-surface-main)] hover:text-[var(--color-content-main)] hover:border-[var(--color-content-secondary)] hover:-translate-y-0.5
-         focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main;
+         focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-main)];
 }
 
-/* MINIMAL PROMINENCE - Borderless hover-reactive button */
 @utility btn-ghost {
   @apply w-full inline-flex items-center justify-center px-6 py-3.5 rounded-lg font-medium text-sm transition-all duration-300
-         bg-transparent text-content-secondary hover:text-content-main hover:bg-surface-main
-         focus:outline-none focus:ring-2 focus:ring-line-subtle focus:ring-offset-2 focus:ring-offset-surface-main;
+         bg-transparent text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)] hover:bg-[var(--color-surface-main)]
+         focus:outline-none focus:ring-2 focus:ring-[var(--color-line-subtle)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-main)];
 }
 
-/* Unified Form Input Fields matching the Custom Token System */
 @utility form-input {
   @apply w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-sm text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)];
 }
 
-/* Focus-only variant used by multiple auth/admin forms */
+/* 7. Global Purple Dropdown Schema (reusable across admin modals) */
+
+@utility dropdown-trigger {
+  @apply w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] transition-all duration-200 shadow-sm outline-none cursor-pointer;
+}
+
+@utility dropdown-panel {
+  @apply bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl shadow-lg py-1 z-50;
+}
+
+
+
+
+@utility dropdown-option {
+  @apply w-full px-4 py-2 text-xs text-left font-semibold transition-colors cursor-pointer block text-[var(--color-content-secondary)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)];
+}
+
+@utility dropdown-option-active {
+  @apply bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)];
+}
+
+
 @utility auth-input-focus {
   @apply focus:outline-none focus:ring-4 focus:ring-[var(--color-brand-accent)]/15 focus:border-[var(--color-brand-accent)]/90;
 }
 
-/* Variant designed to offset content for left-aligned icons */
 @utility form-input-with-icon {
   @apply form-input pl-10;
 }

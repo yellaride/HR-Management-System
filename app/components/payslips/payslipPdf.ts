@@ -1,3 +1,5 @@
+import { siteConfig } from "@/lib/siteConfig";
+
 export interface PayslipRecord {
   _id: string;
   employeeId?: { _id?: string; name?: string; jobTitle?: string } | string | null;
@@ -52,13 +54,14 @@ export async function downloadPayslipPdf({
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text("YOUR COMPANY NAME", 20, 25);
+  doc.text(siteConfig.companyName, 20, 25);
 
   doc.setFontSize(8.5);
   doc.setFont("Helvetica", "normal");
   doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
-  doc.text("123 Corporate Blvd, Suite 100", 20, 31);
-  doc.text("hr@yourcompany.com | +1 (555) 019-2834", 20, 36);
+  doc.text(siteConfig.companyAddress, 20, 31);
+  doc.text(`${siteConfig.companyEmail} | ${siteConfig.companyPhone}`, 20, 36);
+
 
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.5);

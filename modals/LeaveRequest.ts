@@ -1,0 +1,35 @@
+import { Schema, model, models } from "mongoose";
+
+const LeaveSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+
+    // Used by admin UI (Leave Manager) to display who requested the leave and their role/title.
+    employeeName: { type: String, required: false, trim: true, default: "" },
+    role: { type: String, required: false, trim: true, default: "" },
+
+    type: {
+      type: String,
+      required: true,
+      enum: ["ANNUAL", "SICK", "CASUAL", "UNPAID"],
+      uppercase: true,
+      trim: true,
+    },
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    days: { type: Number, required: true, min: 1 },
+    reason: { type: String, required: true, trim: true },
+    status: {
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING",
+      uppercase: true,
+      trim: true,
+    },
+  },
+  { timestamps: true }
+);
+
+const Leave = models.Leave || model("Leave", LeaveSchema);
+export default Leave;
+

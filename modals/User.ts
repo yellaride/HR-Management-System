@@ -22,6 +22,10 @@ const UserSchema = new Schema(
       enum: ["employee", "admin"],
       default: "employee",
     },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

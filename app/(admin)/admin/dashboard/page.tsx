@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-
+import React, { useState, useEffect } from "react";
 import {
   Users,
   Layers,
@@ -14,10 +13,41 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/app/components/admin/StatCard";
 import AddEmployeeModal from "@/app/components/admin/AddEmployeeModal";
+import Link from "next/link";
+import { RecentActivityPanel } from "@/app/components/admin/RecentActivityPanel";
+
+function getFriendlyErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+  const lower = error.toLowerCase();
+  
+  if (lower.includes("failed to fetch") || lower.includes("networkerror")) {
+    return "Unable to connect to the server. Please check your network connection and try again.";
+  }
+  if (lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("401") || lower.includes("403")) {
+    return "Your authorization has expired or you do not have permission. Please sign in again.";
+  }
+  if (lower.includes("not found") || lower.includes("404")) {
+    return "The requested information could not be found. Please refresh and try again.";
+  }
+  if (lower.includes("unique") || lower.includes("already exists") || lower.includes("duplicate")) {
+    return "An employee account with this email address is already registered.";
+  }
+  if (lower.includes("validation") || lower.includes("required") || lower.includes("invalid input")) {
+    return "Please verify that all fields are filled out correctly before saving.";
+  }
+  return "Something went wrong while processing this action. Please try again shortly.";
+}
 
 export default function AdminDashboardPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState("");
+
+  // Resolves Next.js server-to-client hydration lag and displays the current live date
+  useEffect(() => {
+    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
+    setCurrentDate(new Date().toLocaleDateString("en-US", options));
+  }, []);
 
   const handleCreateEmployee = async (data: {
     name: string;
@@ -51,7 +81,6 @@ export default function AdminDashboardPage() {
             serverErrorMsg = text || serverErrorMsg;
           }
         } catch (_) {}
-
         throw new Error(serverErrorMsg);
       }
 
@@ -67,27 +96,40 @@ export default function AdminDashboardPage() {
   const [dashboardStats, setDashboardStats] = useState<{
     totalEmployees: number;
     totalDepartments: number;
+    pendingLeaves: number;
+    todayAttendancePercent: number;
+    presentToday: number;
   } | null>(null);
+  
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const loadStats = async () => {
       try {
         setStatsLoading(true);
         setStatsError(null);
 
-        const res = await fetch("/api/admin/dashboard/stats", { cache: "no-store" });
+        const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load dashboard stats");
         const data = await res.json();
 
         setDashboardStats({
           totalEmployees: Number(data.totalEmployees) || 0,
           totalDepartments: Number(data.totalDepartments) || 0,
+          pendingLeaves: typeof data.pendingLeaves === "number" ? data.pendingLeaves : 0,
+          todayAttendancePercent: typeof data.todayAttendancePercent === "number" ? data.todayAttendancePercent : 0,
+          presentToday: typeof data.presentToday === "number" ? data.presentToday : 0,
         });
       } catch (e: any) {
         setStatsError(e?.message || "Failed to load dashboard stats");
-        setDashboardStats({ totalEmployees: 0, totalDepartments: 0 });
+        setDashboardStats({
+          totalEmployees: 0,
+          totalDepartments: 0,
+          pendingLeaves: 0,
+          todayAttendancePercent: 0,
+          presentToday: 0,
+        });
       } finally {
         setStatsLoading(false);
       }
@@ -96,7 +138,7 @@ export default function AdminDashboardPage() {
     loadStats();
   }, []);
 
-  // Statistics (live for employee/department, mocked for others)
+  // System statistics structured with custom variables for visual cohesion
   const stats = [
     {
       label: "Total Employees",
@@ -105,108 +147,75 @@ export default function AdminDashboardPage() {
       isPositive: true,
       changeText: "vs last month",
       icon: Users,
-      colorClass: "bg-indigo-50/80 text-indigo-600 border-indigo-100/80",
+      colorClass: "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-line-subtle)]",
     },
     {
       label: "Total Departments",
       value: statsLoading ? "—" : String(dashboardStats?.totalDepartments ?? 0),
       change: "Active",
       isPositive: true,
-      changeText: "2 cross-functional",
+      changeText: "In administration",
       icon: Layers,
-      colorClass: "bg-sky-50/80 text-sky-600 border-sky-100/80",
+      colorClass: "bg-[var(--color-brand-subtle)]/40 text-[var(--color-brand-hover)] border-[var(--color-line-subtle)]/60",
     },
     {
       label: "Today's Attendance",
-      value: "94.6%",
+      value: statsLoading ? "—" : `${dashboardStats?.todayAttendancePercent ?? 0}%`,
       change: "+1.2%",
       isPositive: true,
-      changeText: "134 present today",
+      changeText: `${dashboardStats?.presentToday ?? 0} present today`,
       icon: CalendarCheck,
-      colorClass: "bg-emerald-50/80 text-emerald-600 border-emerald-100/80",
+      colorClass: "bg-emerald-50/80 text-emerald-700 border-emerald-100/80",
     },
     {
       label: "Pending Leaves",
-      value: "12",
-      change: "4 Urgent",
+      value: statsLoading ? "—" : String(dashboardStats?.pendingLeaves ?? 0),
+      change: "Action Required",
       isPositive: false,
-      changeText: "Requires review",
+      changeText: "Requires standard review",
       icon: Clock,
-      colorClass: "bg-amber-50/80 text-amber-600 border-amber-100/80",
+      colorClass: "bg-amber-50/80 text-amber-700 border-amber-100/80",
     },
   ];
 
-
-  // Mock Recent Activities with Initials and Specific Colors
-  const recentActivities = [
-    {
-      id: 1,
-      user: "Liam Parker",
-      action: "checked in for the day",
-      time: "10 mins ago",
-      type: "attendance",
-      initials: "LP",
-      avatarBg: "bg-emerald-100 text-emerald-800",
-    },
-    {
-      id: 2,
-      user: "Sophia Martinez",
-      action: "submitted a sick leave request",
-      time: "1 hour ago",
-      type: "leave",
-      initials: "SM",
-      avatarBg: "bg-amber-100 text-amber-800",
-    },
-    {
-      id: 3,
-      user: "Alexander Wright",
-      action: "uploaded signed payslip contract",
-      time: "3 hours ago",
-      type: "payslip",
-      initials: "AW",
-      avatarBg: "bg-indigo-100 text-indigo-800",
-    },
-    {
-      id: 4,
-      user: "Emma Watson",
-      action: "updated profile coordinates",
-      time: "5 hours ago",
-      type: "profile",
-      initials: "EW",
-      avatarBg: "bg-slate-100 text-slate-800",
-    },
-  ];
+  
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-16">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+    <div className="min-h-screen bg-[var(--color-surface-main)] pb-16">
+      <div className="px-2 py-6 space-y-6 w-full">
+        
         {/* 1. Dashboard Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+              <span className="h-2 w-2 rounded-full bg-[var(--color-brand-accent)] animate-pulse" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-accent)]">
                 HR Operations Portal
               </span>
             </div>
-            <h1 className="text-3xl font-bold text-slate-950 tracking-tight mt-1">
+            <h1 className="text-3xl font-extrabold text-[var(--color-content-main)] tracking-tight mt-1">
               Admin Dashboard
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[var(--color-content-secondary)]">
               Overview and quick actions for real-time employee directory operations.
+              {statsError && (
+                <span className="block mt-2 text-xs text-amber-600 font-medium">
+                  ⚠️ {getFriendlyErrorMessage(statsError)}
+                </span>
+              )}
             </p>
           </div>
 
-          {/* Header Actions */}
+          {/* Header Actions Displaying the Dynamic Current Date */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 shadow-sm">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>June 17, 2026</span>
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs font-bold text-[var(--color-brand-accent)] shadow-sm">
+              <Calendar className="w-4 h-4 text-[var(--color-brand-accent)]" />
+              <span>{currentDate || "Loading Date..."}</span>
             </div>
           </div>
         </div>
 
-        {/* 2. Counter Cards Grid (4 columns) */}
+        {/* 2. Counter Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, idx) => (
             <StatCard
@@ -224,68 +233,34 @@ export default function AdminDashboardPage() {
 
         {/* 3. Secondary Row: Recent Activities & Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
           {/* Left Sub-grid: Recent Activities (Col-span-2) */}
-          <div className="lg:col-span-2 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between gap-6">
-            <div>
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Recent System Activity</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Real-time log of administrative events.</p>
-                </div>
-                <button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition">
-                  View All Activity
-                </button>
-              </div>
+          {/* Left Sub-grid: Recent Activities (Col-span-2) */}
+<div className="lg:col-span-2 panel p-6 flex flex-col justify-between gap-6 min-w-0">
+<div className="min-w-0">
+    <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+      <div>
+        <h2 className="text-base font-semibold text-[var(--color-content-main)]">Recent System Activity</h2>
+        <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Real-time log of administrative events.</p>
+      </div>
+      <Link href="/admin/activity" className="text-xs font-semibold text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] transition cursor-pointer">
+        View All Activity
+      </Link>
+    </div>
 
-              <div className="divide-y divide-slate-100 mt-2">
-                {recentActivities.map((act) => (
-                  <div
-                    key={act.id}
-                    className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm"
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Avatar Initials Badge */}
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 select-none ${
-                          act.avatarBg
-                        }`}
-                      >
-                        {act.initials}
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                        <span className="font-semibold text-slate-900">{act.user}</span>
-                        <span className="text-slate-500 text-xs sm:text-sm">{act.action}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 sm:pl-0 pl-11">
-                      {/* Activity Indicator Dot */}
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          act.type === "attendance"
-                            ? "bg-emerald-500"
-                            : act.type === "leave"
-                              ? "bg-amber-500"
-                              : act.type === "payslip"
-                                ? "bg-indigo-500"
-                                : "bg-slate-400"
-                        }`}
-                      />
-                      <span className="text-xs text-slate-400 font-medium">{act.time}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+    {/* Live database backed Activity Feed */}
+    <div className="mt-2">
+      <RecentActivityPanel />
+    </div>
+  </div>
+</div>
 
           {/* Right Sub-grid: Quick HR Actions Panel */}
-          <div className="lg:col-span-1 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5 flex flex-col justify-between">
+          <div className="lg:col-span-1 panel p-6 space-y-5 flex flex-col justify-between">
             <div className="space-y-4">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Quick Actions</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Direct shortcuts to common HR tasks.</p>
+                <h2 className="text-base font-semibold text-[var(--color-content-main)]">Quick Actions</h2>
+                <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Direct shortcuts to common HR tasks.</p>
               </div>
 
               <div className="space-y-3">
@@ -297,58 +272,61 @@ export default function AdminDashboardPage() {
                     setIsAddModalOpen(true);
                   }}
                   aria-label="Add New Employee"
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/70 border border-slate-200 hover:border-slate-300 transition text-left group"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 group-hover:bg-indigo-100 transition-colors">
+                    <div className="p-2.5 bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] rounded-lg border border-[var(--color-brand-subtle)] group-hover:bg-[var(--color-brand-accent)] group-hover:text-white transition-all duration-200">
                       <UserPlus className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-xs text-slate-800 block">Add New Employee</span>
-                      <span className="text-[11px] text-slate-500">Register new directory profiles</span>
+                      <span className="font-semibold text-xs text-[var(--color-content-main)] block">Add New Employee</span>
+                      <span className="text-[11px] text-[var(--color-content-secondary)]">Register new directory profiles</span>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
                 </button>
 
-                {/* Action 2: Process Leave Approvals - Redirects */}
+                {/* Action 2: Process Leave Approvals */}
                 <a
                   href="/admin/leaves"
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/70 border border-slate-200 hover:border-slate-300 transition text-left group"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-100 group-hover:bg-amber-100 transition-colors">
+                    <div className="p-2.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-100 group-hover:bg-amber-500 group-hover:text-white transition-all duration-200">
                       <Clock className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-xs text-slate-800 block">Manage Leave Requests</span>
-                      <span className="text-[11px] text-slate-500">Approve or deny applications</span>
+                      <span className="font-semibold text-xs text-[var(--color-content-main)] block">Manage Leave Requests</span>
+                      <span className="text-[11px] text-[var(--color-content-secondary)]">Approve or deny applications</span>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
                 </a>
 
-                {/* Action 3: Review Payslips - Redirects */}
+                {/* Action 3: Review Payslips */}
                 <a
                   href="/admin/payslips"
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/70 border border-slate-200 hover:border-slate-300 transition text-left group"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 group-hover:bg-emerald-100 transition-colors">
+                    <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-200">
                       <FileSpreadsheet className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-xs text-slate-800 block">Review Salary Payslips</span>
-                      <span className="text-[11px] text-slate-500">Dispatch salary and tax records</span>
+                      <span className="font-semibold text-xs text-[var(--color-content-main)] block">Review Salary Payslips</span>
+                      <span className="text-[11px] text-[var(--color-content-secondary)]">Dispatch salary and tax records</span>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
                 </a>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 text-center">
-                <span className="text-xs text-slate-400">
-                  Need help? Read the <a href="#" className="text-indigo-600 hover:underline">HR Playbook</a>
+              <div className="pt-4 border-t border-[var(--color-line-subtle)] text-center">
+                <span className="text-xs text-[var(--color-content-muted)]">
+                  Need help? Read the{" "}
+                  <a href="#" className="text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] hover:underline transition">
+                    HR Playbook
+                  </a>
                 </span>
               </div>
             </div>
@@ -362,11 +340,10 @@ export default function AdminDashboardPage() {
             setIsAddModalOpen(false);
             setAddEmployeeError(null);
           }}
-          errorMessage={addEmployeeError}
+          errorMessage={getFriendlyErrorMessage(addEmployeeError)}
           onSave={handleCreateEmployee}
         />
       </div>
     </div>
   );
 }
-

@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+   experimental: {
+    turbopackFileSystemCacheForDev: false, // Prevents compilation caching lockups
+  },
 };
 
 export default nextConfig;

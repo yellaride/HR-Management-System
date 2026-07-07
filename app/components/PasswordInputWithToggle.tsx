@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useId, useState } from "react";
@@ -8,6 +9,7 @@ interface PasswordInputWithToggleProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  leftIcon?: React.ReactNode;
   inputClassName?: string;
 }
 
@@ -17,20 +19,28 @@ export default function PasswordInputWithToggle({
   onChange,
   placeholder,
   disabled,
-  inputClassName,
+  leftIcon,
+  inputClassName = "form-input",
 }: PasswordInputWithToggleProps) {
   const [show, setShow] = useState(false);
   const id = useId();
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       {label && (
-        <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <label htmlFor={id} className="field-label block text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
           {label}
         </label>
       )}
 
       <div className="relative">
+        {/* Left Side Icon Slot */}
+        {leftIcon && (
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            {leftIcon}
+          </div>
+        )}
+
         <input
           id={id}
           type={show ? "text" : "password"}
@@ -39,22 +49,23 @@ export default function PasswordInputWithToggle({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={inputClassName}
+          className={`${inputClassName} ${leftIcon ? "pl-10" : "pl-3.5"} pr-11`}
         />
 
+        {/* Visibility Toggle Button */}
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
           disabled={disabled}
-          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[var(--color-content-muted)] hover:text-[var(--color-content-secondary)] transition-colors focus:outline-none"
+          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[var(--color-content-muted)] hover:text-[var(--color-content-secondary)] transition-colors focus:outline-none disabled:opacity-50"
           aria-label={show ? "Hide password" : "Show password"}
         >
           {show ? (
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="2.5"
               viewBox="0 0 24 24"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -66,10 +77,10 @@ export default function PasswordInputWithToggle({
             </svg>
           ) : (
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="2.5"
               viewBox="0 0 24 24"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -90,4 +101,3 @@ export default function PasswordInputWithToggle({
     </div>
   );
 }
-

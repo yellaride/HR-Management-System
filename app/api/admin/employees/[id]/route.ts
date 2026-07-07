@@ -38,10 +38,11 @@ export async function PUT(
     }
 
     // 3. Update Employee profile details
-    employee.name = name || employee.name;
+    employee.name = typeof name === "string" && name.trim() ? name.trim() : employee.name;
 
-    // new fields
-    employee.designation = designation || employee.designation || employee.jobTitle || "";
+    employee.designation = typeof designation === "string" && designation.trim()
+      ? designation.trim()
+      : employee.designation || employee.jobTitle || "";
     employee.joinDate = joinDate ? new Date(joinDate) : employee.joinDate;
     
     // salary
@@ -69,7 +70,7 @@ export async function PUT(
       status: employee.status,
       designation: employee.designation,
       joinDate: employee.joinDate ? employee.joinDate.toISOString() : undefined,
-      salary: employee.salary,
+      salary: typeof employee.salary === "number" ? employee.salary : (employee.salary ? Number(employee.salary) : undefined),
     };
 
 

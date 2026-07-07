@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+
 import Link from "next/link";
+
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 
@@ -9,7 +12,7 @@ interface SidebarProps {
   role?: "admin" | "employee";
 }
 
-// 1. Navigation items with visual SVG icons for both Admin and Employee roles
+// Navigation items with visual SVG icons for both Admin and Employee roles
 const navItems = {
   admin: [
     {
@@ -45,6 +48,25 @@ const navItems = {
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      href: "/admin/leaves-policy",
+      label: "Leaves Policy",
+      icon: (
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+    },
+    {
+      href: "/admin/activity",
+      label: "Activity",
+      icon: (
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v8z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 8h10M7 12h6" />
         </svg>
       ),
     },
@@ -88,11 +110,20 @@ const navItems = {
       ),
     },
     {
-      href: "/employee/leave",
+      href: "/employee/leaves-request",
       label: "Leave",
       icon: (
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      href: "/employee/payslip-employee",
+      label: "Payslips",
+      icon: (
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
     },
@@ -104,58 +135,69 @@ export default function Sidebar({ role }: SidebarProps) {
   const router = useRouter();
   const { data: session } = useSession();
 
-  // 1. Safe role detection from session with lowercase conversion (e.g., "ADMIN" -> "admin")
-  const sessionRole = session?.user?.role?.toLowerCase();
+  // Desktop-only collapsible behavior
+  // State persists across navigation; default expanded.
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Watch for session errors (such as Token/Session expiration from global logout)
+
+  useEffect(() => {
+    if (session?.error === "SessionExpired") {
+      // Clear local session storage and redirect to the home page securely
+      signOut({ callbackUrl: "/" });
+    }
+  }, [session]);
+
+  // 1. Safe role detection from session
+  const sessionRole = session?.user?.role?.trim().toLowerCase();
   const isAdminFromSession = sessionRole === "admin";
   const isEmployeeFromSession = sessionRole === "employee";
 
-  // 2. Active fallback role based strictly on the URL path
+  // 2. Fallback path-based role
   const fallbackPathRole: "admin" | "employee" = 
     pathname.startsWith("/admin") ? "admin" : "employee";
 
-  // 3. Determine final display role
-  // Priority: 1. Current session role -> 2. Optional role prop -> 3. Path prefix fallback
+  // 3. Determine final display role with the prop 'role' prioritized first
   const displayRole: "admin" | "employee" =
-    (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
     role ||
+    (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
     fallbackPathRole;
 
   const activeNavItems = navItems[displayRole];
 
-  // 4. Select visual profile variables based on active roles
+  // 4. Default mock data matching the display context
   const defaultProfile =
     displayRole === "admin"
       ? { name: "Admin User", email: "admin@vibeflow.com", avatarLabel: "AD" }
       : { name: "Employee User", email: "employee@vibeflow.com", avatarLabel: "EM" };
 
+  // 5. Ensure profile name, email, and role match the context of the sidebar layout being viewed
+  const matchesActiveContext = sessionRole === displayRole;
   const currentProfile = {
-    name: session?.user?.name || defaultProfile.name,
-    email: session?.user?.email || defaultProfile.email,
+    role: displayRole,
+    name: matchesActiveContext && session?.user?.name ? session.user.name : defaultProfile.name,
+    email: matchesActiveContext && session?.user?.email ? session.user.email : defaultProfile.email,
     avatarLabel: defaultProfile.avatarLabel,
   };
 
   return (
-    <aside className="w-full min-w-0 lg:w-[260px] h-auto lg:h-screen lg:max-h-screen flex flex-col justify-between bg-slate-900 border-r border-slate-800 text-slate-100 p-5 shadow-xl select-none overflow-hidden">
+<aside className="w-full min-w-0 lg:w-[220px] h-auto lg:h-screen lg:max-h-screen flex flex-col justify-between bg-slate-900 border-r border-slate-800 text-slate-100 p-5 shadow-xl select-none overflow-hidden">
       {/* Upper Section: Profile Header & Navigation */}
       <div className="flex flex-col gap-8">
         
         {/* Dynamic Profile Section */}
         <div className="flex items-center gap-3.5 p-2 rounded-xl bg-slate-800/50 border border-slate-800/40">
           <div className="relative">
-            {/* Visual Avatar with Status Dot */}
-            <div className={`w-11 h-11 rounded-xl bg-gradient-to-tr ${
-              displayRole === "admin" 
-                ? "from-brand-accent to-purple-600" 
-                : "from-sky-500 to-indigo-600"
-            } flex items-center justify-center font-bold text-white shadow-md text-sm border border-white/10`}>
+            {/* Unified Gradient on Profile Avatar matches Website Primary Purple Accent */}
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-brand-accent to-purple-600 flex items-center justify-center font-bold text-white shadow-md text-sm border border-white/10">
               {currentProfile.avatarLabel}
             </div>
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 shadow-sm" />
           </div>
 
-          <div className="flex flex-col overflow-hidden">
+          <div className="flex flex-col overflow-hidden min-w-0">
             <span className="font-bold text-sm tracking-tight text-white leading-tight truncate">
-              {currentProfile.name}
+              {displayRole === "admin" ? "Admin User" : "Employee User"}
             </span>
             <span className="text-[11px] text-slate-400 font-medium truncate leading-tight mt-0.5">
               {currentProfile.email}
@@ -173,7 +215,6 @@ export default function Sidebar({ role }: SidebarProps) {
           <nav className="space-y-1">
             <ul className="space-y-1">
               {activeNavItems.map((item) => {
-                // Ensure correct active state matching regardless of exact subdirectory layout
                 const isActive = pathname === item.href;
 
                 return (
@@ -181,10 +222,8 @@ export default function Sidebar({ role }: SidebarProps) {
                     <Link
                       href={item.href}
                       className={`flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-150 ${
-                      isActive
-                          ? displayRole === "admin"
-                            ? "bg-brand-accent text-white shadow-sm shadow-brand-accent/20"
-                            : "bg-sky-500 text-white shadow-sm shadow-sky-500/20"
+                        isActive
+                          ? "bg-brand-accent text-white shadow-sm shadow-brand-accent/20"
                           : "text-slate-400 hover:text-white hover:bg-slate-800/60"
                       }`}
                     >
@@ -204,7 +243,6 @@ export default function Sidebar({ role }: SidebarProps) {
         <button
           type="button"
           onClick={async () => {
-            // NextAuth logout + redirect to main page
             await signOut({ redirect: false });
             router.push("/");
             router.refresh();

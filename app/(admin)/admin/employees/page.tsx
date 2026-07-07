@@ -7,6 +7,34 @@ import EditEmployeeModal from "../../../components/admin/EditEmployeeModal";
 import ViewEmployeeModal from "../../../components/admin/ViewEmployeeModal";
 import EmptyState from "../../../components/admin/EmptyState";
 
+/**
+ * Translates raw backend errors, database codes, or network issues 
+ * into clear, polite, and user-friendly messages.
+ */
+function getFriendlyErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+
+  const lower = error.toLowerCase();
+  
+  if (lower.includes("failed to fetch") || lower.includes("networkerror")) {
+    return "Unable to connect to the server. Please check your network connection and try again.";
+  }
+  if (lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("401") || lower.includes("403")) {
+    return "Your authorization has expired or you do not have permission. Please sign in again.";
+  }
+  if (lower.includes("not found") || lower.includes("404")) {
+    return "The requested information could not be found. Please refresh and try again.";
+  }
+  if (lower.includes("unique") || lower.includes("already exists") || lower.includes("duplicate")) {
+    return "An employee account with this email address is already registered.";
+  }
+  if (lower.includes("validation") || lower.includes("required") || lower.includes("invalid input")) {
+    return "Please verify that all fields are filled out correctly before saving.";
+  }
+
+  return "Something went wrong while processing this action. Please try again shortly.";
+}
+
 export default function AdminEmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -19,11 +47,11 @@ export default function AdminEmployeesPage() {
   // Selected employee data
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  // loading & system page states
+  // Loading & system page states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // local state containers for safe modal form validation errors (stops global alert popups)
+  // Local state containers for safe modal form validation errors
   const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
   const [editEmployeeError, setEditEmployeeError] = useState<string | null>(null);
 
@@ -64,7 +92,6 @@ export default function AdminEmployeesPage() {
         body: JSON.stringify(data),
       });
 
-      // Robust response parsing: Checks if content is json, otherwise reads raw text
       let serverErrorMsg = "Failed to create profile.";
       if (!res.ok) {
         try {
@@ -84,7 +111,7 @@ export default function AdminEmployeesPage() {
       if (result.employee) {
         setEmployees((prev) => [result.employee, ...prev]);
         setAddEmployeeError(null);
-        setIsAddModalOpen(false); // Only close the modal on safe database success
+        setIsAddModalOpen(false);
       }
     } catch (err: any) {
       setAddEmployeeError(err.message || "An error occurred during registration.");
@@ -171,19 +198,19 @@ export default function AdminEmployeesPage() {
     <div className="space-y-6 pb-12">
       
       {/* Header Area */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-slate-200">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-line-subtle">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Employees</h1>
-          <p className="mt-1 text-xs text-slate-500">
+          <h1 className="text-2xl font-extrabold text-content-main tracking-tight font-sans">Employees</h1>
+          <p className="mt-1 text-xs text-content-secondary">
             Manage employee directory profiles, status actions, and structures.
           </p>
         </div>
 
-        {/* Action Panel with Purple Styling */}
+        {/* Action Panel with Unified Theme Colors */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative w-full sm:w-64">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-4 w-4 text-content-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
@@ -192,7 +219,7 @@ export default function AdminEmployeesPage() {
               placeholder="Search directory..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition duration-150"
+              className="block w-full pl-9 pr-3 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-accent/25 focus:border-brand-accent transition-all duration-150 shadow-sm"
             />
           </div>
 
@@ -201,7 +228,7 @@ export default function AdminEmployeesPage() {
               setAddEmployeeError(null);
               setIsAddModalOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-sm transition duration-150 active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98]"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -213,29 +240,29 @@ export default function AdminEmployeesPage() {
 
       {/* Directory Grid */}
       <div className="space-y-4">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        <div className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
           Directory List ({filteredEmployees.length})
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
-            <span className="text-slate-500 text-xs animate-pulse">Loading employee data...</span>
+          <div className="flex flex-col items-center justify-center p-12 bg-surface-card rounded-2xl border border-line-subtle shadow-sm">
+            <span className="text-content-secondary text-xs animate-pulse">Loading employee data...</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-rose-50 rounded-2xl border border-rose-200 text-rose-600">
-            <span className="text-xs font-semibold">Error: {error}</span>
+          <div className="flex flex-col items-center justify-center p-12 bg-amber-50/50 rounded-2xl border border-amber-100/80 text-amber-800 shadow-sm">
+            <span className="text-xs font-semibold text-center">{getFriendlyErrorMessage(error)}</span>
             <button 
               onClick={fetchEmployees}
-              className="mt-3 px-3 py-1 bg-rose-600 text-white text-[10px] rounded-lg hover:bg-rose-700 font-bold transition"
+              className="mt-3 px-3.5 py-1.5 bg-brand-accent hover:bg-brand-hover text-white text-[10px] font-bold rounded-lg shadow-sm transition-all duration-150 active:scale-[0.95]"
             >
-              Retry
+              Retry Loading Directory
             </button>
           </div>
         ) : employees.length === 0 ? (
           <EmptyState onAddClick={() => setIsAddModalOpen(true)} />
         ) : filteredEmployees.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-dashed border-slate-200">
-            <span className="text-slate-500 text-xs">No employees match your search query.</span>
+          <div className="flex flex-col items-center justify-center p-12 bg-surface-card rounded-2xl border border-dashed border-line-subtle">
+            <span className="text-content-secondary text-xs">No employees match your search query.</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -258,7 +285,7 @@ export default function AdminEmployeesPage() {
           setIsAddModalOpen(false);
           setAddEmployeeError(null);
         }}
-        errorMessage={addEmployeeError} 
+        errorMessage={getFriendlyErrorMessage(addEmployeeError)} 
         onSave={handleCreateEmployee}
       />
 
@@ -270,7 +297,7 @@ export default function AdminEmployeesPage() {
           setSelectedEmployee(null);
           setEditEmployeeError(null);
         }}
-        errorMessage={editEmployeeError}
+        errorMessage={getFriendlyErrorMessage(editEmployeeError)}
         employee={selectedEmployee}
         onSave={handleEditEmployee}
       />

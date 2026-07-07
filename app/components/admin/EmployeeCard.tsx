@@ -9,8 +9,10 @@ export interface Employee {
   status: string;
   // Additional employment fields (admin view)
   designation?: string;
-  joinDate?: string;
-  salary?: number;
+  joinDate?: string | null;
+  salary?: number | null;
+  joiningDate?: string | null;
+  salaryDate?: number | null;
 }
 
 

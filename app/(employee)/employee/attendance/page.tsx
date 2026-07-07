@@ -1,322 +1,320 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   LogIn, 
   LogOut, 
-  CheckCircle, 
-  AlertTriangle, 
-  Hourglass, 
-  Calendar, 
   Clock, 
-  Briefcase,
-  Play,
-  Square,
-  Coffee,
-  CheckCircle2,
-  XCircle
+  CheckCircle2, 
+  AlertTriangle,
+  History,
+  Timer,
+  AlertCircle
 } from "lucide-react";
 
-interface AttendanceLog {
-  id: number;
+interface AttendanceRecord {
+  _id: string;
   date: string;
   checkIn: string;
-  checkOut: string;
-  workingHours: string;
-  dayType: "Regular" | "Half Day" | "Weekend" | "Holiday";
-  status: "On Time" | "Late" | "Absent" | "In Progress" | "Off";
+  checkOut?: string;
+  workingHours?: number;
+  formattedDuration?: string;
+  status: "On Time" | "Late" | "Absent";
 }
 
-const initialLogs: AttendanceLog[] = [
-  { 
-    id: 1, 
-    date: "June 16, 2026", 
-    checkIn: "08:58 AM", 
-    checkOut: "05:42 PM", 
-    workingHours: "8h 44m", 
-    dayType: "Regular", 
-    status: "On Time" 
-  },
-  { 
-    id: 2, 
-    date: "June 15, 2026", 
-    checkIn: "09:42 AM", 
-    checkOut: "06:12 PM", 
-    workingHours: "8h 30m", 
-    dayType: "Regular", 
-    status: "Late" 
-  },
-  { 
-    id: 3, 
-    date: "June 14, 2026", 
-    checkIn: "—", 
-    checkOut: "—", 
-    workingHours: "—", 
-    dayType: "Weekend", 
-    status: "Off" 
-  },
-  { 
-    id: 4, 
-    date: "June 13, 2026", 
-    checkIn: "—", 
-    checkOut: "—", 
-    workingHours: "—", 
-    dayType: "Weekend", 
-    status: "Off" 
-  },
-  { 
-    id: 5, 
-    date: "June 12, 2026", 
-    checkIn: "09:05 AM", 
-    checkOut: "05:30 PM", 
-    workingHours: "8h 25m", 
-    dayType: "Regular", 
-    status: "On Time" 
-  },
-];
+function ClockWidget() {
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentTime(new Date());
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!currentTime) {
+    return <span className="text-sm font-bold text-content-main tabular-nums">--:--:--</span>;
+  }
+
+  return (
+    <span className="text-sm font-bold text-content-main tabular-nums">
+      {currentTime.toLocaleTimeString([], { 
+        hour: "2-digit", 
+        minute: "2-digit", 
+        second: "2-digit", 
+        hour12: true 
+      })}
+    </span>
+  );
+}
 
 export default function EmployeeAttendancePage() {
-  const [logs, setLogs] = useState<AttendanceLog[]>(initialLogs);
-  const [presentDays, setPresentDays] = useState(18);
-  const [lateArrivals, setLateArrivals] = useState(2);
-  const [avgHours, setAvgHours] = useState(8.3);
+  const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Clock-In/Out States
-  const [hasCheckedIn, setHasCheckedIn] = useState(false);
-  const [hasCheckedOut, setHasCheckedOut] = useState(false);
-  const [liveCheckIn, setLiveCheckIn] = useState("—");
-  const [liveCheckOut, setLiveCheckOut] = useState("—");
+  // States to hold the validation rules for the interactive UI buttons
+  const [isSunday, setIsSunday] = useState<boolean>(false);
+  const [isWithinWindow, setIsWithinWindow] = useState<boolean>(false);
 
-  // Clock-In Action
-  const handleCheckIn = () => {
-    if (hasCheckedIn) return;
+  // Validate operational hour rules dynamically (11:30 AM to 8:30 PM)
+  const evaluateTimeConstraints = useCallback(() => {
+    const now = new Date();
+    const day = now.getDay();
+    
+    if (day === 0) {
+      setIsSunday(true);
+      setIsWithinWindow(false);
+      return;
+    }
+    
+    setIsSunday(false);
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const currentMins = hours * 60 + minutes;
 
-    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setLiveCheckIn(timeString);
-    setHasCheckedIn(true);
+    const startLimit = 11 * 60 + 30; // 11:30 AM
+    const endLimit = 20 * 60 + 30;   // 8:30 PM
 
-    // Create a temporary "In Progress" log entry at the top of the table
-    const progressLog: AttendanceLog = {
-      id: Date.now(),
-      date: "June 17, 2026",
-      checkIn: timeString,
-      checkOut: "—",
-      workingHours: "—",
-      dayType: "Regular",
-      status: "In Progress"
-    };
+    setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
+  }, []);
 
-    setLogs([progressLog, ...logs]);
+  const fetchAttendanceData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent;
+    try {
+      if (!silent) setLoading(true);
+      const res = await fetch("/api/employee/attendance");
+      const data = await res.json();
+      if (res.ok) {
+        setTodayRecord(data.todayRecord || null);
+        setHistory(data.history || []);
+      } else {
+        setErrorMessage(data.error || "Failed to fetch attendance history.");
+      }
+    } catch {
+      setErrorMessage("An unexpected network error occurred.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  // Sync constraints and data on load
+  useEffect(() => {
+    fetchAttendanceData();
+    evaluateTimeConstraints();
+    
+    const interval = setInterval(evaluateTimeConstraints, 15000); // Check constraints every 15 seconds
+    return () => clearInterval(interval);
+  }, [fetchAttendanceData, evaluateTimeConstraints]);
+
+  const handleAction = async (actionType: "check-in" | "check-out") => {
+    try {
+      setActionLoading(true);
+      setErrorMessage(null);
+
+      const res = await fetch("/api/employee/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionType }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || "Action execution failed.");
+      } else {
+        await fetchAttendanceData({ silent: true }); 
+      }
+    } catch (err) {
+      setErrorMessage("Network error processing your request.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  // Clock-Out Action
-  const handleCheckOut = () => {
-    if (!hasCheckedIn || hasCheckedOut) return;
-
-    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setLiveCheckOut(timeString);
-    setHasCheckedOut(true);
-
-    // Update statistics metrics
-    setPresentDays(prev => prev + 1);
-    setAvgHours(8.4); // Increment avg metrics
-
-    // Replace the "In Progress" row with a completed row
-    setLogs(prevLogs => 
-      prevLogs.map((log) => {
-        if (log.date === "June 17, 2026" && log.status === "In Progress") {
-          return {
-            ...log,
-            checkOut: timeString,
-            workingHours: "8h 15m", // Mock calculated hours based on standard schedule
-            status: "On Time"
-          };
-        }
-        return log;
-      })
-    );
-  };
-
-  // Status Styling Evaluator matching custom color palettes
-  const getStatusStyles = (status: AttendanceLog["status"]) => {
+  const getStatusBadgeStyle = (status: AttendanceRecord["status"]) => {
     switch (status) {
       case "On Time":
         return "bg-emerald-50 text-emerald-700 border-emerald-100";
       case "Late":
         return "bg-amber-50 text-amber-700 border-amber-100";
-      case "In Progress":
-        return "bg-brand-subtle text-brand-accent border-brand-subtle animate-pulse";
       case "Absent":
         return "bg-rose-50 text-rose-700 border-rose-100";
       default:
-        return "bg-slate-100 text-slate-500 border-slate-200";
+        return "bg-slate-50 text-slate-700 border-slate-100";
     }
   };
 
-  // Day Type Styling Evaluator
-  const getDayTypeStyles = (type: AttendanceLog["dayType"]) => {
-    switch (type) {
-      case "Regular":
-        return "bg-indigo-50 text-indigo-700 border-indigo-100";
-      case "Half Day":
-        return "bg-purple-50 text-purple-700 border-purple-100";
-      case "Holiday":
-        return "bg-teal-50 text-teal-700 border-teal-100";
-      default:
-        return "bg-slate-50 text-slate-500 border-slate-200";
-    }
+  const formatTimeStr = (isoString?: string) => {
+    if (!isoString) return "--:--";
+    return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px] text-xs text-content-secondary">
+        Syncing attendance log data...
+      </div>
+    );
+  }
+
+  // Determine if check-in or check-out buttons should be disabled based on time boundaries
+  const isButtonsDisabled = isSunday || !isWithinWindow || actionLoading;
 
   return (
-    <div className="   pb-12 bg-surface-main min-h-screen">
+    <div className="space-y-6 pt-4 pb-12 bg-surface-main min-h-screen">
       
       {/* 1. Page Header */}
       <div className="pb-6 border-b border-line-subtle flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-content-main tracking-tight">Attendance</h1>
+          <h1 className="text-2xl font-extrabold text-content-main tracking-tight">Shift Attendance</h1>
           <p className="mt-1 text-xs text-content-secondary">
-            Log working hours, check-in daily, and review historical shifts.
+            Process daily session check-in and check-out logs and track active session stats.
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs font-semibold text-content-secondary shadow-xs">
-          <Calendar className="w-4 h-4 text-brand-accent" />
-          <span>June 17, 2026</span>
+        {/* Real-time Clock Widget */}
+        <div className="flex items-center gap-3 bg-surface-card border border-line-subtle py-2 px-4 rounded-xl shadow-xs self-start">
+          <Clock className="w-4 h-4 text-brand-accent animate-pulse" />
+          <ClockWidget />
         </div>
       </div>
 
-      {/* 2. Primary Metrics Cards Grid */}
+      {/* Dynamic Alerts for Sundays or Shift Closures */}
+      {isSunday && (
+        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <span>Today is Sunday (Weekly Off). Shift actions are currently disabled.</span>
+        </div>
+      )}
+
+      {!isSunday && !isWithinWindow && (
+        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <span>Outside Shift Margin: Attendance actions are restricted between 11:30 AM and 08:30 PM.</span>
+        </div>
+      )}
+
+      {/* 2. Rule Alerts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-indigo-50/50 border border-indigo-100/60 text-xs text-indigo-900 leading-relaxed">
+        <div className="flex gap-2">
+          <AlertCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+          <div>
+            <strong className="font-semibold block">Check-In Grace Period:</strong>
+            Shift begins at 12:00 PM. Arrivals after 12:30 PM will flag your state as <span className="text-amber-700 font-bold">Late</span>.
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <strong className="font-semibold block">Operational Limits:</strong>
+            Working hours count only between 11:30 AM and 8:30 PM. Hours worked outside this interval will not accumulate.
+          </div>
+        </div>
+      </div>
+
+      {/* Error Output banner if any */}
+      {errorMessage && (
+        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-xs font-semibold">
+          <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* 3. Action Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Present Days Card */}
-        <div className="p-5 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
-              Monthly Attendance
-            </span>
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600">
-              <CheckCircle className="w-4 h-4" />
+        {/* Check-In Action Card */}
+        <div className="p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-6">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Entrance Check-In</span>
+            <h2 className="text-lg font-extrabold text-content-main">Start Today's Work Session</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600">
+              <LogIn className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-content-muted block font-medium">Recorded Check-In</span>
+              <span className="text-sm font-bold text-content-main">
+                {todayRecord ? formatTimeStr(todayRecord.checkIn) : "Not Tracked"}
+              </span>
             </div>
           </div>
-          <div>
-            <span className="text-2xl font-black text-content-main block">
-              {presentDays} <span className="text-sm font-semibold text-content-secondary">Present</span>
-            </span>
-            <span className="text-[10px] text-content-muted font-medium block mt-1">
-              Active working days recorded this period.
-            </span>
-          </div>
+          <button
+            onClick={() => handleAction("check-in")}
+            disabled={!!todayRecord || isButtonsDisabled}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition"
+          >
+            {actionLoading ? "Executing..." : todayRecord ? "Checked In Successfully" : "Register Check-In"}
+          </button>
         </div>
 
-        {/* Late Arrival Card */}
-        <div className="p-5 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
-              Late Arrivals
-            </span>
-            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
-              <AlertTriangle className="w-4 h-4" />
+        {/* Check-Out Action Card */}
+        <div className="p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-6">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Departure Check-Out</span>
+            <h2 className="text-lg font-extrabold text-content-main">End Today's Work Session</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-rose-50 text-rose-600">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-content-muted block font-medium">Recorded Check-Out</span>
+              <span className="text-sm font-bold text-content-main">
+                {todayRecord?.checkOut ? formatTimeStr(todayRecord.checkOut) : "Not Tracked"}
+              </span>
             </div>
           </div>
-          <div>
-            <span className="text-2xl font-black text-content-main block">
-              {lateArrivals} <span className="text-sm font-semibold text-content-secondary">Times</span>
-            </span>
-            <span className="text-[10px] text-content-muted font-medium block mt-1">
-              Check-ins logged past the regular grace period.
-            </span>
-          </div>
+          <button
+            onClick={() => handleAction("check-out")}
+            disabled={!todayRecord || !!todayRecord?.checkOut || isButtonsDisabled}
+            className="w-full bg-rose-600 text-white hover:bg-rose-700 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition"
+          >
+            {actionLoading ? "Executing..." : todayRecord?.checkOut ? "Checked Out Successfully" : "Register Check-Out"}
+          </button>
         </div>
 
-        {/* Avg Worked Hours Card */}
-        <div className="p-5 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
-              Average Hours
-            </span>
-            <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
-              <Hourglass className="w-4 h-4" />
+        {/* Status Metrics Overview */}
+        <div className="p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-6">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Session Diagnostics</span>
+            <h2 className="text-lg font-extrabold text-content-main">Status & Active Hours</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-line-subtle pb-2.5">
+              <span className="text-xs text-content-secondary font-medium flex items-center gap-1.5">
+                <Timer className="w-3.5 h-3.5 text-content-muted" /> Working Hours
+              </span>
+              <span className="text-xs font-bold text-content-main">
+                {todayRecord?.formattedDuration || "0 hrs 0 mins"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-content-secondary font-medium flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-content-muted" /> Attendance State
+              </span>
+              {todayRecord ? (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wide ${getStatusBadgeStyle(todayRecord.status)}`}>
+                  {todayRecord.status}
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold text-content-muted uppercase">Unregistered</span>
+              )}
             </div>
           </div>
-          <div>
-            <span className="text-2xl font-black text-content-main block">
-              {avgHours} <span className="text-sm font-semibold text-content-secondary">hrs / day</span>
-            </span>
-            <span className="text-[10px] text-content-muted font-medium block mt-1">
-              Average completed working duration daily.
-            </span>
+          <div className="text-[10px] leading-normal text-content-muted text-center pt-2">
+            Status calculations adapt instantly based on when daily checkpoints are saved.
           </div>
         </div>
 
       </div>
 
-      {/* 3. Daily Attendance Clock-In/Out Large Action Console */}
-      <div className="p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-sm space-y-6">
-        <div>
-          <h2 className="text-sm font-extrabold text-content-main">Real-time Check-In Console</h2>
-          <p className="text-[11px] text-content-secondary mt-1">Check-in when beginning your shift and clock-out when finishing.</p>
-        </div>
-
-        {/* Large Buttons side-by-side split */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          
-          {/* Check In Block Action */}
-          <div className="p-5 bg-surface-main border border-line-subtle rounded-xl flex flex-col justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-surface-card border border-line-subtle rounded-xl text-content-secondary">
-                <Play className="w-4 h-4 text-emerald-500 fill-emerald-500/25" />
-              </div>
-              <div>
-                <span className="font-extrabold text-xs text-content-main block">Clock In</span>
-                <span className="text-[10px] text-content-muted mt-0.5 block">Record shift start: {liveCheckIn}</span>
-              </div>
-            </div>
-
-            {/* Uses exact CSS utility button classes from your theme */}
-            <button
-              onClick={handleCheckIn}
-              disabled={hasCheckedIn}
-              className={hasCheckedIn ? "btn-brand-subtle cursor-not-allowed" : "btn-brand-filled"}
-            >
-              <LogIn className="w-4 h-4 mr-2" />
-              <span>{hasCheckedIn ? "Clocked In" : "Register Check-In"}</span>
-            </button>
-          </div>
-
-          {/* Check Out Block Action */}
-          <div className="p-5 bg-surface-main border border-line-subtle rounded-xl flex flex-col justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-surface-card border border-line-subtle rounded-xl text-content-secondary">
-                <Square className="w-4 h-4 text-rose-500 fill-rose-500/25" />
-              </div>
-              <div>
-                <span className="font-extrabold text-xs text-content-main block">Clock Out</span>
-                <span className="text-[10px] text-content-muted mt-0.5 block">Record shift end: {liveCheckOut}</span>
-              </div>
-            </div>
-
-            {/* Disabled logic unless active check-in is verified */}
-            <button
-              onClick={handleCheckOut}
-              disabled={!hasCheckedIn || hasCheckedOut}
-              className={
-                !hasCheckedIn || hasCheckedOut 
-                  ? "btn-outline bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed pointer-events-none hover:translate-y-0" 
-                  : "btn-brand-filled bg-rose-600 hover:bg-rose-500 focus:ring-rose-500 shadow-rose-600/10"
-              }
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              <span>{hasCheckedOut ? "Clocked Out" : "Register Check-Out"}</span>
-            </button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 4. Attendance History Log Table */}
+      {/* 4. Attendance History Logs List */}
       <div className="space-y-3">
-        <div className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
-          Recent Shift History
+        <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
+          <History className="w-3.5 h-3.5" /> Recent Attendance History
         </div>
 
         <div className="bg-surface-card border border-line-subtle rounded-2xl shadow-sm overflow-hidden">
@@ -324,67 +322,45 @@ export default function EmployeeAttendancePage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-main border-b border-line-subtle text-content-muted text-[10px] font-extrabold uppercase tracking-widest">
-                  <th className="px-6 py-4">Work Date</th>
-                  <th className="px-6 py-4">Day Type</th>
-                  <th className="px-6 py-4">Check-In Time</th>
-                  <th className="px-6 py-4">Check-Out Time</th>
+                  <th className="px-6 py-4">Logged Date</th>
+                  <th className="px-6 py-4">Check-In Event</th>
+                  <th className="px-6 py-4">Check-Out Event</th>
                   <th className="px-6 py-4">Working Hours</th>
-                  <th className="px-6 py-4 text-center">Duty Status</th>
+                  <th className="px-6 py-4 text-center">Calculated State</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-subtle text-content-secondary text-xs">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-surface-main/30 transition">
-                    
-                    {/* Date Column */}
-                    <td className="px-6 py-4 font-bold text-content-main flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-content-muted" />
-                      <span>{log.date}</span>
+                {history.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-content-muted">
+                      No historical logs recorded. Register a check-in action to create one.
                     </td>
-
-                    {/* Day Type Badge */}
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wide ${getDayTypeStyles(log.dayType)}`}>
-                        {log.dayType === "Regular" && <Briefcase className="w-3 h-3" />}
-                        {log.dayType === "Weekend" && <Coffee className="w-3 h-3" />}
-                        {log.dayType}
-                      </span>
-                    </td>
-
-                    {/* Clock In */}
-                    <td className="px-6 py-4 font-semibold text-slate-700">
-                      {log.checkIn}
-                    </td>
-
-                    {/* Clock Out */}
-                    <td className="px-6 py-4 font-semibold text-slate-700">
-                      {log.checkOut}
-                    </td>
-
-                    {/* Completed Hours */}
-                    <td className="px-6 py-4 font-extrabold text-content-main">
-                      {log.workingHours !== "—" ? (
-                        <span className="text-brand-accent">{log.workingHours}</span>
-                      ) : (
-                        <span className="text-content-muted">{log.workingHours}</span>
-                      )}
-                    </td>
-
-                    {/* Duty Status Badge */}
-                    <td className="px-6 py-4 text-center">
-                      <div className="inline-flex items-center justify-center">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${getStatusStyles(log.status)}`}>
-                          {log.status === "On Time" && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-                          {log.status === "Late" && <AlertTriangle className="w-3 h-3 text-amber-500" />}
-                          {log.status === "Absent" && <XCircle className="w-3 h-3 text-rose-500" />}
-                          {log.status === "In Progress" && <Clock className="w-3 h-3 text-brand-accent animate-spin" />}
-                          {log.status}
-                        </span>
-                      </div>
-                    </td>
-
                   </tr>
-                ))}
+                ) : (
+                  history.map((record) => (
+                    <tr key={record._id} className="hover:bg-surface-main/30 transition">
+                      <td className="px-6 py-4 font-bold text-content-main">
+                        {record.date}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-content-secondary">
+                        {formatTimeStr(record.checkIn)}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-content-secondary">
+                        {record.checkOut ? formatTimeStr(record.checkOut) : "Ongoing"}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-content-main">
+                        {record.formattedDuration || "--"}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-flex items-center justify-center">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wide ${getStatusBadgeStyle(record.status)}`}>
+                            {record.status}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
