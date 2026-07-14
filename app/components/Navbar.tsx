@@ -9,7 +9,7 @@ export default function Navbar() {
             V
           </div>
           <Link href="/" className="font-bold text-lg tracking-tight text-content-main">
-            VibeFlow<span className="text-brand-accent">.</span>
+            SYNCUP<span className="text-brand-accent">.</span>
           </Link>
         </div>
 

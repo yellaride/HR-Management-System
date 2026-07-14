@@ -2,76 +2,206 @@
 import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import LeavePolicy from "@/modals/LeavePolicy"; // Adjusted to 'models'
+import EmployeeLeavePolicy from "@/modals/LeavePolicy";
+import LeaveBalance from "@/modals/LeaveBalance";
+import { Employee } from "@/modals/Employee"; // Named export
+import User from "@/modals/User"; // Default export
 
+// Define TypeScript interface for Mongoose Lean user document
+interface IUserPopulated {
+  _id: any;
+  email?: string;
+}
+
+// GET: Fetch ONLY active employees with their custom policy status and values
 export async function GET() {
   try {
     await connectDB();
+
+    // Next.js hot-reload fix: Force reference User model so Mongoose registers the schema 
+    // before the "populate" query runs on the Employee collection.
+    const _forceUserRegistration = User.modelName; 
+
     const session = await getServerSession(authOptions);
-    const role = session?.user?.role;
+    const role = String(session?.user?.role ?? "").toLowerCase();
 
     if (role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Access Denied: Admin role required." }, { status: 403 });
     }
 
-    // Attempt to find the default policy. If it doesn't exist, we create it using schema defaults.
-    let policy = await LeavePolicy.findOne({ key: "default" }).lean();
+    // Safer, index-friendly status check. Does not crash if status is missing or null.
+    const activeEmployees = await Employee.find({ 
+      status: { $in: ["Active", "active", "ACTIVE"] }
+    }).populate({
+      path: "userId",
+      select: "email"
+    }).lean();
 
-    if (!policy) {
-      policy = await LeavePolicy.findOneAndUpdate(
-        { key: "default" },
-        {},
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      ).lean();
-    }
+    // Map active user IDs as string keys
+    const activeUserIds = activeEmployees.map((emp: any) => {
+      if (emp.userId && typeof emp.userId === "object" && "_id" in emp.userId) {
+        return emp.userId._id.toString();
+      }
+      return emp.userId?.toString();
+    }).filter(Boolean);
 
-    return NextResponse.json(policy);
-  } catch (error) {
-    console.error("Leave policy GET error", error);
-    return NextResponse.json({ error: "Failed to query policy" }, { status: 500 });
+    // Fetch active leave balances for these user IDs
+    const leaveBalances = await LeaveBalance.find({
+      userId: { $in: activeUserIds }
+    }).lean();
+
+    const employeesList = activeEmployees.map((emp: any) => {
+      const userIdStr = emp.userId && typeof emp.userId === "object" && "_id" in emp.userId
+        ? emp.userId._id.toString()
+        : emp.userId?.toString() || "";
+
+      const emailStr = emp.userId && typeof emp.userId === "object" && "email" in emp.userId
+        ? emp.userId.email
+        : "";
+
+      const balance = leaveBalances.find(
+        (b) => b.userId === userIdStr
+      );
+
+      const isCustom = balance ? !!balance.customPolicy : false;
+
+      return {
+        userId: userIdStr,
+        name: emp.name || "Unnamed Employee",
+        email: emailStr || "No Registered Email",
+        isCustom,
+        policy: {
+          // Using optional chaining (?.allocated) and fallback values (??)
+          // to prevent crashes on legacy documents missing nested sub-objects.
+          ANNUAL: balance?.ANNUAL?.allocated ?? 15,
+          SICK: balance?.SICK?.allocated ?? 8,
+          CASUAL: balance?.CASUAL?.allocated ?? 6,
+          MONTHLY: balance?.MONTHLY?.allocated ?? 2,
+        },
+      };
+    }).filter((emp: any) => emp.userId !== ""); // Filter out null userId objects safely
+
+    return NextResponse.json(employeesList);
+  } catch (error: any) {
+    console.error("Employee leave policies fetch error:", error);
+    return NextResponse.json({ 
+      error: "Failed to load active employee list.", 
+      details: error.message 
+    }, { status: 500 });
   }
 }
-
-export async function PUT(req: Request) {
+// POST: Set or update an employee's customized leave allowances & update balance allocations in sync
+export async function POST(req: Request) {
   try {
     await connectDB();
     const session = await getServerSession(authOptions);
-    const role = session?.user?.role;
+    const role = String(session?.user?.role ?? "").toLowerCase();
 
     if (role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Access Denied: Admin role required." }, { status: 403 });
     }
 
     const body = await req.json();
-    
-    const ANNUAL = Number(body.ANNUAL);
-    const SICK = Number(body.SICK);
-    const CASUAL = Number(body.CASUAL);
+    const { userId, ANNUAL, SICK, CASUAL, MONTHLY } = body;
 
-    // Validate request inputs before updating the database
-    if (
-      isNaN(ANNUAL) || ANNUAL < 0 ||
-      isNaN(SICK) || SICK < 0 ||
-      isNaN(CASUAL) || CASUAL < 0
-    ) {
-      return NextResponse.json({ error: "Invalid policy values" }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required." }, { status: 400 });
     }
 
-    const updatedPolicy = await LeavePolicy.findOneAndUpdate(
-      { key: "default" },
+    const annualNum = Number(ANNUAL);
+    const sickNum = Number(SICK);
+    const casualNum = Number(CASUAL);
+    const monthlyNum = Number(MONTHLY);
+
+    if (
+      isNaN(annualNum) || annualNum < 0 ||
+      isNaN(sickNum) || sickNum < 0 ||
+      isNaN(casualNum) || casualNum < 0 ||
+      isNaN(monthlyNum) || monthlyNum < 0
+    ) {
+      return NextResponse.json({ error: "All leave values must be non-negative integers." }, { status: 400 });
+    }
+
+    // 1. Update the employee custom configuration
+    const updatedCustomPolicy = await EmployeeLeavePolicy.findOneAndUpdate(
+      { userId },
+      { $set: { ANNUAL: annualNum, SICK: sickNum, CASUAL: casualNum, MONTHLY: monthlyNum } },
+      { upsert: true, new: true }
+    );
+
+    // 2. Sync changes directly to LeaveBalance and set customPolicy flag to true
+    await LeaveBalance.findOneAndUpdate(
+      { userId },
       {
         $set: {
-          ANNUAL,
-          SICK,
-          CASUAL,
-        },
+          "ANNUAL.allocated": annualNum,
+          "SICK.allocated": sickNum,
+          "CASUAL.allocated": casualNum,
+          "MONTHLY.allocated": monthlyNum,
+          customPolicy: true,
+        }
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    ).lean();
+      { upsert: true }
+    );
 
-    return NextResponse.json(updatedPolicy);
-  } catch (error) {
-    console.error("Leave policy PUT error", error);
-    return NextResponse.json({ error: "Failed to update policy" }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      message: "Leave allowances updated and active balance synced.",
+      policy: updatedCustomPolicy,
+    });
+  } catch (error: any) {
+    console.error("Employee leave policies save error:", error);
+    return NextResponse.json({ 
+      error: "Failed to save customized configuration.", 
+      details: error.message 
+    }, { status: 500 });
+  }
+}
+
+// DELETE: Reverts custom configuration to baseline and resets balance allocations
+export async function DELETE(req: Request) {
+  try {
+    await connectDB();
+    const session = await getServerSession(authOptions);
+    const role = String(session?.user?.role ?? "").toLowerCase();
+
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Access Denied: Admin role required." }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required to remove parameters." }, { status: 400 });
+    }
+
+    // 1. Delete custom limit record
+    await EmployeeLeavePolicy.findOneAndDelete({ userId });
+
+    // 2. Sync standard baseline limits to active LeaveBalance and set customPolicy flag to false
+    await LeaveBalance.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          "ANNUAL.allocated": 15,
+          "SICK.allocated": 8,
+          "CASUAL.allocated": 6,
+          "MONTHLY.allocated": 2,
+          customPolicy: false,
+        }
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Policy reset back to standard baseline rules.",
+    });
+  } catch (error: any) {
+    console.error("Employee leave policy delete error:", error);
+    return NextResponse.json({ 
+      error: "Database operation failed.", 
+      details: error.message 
+    }, { status: 500 });
   }
 }

@@ -5,8 +5,22 @@ import Swal from "sweetalert2";
 import { Calendar, CheckCircle2, Download, AlertCircle } from "lucide-react";
 import { downloadPayslipPdf, PayslipRecord } from "./payslipPdf";
 
+export interface ExtendedPayslipRecord extends PayslipRecord {
+  status?: string;
+  version?: string;
+}
+
+export interface CompanyDetailsData {
+  name?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  logo?: string;
+  [key: string]: any;
+}
+
 interface PayslipListProps {
-  payslips: PayslipRecord[];
+  payslips: ExtendedPayslipRecord[];
   isLoading?: boolean;
   downloadingId?: string | null;
   onDownloadStart?: (id: string) => void;
@@ -17,6 +31,7 @@ interface PayslipListProps {
   showEmployeeColumn?: boolean; 
   showDetailedBreakdown?: boolean; 
   formatCurrency?: (amount: number) => string;
+  companyDetails?: CompanyDetailsData | null; // Keep companyDetails in the prop definitions
 }
 
 const swalCustomClass = {
@@ -26,6 +41,7 @@ const swalCustomClass = {
   confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
 };
 
+// Declaring ": React.JSX.Element" tells TypeScript this function must return JSX
 export default function PayslipList({
   payslips,
   isLoading = false,
@@ -38,28 +54,43 @@ export default function PayslipList({
   showEmployeeColumn = true, 
   showDetailedBreakdown = false, 
   formatCurrency,
-}: PayslipListProps) {
+  companyDetails = null,
+}: PayslipListProps): React.JSX.Element {
   
   const handleDownload = async (slip: PayslipRecord) => {
     if (onDownloadStart) onDownloadStart(slip._id);
 
-    const employeeObj = typeof slip.employeeId === "object" && slip.employeeId !== null ? slip.employeeId : null;
-    const employeeName = employeeObj?.name || slip.employeeName || "Unknown Employee";
-    const employeeRole = employeeObj?.jobTitle || slip.employeeRole || "No Specified Title";
-
     try {
+      // Fetch dynamic details for this precise payslip ID using a query parameter
+      const res = await fetch(`/api/admin/payslips?id=${slip._id}`);
+      if (!res.ok) {
+        throw new Error(`Server returned status: ${res.status}`);
+      }
+
+      const { payslip: freshSlip, companyDetails: freshCompanyDetails } = await res.json();
+
+      const employeeObj = typeof freshSlip.employeeId === "object" && freshSlip.employeeId !== null 
+        ? freshSlip.employeeId 
+        : null;
+      
+      const employeeName = employeeObj?.name || freshSlip.employeeName || "Unknown Employee";
+      const employeeRole = employeeObj?.jobTitle || freshSlip.employeeRole || "No Specified Title";
+
+      // Call PDF compiler with database values
       await downloadPayslipPdf({
-        slip,
+        slip: freshSlip,
         employeeName,
         employeeRole,
         formatCurrency,
+        companyDetails: freshCompanyDetails || companyDetails, 
       });
+
     } catch (error) {
       console.error("Failed to generate PDF:", error);
       Swal.fire({
         icon: "error",
         title: "Compilation Failed",
-        text: "Could not generate your receipt. Please verify your client environment details and try again.",
+        text: "Could not generate your receipt. Please verify your database connection and try again.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass
       });
@@ -67,7 +98,6 @@ export default function PayslipList({
       if (onDownloadEnd) onDownloadEnd(slip._id);
     }
   };
-
   let totalColumns = 5; 
   if (showEmployeeColumn) totalColumns += 1;
   if (showDetailedBreakdown) totalColumns += 3; 
@@ -104,6 +134,7 @@ export default function PayslipList({
               )}
               
               <th className="px-6 py-4 text-right">Net Take-Home</th>
+              <th className="px-6 py-4 text-center">Version</th>
               <th className="px-6 py-4 text-center">Status</th>
               <th className="px-6 py-4 text-right">Action</th>
             </tr>
@@ -189,11 +220,33 @@ export default function PayslipList({
                     </td>
 
                     <td className="px-6 py-4 text-center">
-                      <div className="inline-flex items-center justify-center">
-                        <span className="status-pill bg-emerald-50 text-emerald-700 border-emerald-100">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                          Paid
+                      {String((slip as any).version ?? (slip as any).Version ?? "").trim() ? (
+                        <span className="font-bold text-[var(--color-content-secondary)]">
+                          {String((slip as any).version ?? (slip as any).Version)}
                         </span>
+                      ) : (
+                        <span className="text-[var(--color-content-muted)]">-</span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4 text-center">
+                      <div className="inline-flex items-center justify-center">
+                        {slip.status === "Suspended" ? (
+                          <span className="status-pill bg-rose-50 text-rose-700 border-rose-100">
+                            <AlertCircle className="w-3 h-3 text-rose-500" />
+                            Suspended
+                          </span>
+                        ) : slip.status === "Active" ? (
+                          <span className="status-pill bg-emerald-50 text-emerald-700 border-emerald-100">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="status-pill bg-slate-50 text-slate-700 border-slate-100">
+                            <AlertCircle className="w-3 h-3 text-slate-500" />
+                            Unknown
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -201,7 +254,7 @@ export default function PayslipList({
                       <button
                         onClick={() => handleDownload(slip)}
                         disabled={isCurrentlyDownloading}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition ${
+                        className={`btn-table-download ${
                           isCurrentlyDownloading
                             ? "bg-[var(--color-surface-main)] text-[var(--color-content-muted)] border-[var(--color-line-subtle)] cursor-not-allowed"
                             : "bg-[var(--color-brand-subtle)] hover:bg-[var(--color-brand-accent)] hover:text-white text-[var(--color-brand-accent)] border-[var(--color-brand-subtle)] cursor-pointer"

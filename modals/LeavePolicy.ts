@@ -1,22 +1,22 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-// Define TypeScript interface for the document
-export interface ILeavePolicy extends Document {
-  key: string;
+export interface IEmployeeLeavePolicy extends Document {
+  userId: string;
   ANNUAL: number;
   SICK: number;
   CASUAL: number;
+  MONTHLY: number; // 2 leaves allowed per month
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-const LeavePolicySchema = new Schema<ILeavePolicy>(
+const EmployeeLeavePolicySchema = new Schema<IEmployeeLeavePolicy>(
   {
-    key: {
+    userId: {
       type: String,
       required: true,
-      unique: true, // Ensures only one document with a specific key exists
-      default: "default",
+      unique: true,
+      index: true,
     },
     ANNUAL: {
       type: Number,
@@ -36,14 +36,20 @@ const LeavePolicySchema = new Schema<ILeavePolicy>(
       min: [0, "Casual leaves cannot be negative"],
       default: 6,
     },
+    MONTHLY: {
+      type: Number,
+      required: true,
+      min: [0, "Monthly leaves cannot be negative"],
+      default: 2, // Default limit of 2 leaves per month
+    },
   },
   {
-    timestamps: true, // Automatically adds createdAt and updatedAt fields
+    timestamps: true,
   }
 );
 
-// Prevent compiling model multiple times in Next.js development environment
-const LeavePolicy: Model<ILeavePolicy> =
-  mongoose.models.LeavePolicy || mongoose.model<ILeavePolicy>("LeavePolicy", LeavePolicySchema);
+const EmployeeLeavePolicy: Model<IEmployeeLeavePolicy> =
+  mongoose.models.EmployeeLeavePolicy ||
+  mongoose.model<IEmployeeLeavePolicy>("EmployeeLeavePolicy", EmployeeLeavePolicySchema);
 
-export default LeavePolicy;
+export default EmployeeLeavePolicy;

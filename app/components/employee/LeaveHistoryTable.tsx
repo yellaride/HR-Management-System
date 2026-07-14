@@ -61,9 +61,15 @@ export default function LeaveHistoryTable({ history }: LeaveHistoryTableProps) {
                   const nType = String(record.typeUpper || record.type || "ANNUAL").toUpperCase();
                   const nStatus = String(record.statusUpper || record.status || "PENDING").toUpperCase();
 
-                  const displayType = nType === "ANNUAL" ? "Annual Leave" : 
-                                      nType === "SICK" ? "Sick Leave" : 
-                                      nType === "CASUAL" ? "Casual Leave" : record.type;
+                  const displayType =
+                    nType.includes("ANNUAL")
+                      ? "Annual Leave"
+                      : nType.includes("SICK")
+                        ? "Sick Leave"
+                        : nType.includes("CASUAL")
+                          ? "Casual Leave"
+                          : record.type;
+
 
                   return (
                     <tr key={record.id} className="hover:bg-gray-50/30 transition">

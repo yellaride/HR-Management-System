@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Swal from "sweetalert2"; // Import SweetAlert2
-import { Employee } from "./EmployeeCard";
+import { Employee } from "./EmployeeTable";
 
 interface ViewEmployeeModalProps {
   isOpen: boolean;
@@ -134,7 +134,7 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">{employee.name}</h3>
-              <p className="text-xs text-indigo-600 font-medium">{employee.role}</p>
+              <p className="text-xs text-indigo-600 font-medium capitalize">{employee.designation}</p>
             </div>
           </div>
 
@@ -156,9 +156,7 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
 
             <div>
               <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Designation</span>
-              <span className="text-xs font-semibold text-slate-700">
-                {(employee as any).designation ?? employee.role}
-              </span>
+              <span className="text-xs font-semibold text-slate-700">{employee.designation || "—"}</span>
             </div>
 
             <div>
@@ -173,11 +171,6 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
               <span className="text-xs font-semibold text-slate-700">
                 {formattedSalary}
               </span>
-            </div>
-
-            <div>
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Role</span>
-              <span className="text-xs font-semibold text-slate-700">{employee.role}</span>
             </div>
           </div>
 

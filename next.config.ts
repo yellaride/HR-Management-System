@@ -10,9 +10,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-   experimental: {
+  // NOTE:
+  // Turbopack font loading can fail with next/font/google in some Next versions.
+  // If you previously enabled/ran Turbopack, use next build/dev with webpack.
+  experimental: {
     turbopackFileSystemCacheForDev: false, // Prevents compilation caching lockups
   },
 };
 
 export default nextConfig;
+

@@ -72,7 +72,8 @@ export default function EmployeeLeavesPage() {
     const mapped: LeaveRequest = {
       id: record.id,
       employeeName: "Your Request",
-      role: "Employee",
+      // Restored both fields to ensure the mapped object satisfies type definitions
+      designation: "Employee",
       department: "Internal",
       type: mappedType,
       startDate: record.startDate,

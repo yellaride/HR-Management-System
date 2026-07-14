@@ -9,6 +9,38 @@ import { LeaveFilters } from "@/app/components/admin/LeaveFilters";
 import { LeaveTable } from "@/app/components/admin/LeaveTable";
 import { LeaveDetailsModal } from "@/app/components/admin/LeaveDetailsModal";
 
+// Helper functions to map uppercase Database values to Frontend Title Case
+const mapStatus = (status?: string): "Pending" | "Approved" | "Rejected" => {
+  const s = String(status || "PENDING").toUpperCase();
+  if (s === "APPROVED" || s === "APPROVE") return "Approved";
+  if (s === "REJECTED" || s === "REJECT") return "Rejected";
+  return "Pending";
+};
+
+const mapType = (
+  type?: string
+): "Annual Leave" | "Sick Leave" | "Casual Leave" | "Unpaid Leave" | "Other Leave" => {
+  if (!type) return "Other Leave";
+
+  // If backend already sends title-case, return it directly.
+  const tTitle = String(type).trim();
+  const normalizedTitle = tTitle.toLowerCase();
+  if (normalizedTitle === "annual leave") return "Annual Leave";
+  if (normalizedTitle === "sick leave") return "Sick Leave";
+  if (normalizedTitle === "casual leave") return "Casual Leave";
+  if (normalizedTitle === "unpaid leave") return "Unpaid Leave";
+  if (normalizedTitle === "other leave") return "Other Leave";
+
+  // Otherwise treat it as uppercase key (ANNUAL / SICK / CASUAL / UNPAID)
+  const t = tTitle.toUpperCase();
+  if (t === "ANNUAL") return "Annual Leave";
+  if (t === "SICK") return "Sick Leave";
+  if (t === "CASUAL") return "Casual Leave";
+  if (t === "UNPAID") return "Unpaid Leave";
+
+  return "Other Leave";
+};
+
 export default function AdminLeavesPage() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +70,11 @@ export default function AdminLeavesPage() {
           const cleanedData = rawArray.map((item: any) => ({
             ...item,
             id: item.id || item._id,
+            // Safe conversions of DB enums to UI formats
+            status: mapStatus(item.status),
+            type: mapType(item.type),
+            // Ensure required UI fields exist
+            department: item.department ?? "Internal",
             // Fallback default values if the backend API does not serve balances yet
             totalLeaves: item.totalLeaves ?? 30,
             usedLeaves: item.usedLeaves ?? 12,
@@ -74,10 +111,13 @@ export default function AdminLeavesPage() {
 
       if (!res.ok) throw new Error("Failed to approve leave");
 
-      const updated = (await res.json()) as LeaveRequest;
-      setLeaves((prev) => 
-        prev.map((item) => 
-          item.id === (updated.id || (updated as any)._id) ? { ...item, status: updated.status } : item
+      const updated = (await res.json()) as { id?: string; _id?: string; status?: string };
+      const updatedId = updated.id || (updated as any)._id || id;
+      setLeaves((prev) =>
+        prev.map((item) =>
+          item.id === updatedId 
+            ? { ...item, status: mapStatus(updated.status ?? item.status) } 
+            : item
         )
       );
     } catch {
@@ -100,10 +140,13 @@ export default function AdminLeavesPage() {
 
       if (!res.ok) throw new Error("Failed to reject leave");
 
-      const updated = (await res.json()) as LeaveRequest;
-      setLeaves((prev) => 
-        prev.map((item) => 
-          item.id === (updated.id || (updated as any)._id) ? { ...item, status: updated.status } : item
+      const updated = (await res.json()) as { id?: string; _id?: string; status?: string };
+      const updatedId = updated.id || (updated as any)._id || id;
+      setLeaves((prev) =>
+        prev.map((item) =>
+          item.id === updatedId 
+            ? { ...item, status: mapStatus(updated.status ?? item.status) } 
+            : item
         )
       );
     } catch {
@@ -135,7 +178,6 @@ export default function AdminLeavesPage() {
 
   return (
     <div className=" space-y-6 pb-12 w-full">
-      
       {/* Top Header & Search Area */}
       <LeaveHeader 
         searchQuery={searchQuery} 
@@ -151,7 +193,6 @@ export default function AdminLeavesPage() {
 
       {/* Main Table Structure Card using Global Utilities */}
       <div className="table-card overflow-x-auto vertical-slider-reset">
-        
         {/* Tab Controls Filter Bar */}
         <LeaveFilters 
           activeTab={activeTab} 
@@ -164,9 +205,8 @@ export default function AdminLeavesPage() {
         <LeaveTable 
           leaves={filteredLeaves} 
           loading={loading} 
-          onSelect={setSelectedLeave} 
+          onSelect={(leave) => setSelectedLeave(leave)} 
         />
-        
       </div>
 
       {/* Detail Review Modal */}

@@ -3,8 +3,9 @@ export interface LeaveRequest {
   id: string; 
   userId?: string;
   employeeName: string;
-  role: string;
+  designation: string;
   department: string;
+
   type: "Annual Leave" | "Sick Leave" | "Casual Leave" | "Unpaid Leave" | "Other Leave";
   startDate: string;
   endDate: string;

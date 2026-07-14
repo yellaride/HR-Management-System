@@ -177,7 +177,7 @@ export default function LoginForm() {
             />
             <span>Remember device</span>
           </label>
-          <Link href="#" className="text-[var(--color-brand-accent)] hover:underline font-semibold transition">
+          <Link href="/forgot-password" className="text-[var(--color-brand-accent)] hover:underline font-semibold transition">
             Forgot password?
           </Link>
         </div>

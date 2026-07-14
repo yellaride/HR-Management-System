@@ -16,7 +16,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the Employee profile linked to the authenticated User
     const employee = await Employee.findOne({ userId })
       .select("_id")
       .lean<{ _id: any }>();
@@ -29,7 +28,12 @@ export async function GET() {
       );
     }
 
-    const payslips = await Payslip.find({ employeeId })
+    // Filter to only display Active payslips for the employee
+    // Explicitly select `version` because the UI relies on it for the Version column.
+    const payslips = await Payslip.find({ employeeId, status: "Active" })
+      .select(
+        "_id employeeId period basicSalary allowances bonus deductions netPay paymentMethod paymentDate status version"
+      )
       .populate("employeeId", "name jobTitle")
       .sort({ createdAt: -1 })
       .lean();
@@ -43,4 +47,3 @@ export async function GET() {
     );
   }
 }
-

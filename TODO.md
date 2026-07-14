@@ -1,14 +1,15 @@
-# TODO
+# TODO - Fix hourly rate not shown in Admin employee list
 
-## Phase 1 — Header consistency (Admin + Employee pages)
-- [ ] Create a shared `PageHeader` component in `app/components/shared/PageHeader.tsx` with consistent typography, spacing, and badge/category label styling.
-- [ ] Update Admin pages to use this shared `PageHeader` for: Dashboard, Employees, Leave Manager, Leaves Policy, Activity, Payslips.
-- [ ] Update Employee pages (Dashboard and any other header pages) to use the shared `PageHeader`.
-- [ ] Ensure all headers use the same font weight, size, tracking, colors, and alignment (left/top) and consistent responsive behavior.
-- [ ] Keep existing page-specific search/input areas, but align them to the shared header layout (same baseline/padding/border).
-- [ ] Replace any hardcoded color hex values in header areas with CSS vars from `globals.css`.
+## Plan
+- Understand how hourly rate is fetched from backend and mapped to frontend.
+- Fix API formatting so the admin employees table receives the correct `HourlyRate`/`hourlyRate` value.
+- Fix frontend mapping if it expects a different field name.
+- Verify create/edit flows also return the hourly rate consistently.
 
-## Phase 2 — Visual regression / testing
-- [ ] Run `npm run lint` and `npm run build` (or `next build`) to ensure no TS/React errors.
-- [ ] Manually verify UI consistency for each route.
+## Steps
+1. Inspect backend `/api/admin/employees` GET response mapping for hourly rate.
+2. Inspect frontend `EmployeeTable` usage to confirm expected property name.
+3. Apply code changes so the API returns `HourlyRate` (or frontend reads `hourlyRate`).
+4. Ensure `/api/admin/employees/[id]` PUT returns hourly rate with the same field naming.
+5. Run dev server/build and verify hourly rate displays on admin employee page.
 

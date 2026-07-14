@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { X, ChevronDown } from "lucide-react";
-import { Employee } from "./EmployeeCard";
+import { Employee } from "./EmployeeTable";
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
@@ -35,7 +35,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
     email: "",
     designation: "",
     joinDate: "",
-    salary: "",
+    salary: "", // Stores salary
     department: "Engineering",
     status: "Active",
   });
@@ -82,7 +82,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
       }
     }
 
-    // 2. Safely parse salary (converting numbers to strings)
+    // 2. Safely parse salary / hourly rate (converting numbers to strings)
     const rawSalary = employee.salary !== undefined && employee.salary !== null
       ? employee.salary
       : ((employee as any).basicSalary || (employee as any).baseSalary);
@@ -226,12 +226,13 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Salary (PKR)</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Salary (Rs)</label>
               <input
                 type="number"
                 required
                 min="0"
-                placeholder="e.g. 75000"
+                step="1"
+                placeholder="e.g. 80000"
                 value={formData.salary}
                 onChange={(e) => handleFieldChange("salary", e.target.value)}
                 className={getInputClass()}

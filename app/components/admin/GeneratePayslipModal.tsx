@@ -11,6 +11,7 @@ export interface EmployeeOption {
   lastName?: string;
   jobTitle?: string;
   role?: string;
+  designation?: string; // from /api/admin/employees
   department?: string;
   status?: string;
 }
@@ -67,6 +68,11 @@ export default function GeneratePayslipModal({
     paymentDate: "",
   });
 
+  const [autoCalculatedValues, setAutoCalculatedValues] = useState({
+    basicSalary: 0,
+    deductions: 0,
+  });
+
   const [isEmployeeOpen, setIsEmployeeOpen] = useState(false);
   const [isPaymentMethodOpen, setIsPaymentMethodOpen] = useState(false);
 
@@ -100,6 +106,36 @@ export default function GeneratePayslipModal({
     };
   }, [isEmployeeOpen, isPaymentMethodOpen]);
 
+  // Handle auto-calculation whenever Employee or Pay Period changes
+  useEffect(() => {
+    if (!formData.employeeId || !formData.period) return;
+
+    const fetchCalculation = async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/payslips?action=calculate&employeeId=${formData.employeeId}&period=${encodeURIComponent(formData.period)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setAutoCalculatedValues({
+            basicSalary: data.basicSalary,
+            deductions: data.deductions,
+          });
+          // Update the inputs automatically
+          setFormData((prev) => ({
+            ...prev,
+            basicSalary: data.basicSalary,
+            deductions: data.deductions,
+          }));
+        }
+      } catch (err) {
+        console.error("Auto-calculation fetch failed:", err);
+      }
+    };
+
+    fetchCalculation();
+  }, [formData.employeeId, formData.period]);
+
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -113,6 +149,7 @@ export default function GeneratePayslipModal({
         paymentMethod: "Bank Transfer",
         paymentDate: getLocalTodayDateString(),
       });
+      setAutoCalculatedValues({ basicSalary: 0, deductions: 0 });
       setValidationError("");
       setIsEmployeeOpen(false);
       setIsPaymentMethodOpen(false);
@@ -130,7 +167,7 @@ export default function GeneratePayslipModal({
 
     let combinedJobTitle = "";
     if (selectedEmployee) {
-      const title = (selectedEmployee.jobTitle || "").trim();
+      const title = (selectedEmployee.designation || selectedEmployee.jobTitle || "").trim();
       const role = (selectedEmployee.role || "").trim();
 
       if (title && role && title.toLowerCase() !== role.toLowerCase()) {
@@ -147,6 +184,16 @@ export default function GeneratePayslipModal({
     }));
     setValidationError("");
     setIsEmployeeOpen(false);
+  };
+
+  const handleResetToCalculated = () => {
+    setFormData((prev) => ({
+      ...prev,
+      basicSalary: autoCalculatedValues.basicSalary,
+      deductions: autoCalculatedValues.deductions,
+      allowances: 0,
+      bonus: 0,
+    }));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,10 +250,12 @@ export default function GeneratePayslipModal({
       `${selectedEmployeeObj.firstName || ""} ${selectedEmployeeObj.lastName || ""}`.trim() ||
       "Unnamed Employee";
 
+    const designation = selectedEmployeeObj.designation || selectedEmployeeObj.jobTitle || "No Designation";
+
     const isInactive =
       selectedEmployeeObj.status && selectedEmployeeObj.status.toLowerCase() !== "active";
 
-    return isInactive ? `${baseName} (${selectedEmployeeObj.status})` : baseName;
+    return isInactive ? `${baseName} - ${designation} (${selectedEmployeeObj.status})` : `${baseName} - ${designation}`;
   };
 
   const getInputClass = (hasError = false) => {
@@ -291,8 +340,9 @@ export default function GeneratePayslipModal({
                     const empId = emp._id?.toString() || emp.id?.toString() || "";
                     const baseName =
                       emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Unnamed Employee";
+                    const designation = emp.designation || emp.jobTitle || "No Designation";
                     const isInactive = emp.status && emp.status.toLowerCase() !== "active";
-                    const displayLabel = isInactive ? `${baseName} (${emp.status})` : baseName;
+                    const displayLabel = `${baseName} - ${designation}${isInactive ? ` (${emp.status})` : ""}`;
 
                     return (
                       <button
@@ -403,9 +453,20 @@ export default function GeneratePayslipModal({
           </div>
 
           <div className="p-4 bg-[var(--color-surface-main)] rounded-2xl border border-[var(--color-line-subtle)] space-y-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block border-b border-[var(--color-line-subtle)] pb-1.5">
-              Financial Breakdown (Rs.)
-            </span>
+            <div className="flex items-center justify-between border-b border-[var(--color-line-subtle)] pb-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+                Financial Breakdown (Rs.)
+              </span>
+              {formData.employeeId && formData.period && (
+                <button
+                  type="button"
+                  onClick={handleResetToCalculated}
+                  className="text-[10px] font-bold text-[var(--color-brand-accent)] hover:underline cursor-pointer transition-all"
+                >
+                  Reset to Calculated
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1.5">
@@ -422,7 +483,7 @@ export default function GeneratePayslipModal({
                     value={formData.basicSalary || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className={getInputClass(formData.basicSalary <= 0 && !!validationError)}
+                    className={`pl-7 ${getInputClass(formData.basicSalary <= 0 && !!validationError)}`}
                   />
                 </div>
               </div>
@@ -440,7 +501,7 @@ export default function GeneratePayslipModal({
                     value={formData.allowances || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className={getInputClass()}
+                    className={`pl-7 ${getInputClass()}`}
                   />
                 </div>
               </div>
@@ -458,7 +519,7 @@ export default function GeneratePayslipModal({
                     value={formData.bonus || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className={getInputClass()}
+                    className={`pl-7 ${getInputClass()}`}
                   />
                 </div>
               </div>
@@ -476,7 +537,7 @@ export default function GeneratePayslipModal({
                     value={formData.deductions || ""}
                     onChange={handleChange}
                     placeholder="0"
-                    className={getInputClass()}
+                    className={`pl-7 ${getInputClass()}`}
                   />
                 </div>
               </div>
@@ -514,4 +575,3 @@ export default function GeneratePayslipModal({
     </div>
   );
 }
-

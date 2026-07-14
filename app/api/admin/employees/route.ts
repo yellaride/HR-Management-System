@@ -1,33 +1,33 @@
 import { NextResponse } from "next/server";
-import connectDB from "../../../../lib/mongodb"; // Adjust relative path as needed
+import connectDB from "@/lib/mongodb";
 import User from "@/modals/User";
 import { Employee } from "@/modals/Employee";
+import CompanyDetails from "@/modals/CompanyDetails"; // Adjust this path to match where your model is saved
 import bcrypt from "bcryptjs";
-import { sendWelcomeEmail } from "@/lib/email"; // Adjust alias path if needed
+import { sendWelcomeEmail } from "@/lib/email/welcome-email";
 
-// GET Endpoint: Fetch all active employees
 export async function GET() {
   try {
     await connectDB();
 
-    // Populate the userId reference to grab the email field
+    // DEBUG: verify numeric values exist
     const employees = await Employee.find({ status: { $ne: "Inactive" } }).populate("userId", "email");
 
-    // Format data to match the UI interface structure
+
+    // Map backend properties so frontend gets consistent keys for dates + compensation
     const formattedEmployees = employees.map((emp: any) => ({
       id: emp._id.toString(),
       name: emp.name,
-      role: emp.designation, // Replaced jobTitle with designation
       email: emp.userId?.email || "",
       department: emp.department,
       status: emp.status,
       designation: emp.designation,
-      // Ensure UI modals always receive these fields
       joinDate: emp.joinDate ? new Date(emp.joinDate).toISOString() : null,
-      salary: emp.salary !== undefined && emp.salary !== null ? Number(emp.salary) : null,
-      // Optional aliases (helps if some frontend expects other keys)
-      joiningDate: emp.joinDate ? new Date(emp.joinDate).toISOString() : null,
-      salaryDate: emp.salary !== undefined && emp.salary !== null ? Number(emp.salary) : null,
+      salary: emp.salary !== undefined && emp.salary !== null ? Number(emp.salary) : 0,
+      hourlyRate:
+        emp.hourlyRate !== undefined && emp.hourlyRate !== null
+          ? Number(emp.hourlyRate)
+          : 0,
     }));
 
     return NextResponse.json(formattedEmployees, { status: 200 });
@@ -40,20 +40,18 @@ export async function GET() {
   }
 }
 
-// POST Endpoint: Create User and Employee profiles
 export async function POST(request: Request) {
   try {
     await connectDB();
 
     const body = await request.json();
-    const { name, email, password, department, status, designation, joinDate, role, salary } = body;
-    const assignedRole = role;
+    const { name, email, password, department, status, designation, joinDate, salary } = body;
+
     const normalizedName = typeof name === "string" ? name.trim() : "";
     const normalizedDesignation = typeof designation === "string" ? designation.trim() : "";
     const normalizedDepartment = typeof department === "string" ? department.trim() : "";
 
-    // Validate request inputs
-    if (!normalizedName || !email || !password || !normalizedDepartment || !normalizedDesignation || !joinDate || !role || salary === undefined) {
+    if (!normalizedName || !email || !password || !normalizedDepartment || !normalizedDesignation || !joinDate || salary === undefined) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -62,7 +60,6 @@ export async function POST(request: Request) {
 
     const normalizedEmail = email.toLowerCase();
 
-    // Check if the user email already exists
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return NextResponse.json(
@@ -71,10 +68,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash the raw temporary password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Safeguard and convert inputs to proper database-ready formats
     const parsedJoinDate = new Date(joinDate);
     if (isNaN(parsedJoinDate.getTime())) {
       return NextResponse.json(
@@ -84,21 +79,41 @@ export async function POST(request: Request) {
     }
 
     const parsedSalary = Number(salary);
-    if (isNaN(parsedSalary)) {
+    if (isNaN(parsedSalary) || parsedSalary < 0) {
       return NextResponse.json(
-        { error: "Salary must be a valid number" },
+        { error: "Salary must be a valid positive number" },
         { status: 400 }
       );
     }
 
-    // 1. Create access credentials in Users collection
+    // 1. Retrieve Standard Working Hours from Company Settings
+   let standardHours = 160; // Fallback default
+try {
+  const company = await CompanyDetails.findOne();
+  if (company && company.standardWorkingHours && company.standardWorkingHours > 0) {
+    standardHours = company.standardWorkingHours;
+  }
+} catch (err) {
+  console.warn("Unable to fetch Company Details, using fallback 160 hours:", err);
+}
+
+// 2. Calculate Hourly Rate
+const parsedHourlyRate = parsedSalary / standardHours;
+
+    console.log("[Employee POST] received salary:", salary);
+    console.log("[Employee POST] parsedSalary:", parsedSalary);
+    console.log("[Employee POST] standardHours:", standardHours);
+    console.log("[Employee POST] parsedHourlyRate:", parsedHourlyRate);
+
+
+    const assignedRole = "employee"; 
+
     const newUser = await User.create({
       email: normalizedEmail,
       password: hashedPassword,
-      role: assignedRole, 
+      role: assignedRole,
     });
 
-    // 2. Create the profile mapping inside Employees collection
     const newEmployee = await Employee.create({
       userId: newUser._id,
       name: normalizedName,
@@ -106,14 +121,13 @@ export async function POST(request: Request) {
       joinDate: parsedJoinDate,
       department: normalizedDepartment,
       salary: parsedSalary,
+      hourlyRate: parsedHourlyRate, // Saved programmatically to the database
       status: typeof status === "string" && status.trim() ? status.trim() : "Active",
       jobTitle: normalizedDesignation,
     });
 
-    // 3. Dispatch the welcome email safely
     const emailSent = await sendWelcomeEmail(name, normalizedEmail, password);
 
-    // Format payload to return clean frontend-ready structure
     const formattedNewEmployee = {
       id: newEmployee._id.toString(),
       name: newEmployee.name,
@@ -123,8 +137,12 @@ export async function POST(request: Request) {
       status: newEmployee.status,
       designation: newEmployee.designation,
       joinDate: newEmployee.joinDate ? newEmployee.joinDate.toISOString() : undefined,
-      salary: typeof newEmployee.salary === "number" ? newEmployee.salary : (newEmployee.salary ? Number(newEmployee.salary) : undefined),
+      salary: typeof newEmployee.salary === "number" ? newEmployee.salary : undefined,
+      hourlyRate:
+        typeof (newEmployee as any).hourlyRate === "number" ? (newEmployee as any).hourlyRate : undefined,
     };
+
+
 
     return NextResponse.json(
       {

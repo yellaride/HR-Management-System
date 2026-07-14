@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Search, Filter, Calendar, RefreshCw, CheckSquare, Heart, User } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Search, Filter, Calendar, RefreshCw, CheckSquare, Heart, User, ChevronDown } from "lucide-react";
 
 interface Activity {
   _id: string;
@@ -19,6 +19,14 @@ function ActivityLogPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
 
+  // Custom Dropdown Open States
+  const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [isDateOpen, setIsDateOpen] = useState(false);
+
+  // Dropdown Refs for Click Outside Handlers
+  const typeRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
+
   const fetchLogs = async () => {
     try {
       setLoading(true);
@@ -31,12 +39,22 @@ function ActivityLogPage() {
         const data = await res.json();
         let fetchedLogs = data.logs || [];
 
-        // Apply interactive client-side date filters
+        // Apply robust client-side type filtering to guarantee accurate results
+        if (typeFilter !== "all") {
+          fetchedLogs = fetchedLogs.filter((log: Activity) => log.type === typeFilter);
+        }
+
+        // Apply interactive client-side date filters.
+        // For birthday logs, `createdAt` is synthetic (set to "now"), so date ranges
+        // would incorrectly hide birthday entries. Therefore, apply range filters only
+        // to non-birthday logs.
         if (dateFilter !== "all") {
           const now = new Date();
           const startOfToday = new Date(now.setHours(0, 0, 0, 0));
 
           fetchedLogs = fetchedLogs.filter((log: Activity) => {
+            if (log.type === "birthday") return true;
+
             const logDate = new Date(log.createdAt);
             if (dateFilter === "today") {
               return logDate >= startOfToday;
@@ -68,6 +86,26 @@ function ActivityLogPage() {
     }, 300); // 300ms input debounce
     return () => clearTimeout(delayDebounce);
   }, [search, typeFilter, dateFilter]);
+
+  // Click Outside Handler for Custom Dropdowns
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (typeRef.current && !typeRef.current.contains(target)) {
+        setIsTypeOpen(false);
+      }
+      if (dateRef.current && !dateRef.current.contains(target)) {
+        setIsDateOpen(false);
+      }
+    }
+
+    if (isTypeOpen || isDateOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isTypeOpen, isDateOpen]);
 
   const getInitials = (name: string) => {
     if (!name) return "U";
@@ -110,6 +148,32 @@ function ActivityLogPage() {
     }
   };
 
+  const getTypeLabel = (val: string) => {
+    switch (val) {
+      case "attendance":
+        return "Attendance";
+      case "leave":
+        return "Leaves";
+      case "birthday":
+        return "Birthdays";
+      default:
+        return "All Types";
+    }
+  };
+
+  const getDateLabel = (val: string) => {
+    switch (val) {
+      case "today":
+        return "Today";
+      case "week":
+        return "Last 7 Days";
+      case "month":
+        return "Last 30 Days";
+      default:
+        return "All History";
+    }
+  };
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -139,7 +203,7 @@ function ActivityLogPage() {
 
   return (
     <div className="min-h-screen bg-[#f9f8fc] text-[#181124] pb-16">
-      <div className="  pr-2 py-10 space-y-6">
+      <div className="pr-2 py-10 space-y-6">
         
         {/* Page Title & Navigation Area */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[#e2e0e8]">
@@ -178,38 +242,106 @@ function ActivityLogPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-            {/* Filter Dropdown (Attendance, Leaves, and Birthdays only) */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Filter Dropdown (Custom styling matching the payslip modal) */}
+            <div className="flex items-center gap-2 w-full sm:w-auto relative" ref={typeRef}>
               <span className="text-xs font-semibold text-[#534a60] flex items-center gap-1.5 shrink-0">
                 <Filter className="w-3.5 h-3.5 text-[#7c3aed]" /> Filter:
               </span>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full sm:w-auto bg-[#f9f8fc] border border-[#e2e0e8] rounded-xl px-3.5 py-2 text-xs font-semibold text-[#181124] focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/20 focus:border-[#7c3aed] cursor-pointer"
-              >
-                <option value="all">All Types</option>
-                <option value="attendance">Attendance</option>
-                <option value="leave">Leaves</option>
-                <option value="birthday">Birthdays</option>
-              </select>
+              <div className="relative w-full sm:w-44">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTypeOpen(!isTypeOpen);
+                    setIsDateOpen(false);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#e2e0e8] rounded-xl text-xs font-bold text-[#181124] flex items-center justify-between cursor-pointer hover:border-[#7c3aed]/40 focus:ring-2 focus:ring-[#7c3aed]/20 transition shadow-xs"
+                >
+                  <span className="truncate">{getTypeLabel(typeFilter)}</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-[#8e859c] transition-transform duration-200 shrink-0 ${
+                      isTypeOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {isTypeOpen && (
+                  <div className="dropdown-panel absolute left-0 right-0 mt-1.5 bg-white border border-[#e2e0e8] rounded-xl shadow-lg py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                    {[
+                      { value: "all", label: "All Types" },
+                      { value: "attendance", label: "Attendance" },
+                      { value: "leave", label: "Leaves" },
+                      { value: "birthday", label: "Birthdays" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setTypeFilter(opt.value);
+                          setIsTypeOpen(false);
+                        }}
+                        className={`dropdown-option w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                          typeFilter === opt.value
+                            ? "dropdown-option-active bg-[#f4f0ff] text-[#7c3aed]"
+                            : "text-[#534a60] hover:bg-[#f9f8fc] hover:text-[#181124]"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Time Range Filter */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Time Range Filter (Custom styling matching the payslip modal) */}
+            <div className="flex items-center gap-2 w-full sm:w-auto relative" ref={dateRef}>
               <span className="text-xs font-semibold text-[#534a60] flex items-center gap-1.5 shrink-0">
                 <Calendar className="w-3.5 h-3.5 text-[#7c3aed]" /> Range:
               </span>
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full sm:w-auto bg-[#f9f8fc] border border-[#e2e0e8] rounded-xl px-3.5 py-2 text-xs font-semibold text-[#181124] focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/20 focus:border-[#7c3aed] cursor-pointer"
-              >
-                <option value="all">All History</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-              </select>
+              <div className="relative w-full sm:w-44">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDateOpen(!isDateOpen);
+                    setIsTypeOpen(false);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#e2e0e8] rounded-xl text-xs font-bold text-[#181124] flex items-center justify-between cursor-pointer hover:border-[#7c3aed]/40 focus:ring-2 focus:ring-[#7c3aed]/20 transition shadow-xs"
+                >
+                  <span className="truncate">{getDateLabel(dateFilter)}</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-[#8e859c] transition-transform duration-200 shrink-0 ${
+                      isDateOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {isDateOpen && (
+                  <div className="dropdown-panel absolute left-0 right-0 mt-1.5 bg-white border border-[#e2e0e8] rounded-xl shadow-lg py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                    {[
+                      { value: "all", label: "All History" },
+                      { value: "today", label: "Today" },
+                      { value: "week", label: "Last 7 Days" },
+                      { value: "month", label: "Last 30 Days" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setDateFilter(opt.value);
+                          setIsDateOpen(false);
+                        }}
+                        className={`dropdown-option w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                          dateFilter === opt.value
+                            ? "dropdown-option-active bg-[#f4f0ff] text-[#7c3aed]"
+                            : "text-[#534a60] hover:bg-[#f9f8fc] hover:text-[#181124]"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -222,9 +354,15 @@ function ActivityLogPage() {
               <p className="text-xs text-[#534a60] font-medium">Querying organizational feed...</p>
             </div>
           ) : logs.length === 0 ? (
-            <div className="py-24 text-center">
-              <p className="text-sm font-semibold text-[#181124]">No matching logs found.</p>
-              <p className="text-xs text-[#8e859c] mt-1">Try resetting selected parameters or search input.</p>
+            <div className="py-24 text-center px-4">
+              <p className="text-sm font-semibold text-[#181124]">
+                {typeFilter === "birthday" ? "No birthday celebrations found." : "No matching logs found."}
+              </p>
+              <p className="text-xs text-[#8e859c] mt-1">
+                {typeFilter === "birthday" 
+                  ? "There are no employee birthdays scheduled or recorded for this period." 
+                  : "Try resetting selected parameters or search input."}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-[#e2e0e8]">

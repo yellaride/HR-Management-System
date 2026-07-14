@@ -5,6 +5,11 @@ import { Search, Filter } from "lucide-react";
 import GeneratePayslipModal, { EmployeeOption } from "@/app/components/admin/GeneratePayslipModal";
 import PayslipList from "@/app/components/payslips/PayslipList";
 
+// Safely extend the component's props to allow companyDetails dynamically
+const ExtendedGeneratePayslipModal = GeneratePayslipModal as React.ComponentType<
+  React.ComponentProps<typeof GeneratePayslipModal> & { companyDetails?: any }
+>;
+
 interface ReferencedEmployee {
   _id: string;
   name: string;
@@ -13,17 +18,19 @@ interface ReferencedEmployee {
 
 interface Payslip {
   _id: string;
-  employeeId: ReferencedEmployee | null; // From mongoose populate (might be null if deleted)
-  employeeName?: string; // Historical fallback snapshot
-  employeeRole?: string; // Historical fallback snapshot
-  period: string; // e.g., "June 2026"
+  employeeId: ReferencedEmployee | null;
+  employeeName?: string;
+  employeeRole?: string;
+  period: string;
   basicSalary: number;
   allowances: number;
   bonus: number;
   deductions: number;
-  netPay: number; // Matches mongoose backend property
+  netPay: number;
   paymentMethod?: string;
   paymentDate?: string;
+  status?: string;
+  version?: string; // Mapped here
 }
 
 export default function AdminPayslipsPage() {
@@ -33,6 +40,7 @@ export default function AdminPayslipsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -54,6 +62,10 @@ export default function AdminPayslipsPage() {
             ? payslipData
             : (payslipData.payslips || payslipData.data || []);
           setPayslips(payslipsArray);
+
+          if (payslipData.companyDetails) {
+            setCompanyDetails(payslipData.companyDetails);
+          }
         }
 
         if (employeesRes && employeesRes.ok) {
@@ -90,7 +102,7 @@ export default function AdminPayslipsPage() {
     allowances: number;
     deductions: number;
     bonus: number;
-    netPay: number; // Added netPay so backend schema validations pass
+    netPay: number;
     paymentMethod: string;
     paymentDate: string;
   }) => {
@@ -145,7 +157,7 @@ export default function AdminPayslipsPage() {
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-12">
       
-      {/* 1. Page Header */}
+      {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Paid Payslips Ledger</h1>
@@ -164,20 +176,19 @@ export default function AdminPayslipsPage() {
               placeholder="Search paid payroll history..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+              className="block w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition duration-150"
             />
           </div>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer"
           >
             <span>Record Payment</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Management Table Card */}
       <div className="flex items-center justify-between px-1 py-2">
         <div className="inline-flex items-center gap-1.5 text-slate-500 text-[11px] font-semibold">
           <Filter className="w-3.5 h-3.5" />
@@ -194,14 +205,16 @@ export default function AdminPayslipsPage() {
         title="Paid Records"
         showAdminControls
         formatCurrency={formatCurrency}
+        companyDetails={companyDetails}
       />
 
-      <GeneratePayslipModal
+      <ExtendedGeneratePayslipModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         employees={employees}
         isLoading={isLoading} 
         onSave={handleSavePayslip}
+        companyDetails={companyDetails} // Passed company details safely
       />
     </div>
   );

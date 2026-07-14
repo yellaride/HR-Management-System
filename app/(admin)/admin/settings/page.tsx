@@ -3,19 +3,23 @@
 import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import { Loader2, Edit2, CheckCircle2, X, Building, MapPin, Phone } from "lucide-react";
+
 import ChangePasswordSettings from "@/app/components/change-password";
 
 interface CompanySettingsState {
   companyName: string;
   location: string;
   phone: string;
+  email: string;
+  standardWorkingHours: number;
 }
 
 const swalCustomClass = {
   popup: "bg-white rounded-2xl border border-[var(--color-line-subtle)] shadow-xl font-sans",
   title: "text-sm font-bold text-[var(--color-content-main)]",
   htmlContainer: "text-xs text-[var(--color-content-secondary)]",
-  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
+  confirmButton:
+    "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
 };
 
 const Toast = Swal.mixin({
@@ -39,22 +43,29 @@ export default function AdminSettingsPage() {
     companyName: "",
     location: "",
     phone: "",
+    email: "",
+    standardWorkingHours: 160,
   });
 
-  const [tempCompanyData, setTempCompanyData] = useState<CompanySettingsState>({ ...companyData });
+  const [tempCompanyData, setTempCompanyData] = useState<CompanySettingsState>({
+    ...companyData,
+  });
 
   useEffect(() => {
     const fetchCompanySettings = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/admin/company-settings");
+        const res = await fetch("/api/settings/company-settings");
         if (!res.ok) throw new Error("Could not load corporate profiles.");
         const data = await res.json();
-        
-        const payload = {
+
+        const payload: CompanySettingsState = {
           companyName: data.companyName || "",
           location: data.location || "",
           phone: data.phone || "",
+          email: data.email || "",
+          standardWorkingHours:
+            typeof data.standardWorkingHours === "number" ? data.standardWorkingHours : 160,
         };
 
         setCompanyData(payload);
@@ -88,14 +99,26 @@ export default function AdminSettingsPage() {
 
   const handleSaveCompanyDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!tempCompanyData.companyName.trim()) {
       Toast.fire({ icon: "warning", title: "Company Name is required" });
       return;
     }
 
+    if (!Number.isFinite(tempCompanyData.standardWorkingHours) || tempCompanyData.standardWorkingHours < 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Hours",
+        text: "Standard working hours must be 0 or a positive number.",
+        confirmButtonColor: "#7c3aed",
+        customClass: swalCustomClass,
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-      const res = await fetch("/api/admin/company-settings", {
+      const res = await fetch("/api/settings/company-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tempCompanyData),
@@ -112,7 +135,8 @@ export default function AdminSettingsPage() {
         icon: "success",
         title: "Company details updated",
         customClass: {
-          popup: "bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xl p-4 font-sans text-xs",
+          popup:
+            "bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xl p-4 font-sans text-xs",
           title: "text-xs font-bold text-[var(--color-content-main)]",
         },
       });
@@ -134,16 +158,16 @@ export default function AdminSettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 bg-[var(--color-surface-main)]">
         <Loader2 className="w-8 h-8 text-[var(--color-brand-accent)] animate-spin" />
-        <span className="text-sm font-semibold text-[var(--color-content-secondary)]">Retrieving dashboard parameters...</span>
+        <span className="text-sm font-semibold text-[var(--color-content-secondary)]">
+          Retrieving dashboard parameters...
+        </span>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto w-full space-y-6">
-        
-        {/* Page Header */}
+      <div className="max-w-4xl w-full space-y-6">
         <div className="flex items-center justify-between pb-6 border-b border-[var(--color-line-subtle)]">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-[var(--color-content-main)]">System Settings</h1>
@@ -153,11 +177,8 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Company Settings panel */}
         <div className="panel">
           <div className="panel-section space-y-4">
-            
-            {/* Panel Header with state toggles */}
             <div className="flex items-center justify-between pb-2 border-b border-[var(--color-line-subtle)]">
               <div className="flex items-center gap-2">
                 <Building className="w-4 h-4 text-[var(--color-brand-accent)]" />
@@ -190,48 +211,15 @@ export default function AdminSettingsPage() {
                     disabled={saving}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
                   >
-                    {saving ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    )}
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                     <span>{saving ? "Saving..." : "Save Changes"}</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Content Division (Read or Write States) */}
             <form onSubmit={handleSaveCompanyDetails} className="space-y-4">
-              {!isEditing ? (
-                // View Mode
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-1">
-                  <div className="space-y-1">
-                    <span className="field-label block">Company Name</span>
-                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
-                      <Building className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
-                      {companyData.companyName || "Not Provided"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="field-label block">Location / Head Office</span>
-                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
-                      {companyData.location || "Not Provided"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="field-label block">Phone Line</span>
-                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
-                      <Phone className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
-                      {companyData.phone || "Not Provided"}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                // Edit Mode
+              {isEditing ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <label className="field-label block">Company Name</label>
@@ -266,18 +254,89 @@ export default function AdminSettingsPage() {
                       className="form-input text-xs"
                     />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <label className="field-label block">Company Email</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. hr@company.com"
+                      value={tempCompanyData.email}
+                      onChange={(e) => setTempCompanyData({ ...tempCompanyData, email: e.target.value })}
+                      className="form-input text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="field-label block">Standard Working Hours</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      required
+                      value={tempCompanyData.standardWorkingHours}
+                      onChange={(e) =>
+                        setTempCompanyData({
+                          ...tempCompanyData,
+                          // Keep numeric value but prevent leading-zero issues by converting only when non-empty.
+                          standardWorkingHours: e.target.value === "" ? 0 : Number.parseInt(e.target.value, 10),
+                        })
+                      }
+                      className="form-input text-xs"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-1">
+                  <div className="space-y-1">
+                    <span className="field-label block">Company Name</span>
+                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
+                      {companyData.companyName || "Not Provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="field-label block">Location / Head Office</span>
+                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
+                      {companyData.location || "Not Provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="field-label block">Phone Line</span>
+                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
+                      {companyData.phone || "Not Provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="field-label block">Company Email</span>
+                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
+                      {companyData.email || "Not Provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="field-label block">Standard Working Hours</span>
+                    <span className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
+                      {companyData.standardWorkingHours} <span className="text-xs text-[var(--color-content-secondary)]">hours / month</span>
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="field-label block"> </span>
+                    <span className="text-sm font-semibold text-[var(--color-content-main)]" />
+                  </div>
                 </div>
               )}
             </form>
           </div>
         </div>
 
-        {/* Separated and Reusable Change Password Form */}
         <div className="flex justify-start">
           <ChangePasswordSettings role="admin" />
         </div>
-
       </div>
     </div>
   );
 }
+

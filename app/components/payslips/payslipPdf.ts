@@ -1,4 +1,4 @@
-import { siteConfig } from "@/lib/siteConfig";
+
 
 export interface PayslipRecord {
   _id: string;
@@ -13,6 +13,7 @@ export interface PayslipRecord {
   netPay: number;
   paymentMethod?: string;
   paymentDate?: string;
+  version?: string; // v1, v2...
 }
 
 const defaultFormatCurrency = (amount: number) =>
@@ -26,16 +27,42 @@ const defaultFormatCurrency = (amount: number) =>
     .format(amount)
     .replace(/\u0024/g, "");
 
+function hexToRgb(hex: string): [number, number, number] {
+  const cleaned = (hex || "").trim().replace(/^#/, "");
+  if (cleaned.length === 3) {
+    const r = parseInt(cleaned[0] + cleaned[0], 16);
+    const g = parseInt(cleaned[1] + cleaned[1], 16);
+    const b = parseInt(cleaned[2] + cleaned[2], 16);
+    return [r, g, b];
+  }
+  if (cleaned.length === 6) {
+    const r = parseInt(cleaned.slice(0, 2), 16);
+    const g = parseInt(cleaned.slice(2, 4), 16);
+    const b = parseInt(cleaned.slice(4, 6), 16);
+    return [r, g, b];
+  }
+  return [124, 58, 237]; // default: #7c3aed
+}
+
 export async function downloadPayslipPdf({
   slip,
   employeeName,
   employeeRole,
   formatCurrency = defaultFormatCurrency,
+  companyDetails, // <-- Pass database retrieved data down
 }: {
   slip: PayslipRecord;
   employeeName: string;
   employeeRole: string;
   formatCurrency?: (amount: number) => string;
+  companyDetails?: {
+    companyName?: string;
+    location?: string;
+    email?: string;
+    phone?: string;
+    brandAccent?: string; // optional brand override (hex)
+    [key: string]: any;
+  } | null;
 }) {
   const { jsPDF } = await import("jspdf");
 
@@ -45,25 +72,48 @@ export async function downloadPayslipPdf({
     format: "a4",
   });
 
-  const primaryColor = [79, 70, 229];
+  // Prefer DB override, else fallback to global token value.
+  // Global CSS token: --color-brand-accent: #7c3aed
+  const brandAccentHex = (companyDetails as any)?.brandAccent || (companyDetails as any)?.brand_accent || "#7c3aed";
+
+  const primaryColor = hexToRgb(brandAccentHex);
+  // Keep other theme-neutral colors stable (can be extended later).
   const darkColor = [15, 23, 42];
   const lightColor = [248, 250, 252];
   const grayColor = [100, 116, 139];
   const borderColor = [226, 232, 240];
 
+
+  // Map database details with fallbacks in case DB properties are blank
+  const companyNameRaw = companyDetails?.companyName || "Corporate Hub";
+  // Preserve casing from DB (the PDF should not force lowercase/uppercase).
+  // If you store "syncup" in DB and want "Syncup" display, fix the value in DB
+  // or implement a smarter casing rule here.
+  const companyName = companyNameRaw;
+
+  const companyAddress = companyDetails?.location || "Office Headquarters, Pakistan";
+  const companyEmail = companyDetails?.email || "hr@company.com";
+  const companyPhone = companyDetails?.phone || "N/A";
+
+
+
+
+
+
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text(siteConfig.companyName, 20, 25);
+  doc.text(companyName, 20, 25);
 
   doc.setFontSize(8.5);
   doc.setFont("Helvetica", "normal");
   doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
-  doc.text(siteConfig.companyAddress, 20, 31);
-  doc.text(`${siteConfig.companyEmail} | ${siteConfig.companyPhone}`, 20, 36);
+  doc.text(companyAddress, 20, 31);
+  doc.text(`${companyEmail} | ${companyPhone}`, 20, 36);
 
 
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+
   doc.setLineWidth(0.5);
   doc.line(20, 42, 190, 42);
 

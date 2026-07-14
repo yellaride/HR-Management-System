@@ -74,7 +74,7 @@ export const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 {leave.employeeName || "Your Request"}
               </h4>
               <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">
-                {leave.role || "Employee"} • {leave.department || "Internal"}
+                {leave.department || "Internal"}
               </p>
             </div>
             <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase border ${getLeaveTypeStyles(leave.type)}`}>

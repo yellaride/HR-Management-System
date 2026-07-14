@@ -6,7 +6,7 @@ const LeaveSchema = new Schema(
 
     // Used by admin UI (Leave Manager) to display who requested the leave and their role/title.
     employeeName: { type: String, required: false, trim: true, default: "" },
-    role: { type: String, required: false, trim: true, default: "" },
+    designation: { type: String, required: false, trim: true, default: "" },
 
     type: {
       type: String,

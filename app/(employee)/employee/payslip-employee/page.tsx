@@ -185,8 +185,10 @@ export default function PayslipEmployeePage() {
             
             {/* Custom Styled Month Dropdown filter */}
             <div className="relative" ref={monthRef}>
-              <button
+<button
                 type="button"
+                title="Filter payslips by month"
+onMouseEnter={() => setIsMonthOpen(true)}
                 onClick={() => {
                   setIsMonthOpen(!isMonthOpen);
                   setIsYearOpen(false);

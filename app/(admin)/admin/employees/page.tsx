@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import EmployeeCard, { Employee } from "../../../components/admin/EmployeeCard";
+// Updated import to resolve the new default-exported EmployeeTable
+import EmployeeTable, { Employee } from "../../../components/admin/EmployeeTable";
 import AddEmployeeModal from "../../../components/admin/AddEmployeeModal";
 import EditEmployeeModal from "../../../components/admin/EditEmployeeModal";
 import ViewEmployeeModal from "../../../components/admin/ViewEmployeeModal";
@@ -76,20 +77,28 @@ export default function AdminEmployeesPage() {
 
   // CREATE profile handler
   const handleCreateEmployee = async (
-    data: Omit<Employee, "id"> & {
+    data: Omit<Employee, "id" | "role"> & {
       password?: string;
       designation?: string;
       joinDate?: string;
-      role: "employee" | "admin";
+      role?: "employee" | "admin";
       salary: number;
+      department: string;
+      status: string;
     }
   ) => {
     setAddEmployeeError(null);
     try {
+      // Attach a fallback/default role in case it is missing
+      const payload = {
+        role: "employee",
+        ...data,
+      };
+
       const res = await fetch("/api/admin/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       let serverErrorMsg = "Failed to create profile.";
@@ -228,7 +237,7 @@ export default function AdminEmployeesPage() {
               setAddEmployeeError(null);
               setIsAddModalOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -238,7 +247,7 @@ export default function AdminEmployeesPage() {
         </div>
       </div>
 
-      {/* Directory Grid */}
+      {/* Directory Section */}
       <div className="space-y-4">
         <div className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
           Directory List ({filteredEmployees.length})
@@ -265,16 +274,12 @@ export default function AdminEmployeesPage() {
             <span className="text-content-secondary text-xs">No employees match your search query.</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredEmployees.map((emp) => (
-              <EmployeeCard
-                key={emp.id}
-                employee={emp}
-                onEdit={handleOpenEdit}
-                onViewPortal={handleOpenView}
-              />
-            ))}
-          </div>
+          /* Replaced the grid-mapping loop with a single responsive table element */
+          <EmployeeTable
+            employees={filteredEmployees}
+            onEdit={handleOpenEdit}
+            onViewPortal={handleOpenView}
+          />
         )}
       </div>
 

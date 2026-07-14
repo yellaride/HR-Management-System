@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { 
   AlertCircle, 
@@ -8,6 +10,8 @@ import {
   Clock, 
   Eye 
 } from "lucide-react";
+
+// Import the centralized LeaveRequest type. 
 import { LeaveRequest } from "@/lib/types";
 
 interface LeaveTableProps {
@@ -15,7 +19,6 @@ interface LeaveTableProps {
   loading: boolean;
   onSelect: (leave: LeaveRequest) => void;
 }
-
 export const LeaveTable: React.FC<LeaveTableProps> = ({
   leaves,
   loading,
@@ -33,7 +36,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
     return "bg-amber-50/80 text-amber-700 border-amber-100";
   };
 
-  // Case-insensitive leave type mapping (uses theme variables for the fallback state)
+  // Case-insensitive leave type mapping (uses safe defaults if variables are uninitialized)
   const getLeaveTypeStyles = (type?: string) => {
     const t = String(type || "").toUpperCase();
     if (t.includes("ANNUAL")) {
@@ -45,12 +48,36 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
     if (t.includes("CASUAL")) {
       return "bg-sky-50 text-sky-700 border-sky-100";
     }
-    return "bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border-[var(--color-line-subtle)]";
+    if (t.includes("UNPAID")) {
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+    // Safe standard fallback styling in case CSS theme variables are not defined in stylesheet
+    return "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
+  };
+
+  // Resolve leave type consistently from multiple possible backend keys.
+  // Backend currently sends: { type: "Annual Leave" | "Sick Leave" | ... , typeUpper: "ANNUAL" | "SICK" | "CASUAL" }
+  const resolveLeaveTypeTitle = (leave: LeaveRequest) => {
+    const anyLeave = leave as any;
+
+    const titleFromType = leave.type; // expected title-case
+    if (titleFromType) return titleFromType;
+
+    const titleFromLegacy = anyLeave.leaveType as string | undefined;
+    if (titleFromLegacy) return titleFromLegacy;
+
+    const key = String(anyLeave.typeUpper || "").toUpperCase();
+    if (key === "ANNUAL") return "Annual Leave";
+    if (key === "SICK") return "Sick Leave";
+    if (key === "CASUAL") return "Casual Leave";
+    if (key === "UNPAID") return "Unpaid Leave";
+
+    return "Other Leave";
   };
 
   if (loading) {
     return (
-      <div className=" py-12 text-center text-[var(--color-content-muted)]">
+      <div className="py-12 text-center text-[var(--color-content-muted)]">
         <div className="flex justify-center items-center gap-2">
           <div className="w-4 h-4 border-2 border-[var(--color-brand-accent)] border-t-transparent rounded-full animate-spin" />
           <span>Loading leave records...</span>
@@ -76,7 +103,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
         <thead>
           <tr className="table-head">
             <th className="table-cell">Employee</th>
-            <th className="table-cell">Department</th>
+            <th className="table-cell">Designation</th>
             <th className="table-cell">Leave Type</th>
             <th className="table-cell">Duration & Dates</th>
             <th className="table-cell max-w-xs">Reason</th>
@@ -96,36 +123,41 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
 
             const rawStatus = String(leave.status || "Pending").toUpperCase();
 
+            // Resolve title-case leave type robustly from backend keys.
+            // Backend currently sends: { type: "Annual Leave" | ... , typeUpper: "ANNUAL" | "SICK" | "CASUAL" }
+            const resolvedType = resolveLeaveTypeTitle(leave as LeaveRequest);
+
             return (
               <tr key={leave.id} className="table-row-hover">
+                {/* Employee Column (Name & Avatar) */}
                 <td className="table-cell">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px]">
                       {initials}
                     </div>
                     <div>
-                      <span className="font-bold text-[var(--color-content-main)] block leading-tight">
+                      <span className="font-bold text-[var(--color-content-main)] block leading-tight capitalize">
                         {leave.employeeName}
-                      </span>
-                      <span className="text-[10px] text-[var(--color-content-muted)] font-medium mt-0.5 block">
-                        {leave.role || "No Role Specified"}
                       </span>
                     </div>
                   </div>
                 </td>
 
+                {/* Designation Column */}
                 <td className="table-cell">
-                  <span className="text-[var(--color-content-secondary)] font-medium">
-                    {leave.department || "No Department Specified"}
+                  <span className="text-[var(--color-content-secondary)] font-medium capitalize">
+                    {leave.designation || "No Designation Specified"}
                   </span>
                 </td>
 
+                {/* Leave Type Column */}
                 <td className="table-cell">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase border ${getLeaveTypeStyles(leave.type)}`}>
-                    {leave.type || "Other Leave"}
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase border ${getLeaveTypeStyles(resolvedType)}`}>
+                    {leave.type}
                   </span>
                 </td>
 
+                {/* Duration & Dates Column */}
                 <td className="table-cell">
                   <div className="flex flex-col">
                     <span className="font-bold text-[var(--color-content-main)] flex items-center gap-1">
@@ -138,6 +170,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                   </div>
                 </td>
 
+                {/* Reason Column */}
                 <td className="table-cell max-w-xs">
                   <button
                     onClick={() => onSelect(leave)}
@@ -151,6 +184,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                   </button>
                 </td>
 
+                {/* Status Column */}
                 <td className="table-cell text-center">
                   <div className="inline-flex items-center justify-center">
                     <span className={`status-pill ${getStatusBadgeStyles(leave.status)}`}>
@@ -162,6 +196,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                   </div>
                 </td>
 
+                {/* Actions Column */}
                 <td className="table-cell text-right">
                   <button
                     onClick={() => onSelect(leave)}
