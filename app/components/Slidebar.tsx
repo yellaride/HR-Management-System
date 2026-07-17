@@ -71,6 +71,26 @@ const navItems = {
       ),
     },
     {
+      href: "/admin/employee-attendance",
+      label: "Attendance Record",
+      icon: (
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 11l3 3L22 4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+      ),
+    },
+    {
+      href: "/admin/birthdays",
+      label: "Birthdays",
+      icon: (
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 22s8-4 8-10V6l-8-4-8 4v6c0 6 8 10 8 10z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 10h.01M15 10h.01" />
+        </svg>
+      ),
+    },
+    {
       href: "/admin/settings",
       label: "Settings",
       icon: (
@@ -80,6 +100,7 @@ const navItems = {
         </svg>
       ),
     },
+   
   ],
   employee: [
     {

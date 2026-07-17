@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     // Case B: Fetch a single specific payslip
     if (id) {
       const payslip = await Payslip.findById(id)
-        .populate("employeeId", "name jobTitle designation")
+        .populate("employeeId", "name jobTitle designation profilePhotoUrl")
         .lean();
 
       if (!payslip) {
@@ -121,7 +121,7 @@ export async function GET(request: Request) {
     }
 
     const payslips = await Payslip.find(query)
-      .populate("employeeId", "name jobTitle designation")
+      .populate("employeeId", "name jobTitle designation profilePhotoUrl")
       .sort({ createdAt: -1 })
       .lean();
 

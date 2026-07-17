@@ -1,3 +1,4 @@
+// modals/Employee.ts
 import { Schema, model, models } from "mongoose";
 
 const EmployeeSchema = new Schema(
@@ -13,15 +14,14 @@ const EmployeeSchema = new Schema(
     joinDate: { type: Date, required: true },
     department: { type: String, required: true },
     
-    // Storing both base salary and calculated hourly rate
     salary: {
-    type: Number,
-    default: 0
-  },
-  hourlyRate: {
-    type: Number,
-    default: 0
-  },
+      type: Number,
+      default: 0
+    },
+    hourlyRate: {
+      type: Number,
+      default: 0
+    },
 
     status: { type: String, required: true, default: "Active" },
     employeeId: { type: String, default: "" },
@@ -33,16 +33,18 @@ const EmployeeSchema = new Schema(
     maritalStatus: { type: String, default: "" },
     emergencyContactName: { type: String, default: "" },
     emergencyContactPhone: { type: String, default: "" },
-    birthdayVisibility: { 
-      type: String, 
-      enum: ["everyone", "admin", "hidden"], 
-      default: "everyone" 
-    },
+    
+    // Updated enum to include "Failed"
     birthdayEmailStatus: { 
       type: String, 
-      enum: ["Sent", "Scheduled", "Pending"], 
+      enum: ["Sent", "Scheduled", "Pending", "Failed"], 
       default: "Pending" 
     },
+    // New field to track the year of the last successful email
+    birthdayEmailSentYear: {
+      type: Number,
+      default: null
+    }
   },
   { timestamps: true }
 );

@@ -1,103 +1,133 @@
+// app/api/employees/birthdays/route.ts (or your listing route path)
 import { NextResponse } from "next/server";
-import connectDB from "@/lib/mongodb"; // Utilizing path alias for connectivity config
+import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
-import { sendBirthdayEmail } from "@/lib/email/birthday-email"; // Ensure this matches your mailing engine
+import CompanyDetails from "@/modals/CompanyDetails";
 
-// GET: Fetch birthdays for all active employees
-export async function GET() {
-  try {
-    await connectDB();
-
-    // Query active employees and grab their linked login emails
-    const employees = await Employee.find({ status: { $ne: "Inactive" } })
-      .populate("userId", "email");
-
-    // Format fields dynamically so the client-side component can read them instantly
-    const formattedBirthdays = employees
-      .filter((emp: any) => emp.birthDate) // Only evaluate profiles with input birthdates
-      .map((emp: any) => {
-        const bDate = new Date(emp.birthDate);
-        return {
-          id: emp._id.toString(),
-          name: emp.name,
-          email: emp.userId?.email || "",
-          department: emp.department,
-          designation: emp.designation,
-          birthDate: bDate.toISOString().split("T")[0], // YYYY-MM-DD
-          birthDay: bDate.getUTCDate(), // 1 - 31 (using UTC values preserves date boundaries)
-          birthMonth: bDate.getUTCMonth(), // 0 - 11 (0-indexed matching your UI array mappings)
-          visibility: emp.birthdayVisibility || "everyone",
-          emailStatus: emp.birthdayEmailStatus || "Pending",
-        };
-      });
-
-    return NextResponse.json(formattedBirthdays, { status: 200 });
-  } catch (error: any) {
-    console.error("Birthday data query processing error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to load birthday records database feed" },
-      { status: 500 }
-    );
-  }
+// Small timezone-aware helper to get current Karachi year
+function getKarachiYear(date: Date): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+  });
+  return parseInt(formatter.format(date));
 }
 
-// PUT: Modify privacy restrictions or manually trigger email greetings
-export async function PUT(request: Request) {
+export async function GET(request: Request) {
   try {
     await connectDB();
-    const body = await request.json();
-    const { id, action, visibility } = body;
 
-    if (!id || !action) {
-      return NextResponse.json({ error: "Missing required parameters (id, action)" }, { status: 400 });
+    const { searchParams } = new URL(request.url);
+    const monthParam = searchParams.get("month") || "all";
+    const deptParam = searchParams.get("department") || "all";
+    const searchParam = searchParams.get("search") || "";
+
+    const company = (await CompanyDetails.findOne().lean()) as any;
+    const departmentsList: string[] = company?.departments || [];
+
+    const query: any = {
+      status: "Active",
+      dateOfBirth: { $ne: null },
+      $or: [
+        { birthdayVisibility: { $exists: false } },
+        { birthdayVisibility: { $ne: "hidden" } }
+      ]
+    };
+
+    if (deptParam !== "all") {
+      query.department = deptParam;
     }
 
-    const employee = await Employee.findById(id).populate("userId", "email");
-    if (!employee) {
-      return NextResponse.json({ error: "Employee profile record not found" }, { status: 404 });
+    if (searchParam) {
+      query.$or = [
+        { name: { $regex: searchParam, $options: "i" } },
+        { designation: { $regex: searchParam, $options: "i" } }
+      ];
     }
 
-    // Process Action A: Update Visibility Restrictions
-    if (action === "UPDATE_PRIVACY") {
-      if (!visibility || !["everyone", "admin", "hidden"].includes(visibility)) {
-        return NextResponse.json({ error: "Invalid privacy parameter" }, { status: 400 });
+    const rawEmployees = (await Employee.find(query)
+      .populate("userId", "email")
+      .lean()) as any[];
+
+    const today = new Date();
+    const currentMonthIdx = today.getMonth(); 
+    const currentDayNum = today.getDate();
+    const currentKarachiYear = getKarachiYear(today);
+
+    const formattedEmployees = rawEmployees.map((emp) => {
+      const dob = new Date(emp.dateOfBirth);
+      const birthMonth = dob.getMonth(); 
+      const birthDay = dob.getDate();   
+      const birthYear = dob.getFullYear();
+
+      // Dynamic reset logic: If the email was sent in a different year, represent it as "Pending"
+      let displayStatus = emp.birthdayEmailStatus || "Pending";
+      if (emp.birthdayEmailSentYear && emp.birthdayEmailSentYear !== currentKarachiYear) {
+        displayStatus = "Pending";
       }
-      
-      employee.birthdayVisibility = visibility;
-      await employee.save();
 
-      return NextResponse.json({ 
-        message: "Roster privacy preferences modified",
-        visibility: employee.birthdayVisibility 
-      }, { status: 200 });
-    }
+      return {
+        id: emp.employeeId || emp._id.toString(),
+        name: emp.name,
+        email: emp.userId?.email || `${emp.name.toLowerCase().replace(/\s+/g, ".")}@company.com`,
+        department: emp.department,
+        designation: emp.designation,
+        // profile photo fields (used by EmployeeRow avatar)
+        profilePhotoUrl:
+          emp.profilePhotoUrl ||
+          emp.profilePhotoURL ||
+          emp.profilePicture ||
+          emp.image ||
+          emp.picture ||
+          "",
+        birthDate: `${birthYear}-${String(birthMonth + 1).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`,
+        birthDay,
+        birthMonth,
+        birthdayEmailStatus: displayStatus
+      };
+    });
 
-    // Process Action B: Force Manual Wish Dispatcher
-    if (action === "SEND_WISH") {
-      const userEmail = (employee.userId as any)?.email;
-      if (!userEmail) {
-        return NextResponse.json({ error: "No verified user email mapped to this directory record" }, { status: 400 });
+    let todayCount = 0;
+    let monthCount = 0;
+    let upcomingCount = 0;
+
+    const targetMonthIdx = monthParam === "all" ? currentMonthIdx : parseInt(monthParam);
+
+    formattedEmployees.forEach((emp) => {
+      if (emp.birthMonth === targetMonthIdx) {
+        monthCount++;
       }
 
-      // Safeguard email routing call
-      const emailSent = await sendBirthdayEmail(employee.name, userEmail);
-      
-      employee.birthdayEmailStatus = "Sent";
-      await employee.save();
+      if (emp.birthMonth === currentMonthIdx && emp.birthDay === currentDayNum) {
+        todayCount++;
+      }
 
-      return NextResponse.json({ 
-        message: emailSent 
-          ? "Birthday greeting dispatched successfully" 
-          : "Wishes marked as sent (delivery pending domain setup configuration)",
-        emailStatus: employee.birthdayEmailStatus
-      }, { status: 200 });
+      if (emp.birthMonth === currentMonthIdx) {
+        if (emp.birthDay > currentDayNum) upcomingCount++;
+      } else if (emp.birthMonth > currentMonthIdx) {
+        upcomingCount++;
+      }
+    });
+
+    let finalEmployees = formattedEmployees;
+    if (monthParam !== "all") {
+      const parsedMonth = parseInt(monthParam);
+      finalEmployees = finalEmployees.filter(emp => emp.birthMonth === parsedMonth);
     }
 
-    return NextResponse.json({ error: "Requested operation action not supported" }, { status: 400 });
+    return NextResponse.json({
+      departments: departmentsList,
+      metrics: {
+        todayCount,
+        monthCount,
+        upcomingCount
+      },
+      employees: finalEmployees
+    });
+
   } catch (error: any) {
-    console.error("Birthday update database processing error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to execute database modifications" },
+      { error: "Internal Server Error", details: error.message },
       { status: 500 }
     );
   }

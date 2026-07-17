@@ -96,8 +96,31 @@ export default function EmployeeTable({ employees, onEdit, onViewPortal }: Emplo
                     
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center font-bold text-[11px] tracking-wide">
-                          {initials}
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center font-bold text-[11px] tracking-wide overflow-hidden">
+                          {/** If backend provides an image/picture, prefer it; otherwise show initials */}
+                          {(() => {
+                            const imageUrl =
+                              (emp as any).image ||
+                              (emp as any).picture ||
+                              (emp as any).profilePicture ||
+                              (emp as any).profilePhotoUrl;
+
+                            if (typeof imageUrl !== "string" || !imageUrl.trim()) return initials;
+
+                            return (
+                              <img
+                                src={imageUrl}
+                                alt={emp.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  target.onerror = null;
+                                  // Hide broken image and rely on initials (handled by conditional rendering next mount).
+                                  target.style.display = "none";
+                                }}
+                              />
+                            );
+                          })()}
                         </div>
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-900 capitalize block leading-tight">

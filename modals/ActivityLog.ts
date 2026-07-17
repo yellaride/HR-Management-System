@@ -2,17 +2,25 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IActivityLog extends Document {
   userId: string;
-  activityType: "CHECK_IN" | "CHECK_OUT" | "LEAVE_REQUEST" | "LEAVE_APPROVED" | "LEAVE_REJECTED";
-  date: string; // YYYY-MM-DD format for easy daily queries
-  timestamp: Date; // Actual instant of the action
-  description: string; // E.g., "Checked in (Late) at 12:45 PM"
+  activityType:
+    | "CHECK_IN"
+    | "CHECK_OUT"
+    | "LEAVE_REQUEST"
+    | "LEAVE_APPROVED"
+    | "LEAVE_REJECTED"
+    | "BIRTHDAY_EMAIL"
+    | "PAYSLIP";
+  date: string; // YYYY-MM-DD
+  timestamp: Date;
+  description: string;
   metadata?: {
     attendanceId?: mongoose.Types.ObjectId | string;
     leaveId?: mongoose.Types.ObjectId | string;
-    status?: string; // "Late", "On Time", "Approved", "Rejected"
+    status?: string; // "Sent", "Failed", etc.
     workingHours?: number;
-    leaveType?: string; // "ANNUAL", "SICK", "CASUAL"
+    leaveType?: string;
     days?: number;
+    emailAddress?: string;
   };
 }
 
@@ -22,7 +30,15 @@ const ActivityLogSchema = new Schema<IActivityLog>(
     activityType: {
       type: String,
       required: true,
-      enum: ["CHECK_IN", "CHECK_OUT", "LEAVE_REQUEST", "LEAVE_APPROVED", "LEAVE_REJECTED"],
+      enum: [
+        "CHECK_IN",
+        "CHECK_OUT",
+        "LEAVE_REQUEST",
+        "LEAVE_APPROVED",
+        "LEAVE_REJECTED",
+        "BIRTHDAY_EMAIL",
+        "PAYSLIP"
+      ],
     },
     date: { type: String, required: true, index: true }, // Format: YYYY-MM-DD
     timestamp: { type: Date, default: Date.now },
@@ -39,7 +55,7 @@ const ActivityLogSchema = new Schema<IActivityLog>(
   { timestamps: true }
 );
 
-// Compound index to quickly fetch history for a specific user ordered by time
+// Fetch history for a specific user ordered by time
 ActivityLogSchema.index({ userId: 1, timestamp: -1 });
 
 export const ActivityLog: Model<IActivityLog> =

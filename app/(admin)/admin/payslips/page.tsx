@@ -155,7 +155,7 @@ export default function AdminPayslipsPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto pb-12">
+    <div className="space-y-6  pb-12">
       
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200">
@@ -204,6 +204,7 @@ export default function AdminPayslipsPage() {
         onDownloadEnd={() => setDownloadingId(null)}
         title="Paid Records"
         showAdminControls
+        showVersion={true}
         formatCurrency={formatCurrency}
         companyDetails={companyDetails}
       />

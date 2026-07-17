@@ -4,10 +4,10 @@ import React, { useEffect, useState, useMemo } from "react";
 import { AlertCircle } from "lucide-react";
 
 import { LeaveRequest } from "@/lib/types";
-import { LeaveHeader } from "@/app/components/admin/LeaveHeader";
-import { LeaveFilters } from "@/app/components/admin/LeaveFilters";
-import { LeaveTable } from "@/app/components/admin/LeaveTable";
-import { LeaveDetailsModal } from "@/app/components/admin/LeaveDetailsModal";
+import { LeaveHeader } from "@/app/components/admin/leaves/LeaveHeader";
+import { LeaveFilters } from "@/app/components/admin/leaves/LeaveFilters";
+import { LeaveTable } from "@/app/components/admin/leaves/LeaveTable";
+import { LeaveDetailsModal } from "@/app/components/admin/leaves/LeaveDetailsModal";
 
 // Helper functions to map uppercase Database values to Frontend Title Case
 const mapStatus = (status?: string): "Pending" | "Approved" | "Rejected" => {
@@ -74,6 +74,7 @@ export default function AdminLeavesPage() {
             status: mapStatus(item.status),
             type: mapType(item.type),
             // Ensure required UI fields exist
+            designation: item.designation ?? "Internal",
             department: item.department ?? "Internal",
             // Fallback default values if the backend API does not serve balances yet
             totalLeaves: item.totalLeaves ?? 30,

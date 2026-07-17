@@ -1,3 +1,4 @@
+// app/api/admin/dashboard/route.ts
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
@@ -17,17 +18,15 @@ export async function GET() {
     const totalDepartments = Array.isArray(departments) ? departments.filter(Boolean).length : 0;
 
     // 3. Fetch count of pending leave requests dynamically from database
-    let pendingLeaves = 0; // Standard fallback initialized to 0
+    let pendingLeaves = 0; 
     try {
-      // Safely check registered mongoose models or locate matching schema
       const LeaveModel = mongoose.models.Leave || mongoose.models.LeaveRequest || mongoose.models.Leaves;
       
       if (LeaveModel) {
         pendingLeaves = await LeaveModel.countDocuments({
-          status: { $regex: /^pending$/i } // Case-insensitive match for "Pending"
+          status: { $regex: /^pending$/i } 
         });
       } else {
-        // Dynamic native MongoDB collection query fallback to bypass MissingSchemaError
         const db = mongoose.connection.db;
         if (db) {
           const collections = await db.listCollections().toArray();
@@ -47,9 +46,6 @@ export async function GET() {
     let todayAttendancePercent = 0;
     let presentToday = 0;
 
-    // Match the schema used in modals/Attendance.ts:
-    // - date stored as YYYY-MM-DD string
-    // - status stored as "On Time" | "Late" | "Absent"
     const TIMEZONE = "Asia/Karachi";
     const getLocalDateString = (date: Date = new Date()): string => {
       const tzString = date.toLocaleString("en-US", { timeZone: TIMEZONE });
@@ -63,8 +59,6 @@ export async function GET() {
     try {
       const AttendanceModel = mongoose.models.Attendance || mongoose.models.Attendances;
       const todayDateStr = getLocalDateString();
-
-      // “Present” = On Time OR Late
       const presentStatuses = ["On Time", "Late"];
 
       let presentTodayCount = 0;
@@ -75,7 +69,6 @@ export async function GET() {
           status: { $in: presentStatuses },
         });
       } else {
-        // Dynamic Mongo collection fallback
         const db = mongoose.connection.db;
         if (db) {
           const collections = await db.listCollections().toArray();
@@ -100,6 +93,34 @@ export async function GET() {
       console.warn("Attendance model dynamic query failed. Fallback applied.", e);
     }
 
+    // 5. Fetch Today's Birthday Celebrants dynamically (Asia/Karachi)
+    let todayBirthdays: any[] = [];
+    try {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: TIMEZONE,
+        month: "numeric",
+        day: "numeric",
+      });
+      const parts = formatter.formatToParts(now);
+      const targetMonth = parseInt(parts.find((p) => p.type === "month")?.value || "0");
+      const targetDay = parseInt(parts.find((p) => p.type === "day")?.value || "0");
+
+      todayBirthdays = await Employee.find({
+        status: "Active",
+        dateOfBirth: { $ne: null },
+        $expr: {
+          $and: [
+            { $eq: [{ $month: "$dateOfBirth" }, targetMonth] },
+            { $eq: [{ $dayOfMonth: "$dateOfBirth" }, targetDay] }
+          ]
+        }
+      })
+      .select("name department designation profilePhotoUrl")
+      .lean();
+    } catch (e) {
+      console.warn("Failed to retrieve today's birthdays for dashboard stats:", e);
+    }
 
     return NextResponse.json(
       {
@@ -108,6 +129,7 @@ export async function GET() {
         pendingLeaves,
         todayAttendancePercent,
         presentToday,
+        todayBirthdays // Return birthday arrays to Admin side
       },
       { status: 200 }
     );

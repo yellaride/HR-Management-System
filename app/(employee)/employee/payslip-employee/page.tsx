@@ -167,7 +167,7 @@ export default function PayslipEmployeePage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased py-8 px-4 sm:px-6 lg:px-8">
-      <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-6 ">
         
         {/* Header Block with Integrated Filters */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
@@ -317,6 +317,7 @@ onMouseEnter={() => setIsMonthOpen(true)}
           showAdminControls={false}
           showEmployeeColumn={false} // Clean presentation when displaying own records
           showDetailedBreakdown={true} // Shows allowances, bonuses, and deductions in full view
+          showVersion={false}
         />
       </div>
     </div>

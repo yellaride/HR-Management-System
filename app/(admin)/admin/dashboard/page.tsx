@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Users,
   Layers,
@@ -9,12 +9,13 @@ import {
   UserPlus,
   FileSpreadsheet,
   Calendar,
-  ChevronRight,
+  ChevronRight
 } from "lucide-react";
 import { StatCard } from "@/app/components/admin/StatCard";
-import AddEmployeeModal from "@/app/components/admin/AddEmployeeModal";
+import AddEmployeeModal from "@/app/components/admin/employees/AddEmployeeModal";
 import Link from "next/link";
 import { RecentActivityPanel } from "@/app/components/admin/RecentActivityPanel";
+import BirthdayCelebrationsCard from "@/app/components/admin/dashbord/BirthdayCelebrationsCard";
 
 function getFriendlyErrorMessage(error: string | null): string | null {
   if (!error) return null;
@@ -43,11 +44,60 @@ export default function AdminDashboardPage() {
   const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState("");
 
-  // Resolves Next.js server-to-client hydration lag and displays the current live date
+  const [dashboardStats, setDashboardStats] = useState<{
+    totalEmployees: number;
+    totalDepartments: number;
+    pendingLeaves: number;
+    todayAttendancePercent: number;
+    presentToday: number;
+  } | null>(null);
+  
+  const [todayBirthdays, setTodayBirthdays] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
   useEffect(() => {
     const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
     setCurrentDate(new Date().toLocaleDateString("en-US", options));
   }, []);
+
+  const loadStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      setStatsError(null);
+
+      const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load dashboard stats");
+      const data = await res.json();
+
+      setDashboardStats({
+        totalEmployees: Number(data.totalEmployees) || 0,
+        totalDepartments: Number(data.totalDepartments) || 0,
+        pendingLeaves: typeof data.pendingLeaves === "number" ? data.pendingLeaves : 0,
+        todayAttendancePercent: typeof data.todayAttendancePercent === "number" ? data.todayAttendancePercent : 0,
+        presentToday: typeof data.presentToday === "number" ? data.presentToday : 0,
+      });
+
+      setTodayBirthdays(Array.isArray(data.todayBirthdays) ? data.todayBirthdays : []);
+
+    } catch (e: any) {
+      setStatsError(e?.message || "Failed to load dashboard stats");
+      setDashboardStats({
+        totalEmployees: 0,
+        totalDepartments: 0,
+        pendingLeaves: 0,
+        todayAttendancePercent: 0,
+        presentToday: 0,
+      });
+      setTodayBirthdays([]);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const handleCreateEmployee = async (data: {
     name: string;
@@ -56,7 +106,6 @@ export default function AdminDashboardPage() {
     department: string;
     status: string;
     designation: string;
-    role: "employee" | "admin";
     salary: number;
     joinDate: string;
   }) => {
@@ -66,7 +115,10 @@ export default function AdminDashboardPage() {
       const res = await fetch("/api/admin/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          role: "employee",
+        }),
       });
 
       let serverErrorMsg = "Failed to create profile.";
@@ -87,58 +139,13 @@ export default function AdminDashboardPage() {
       const result = await res.json();
       if (result?.employee) {
         setIsAddModalOpen(false);
+        await loadStats();
       }
     } catch (err: any) {
       setAddEmployeeError(err?.message || "An error occurred during registration.");
     }
   };
 
-  const [dashboardStats, setDashboardStats] = useState<{
-    totalEmployees: number;
-    totalDepartments: number;
-    pendingLeaves: number;
-    todayAttendancePercent: number;
-    presentToday: number;
-  } | null>(null);
-  
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        setStatsLoading(true);
-        setStatsError(null);
-
-        const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to load dashboard stats");
-        const data = await res.json();
-
-        setDashboardStats({
-          totalEmployees: Number(data.totalEmployees) || 0,
-          totalDepartments: Number(data.totalDepartments) || 0,
-          pendingLeaves: typeof data.pendingLeaves === "number" ? data.pendingLeaves : 0,
-          todayAttendancePercent: typeof data.todayAttendancePercent === "number" ? data.todayAttendancePercent : 0,
-          presentToday: typeof data.presentToday === "number" ? data.presentToday : 0,
-        });
-      } catch (e: any) {
-        setStatsError(e?.message || "Failed to load dashboard stats");
-        setDashboardStats({
-          totalEmployees: 0,
-          totalDepartments: 0,
-          pendingLeaves: 0,
-          todayAttendancePercent: 0,
-          presentToday: 0,
-        });
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-
-    loadStats();
-  }, []);
-
-  // System statistics structured with custom variables for visual cohesion
   const stats = [
     {
       label: "Total Employees",
@@ -178,13 +185,11 @@ export default function AdminDashboardPage() {
     },
   ];
 
-  
-
   return (
     <div className="min-h-screen bg-[var(--color-surface-main)] pb-16">
       <div className="px-2 py-6 space-y-6 w-full">
         
-        {/* 1. Dashboard Header Section */}
+        {/* Dashboard Header Section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
           <div>
             <div className="flex items-center gap-2">
@@ -206,7 +211,6 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          {/* Header Actions Displaying the Dynamic Current Date */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs font-bold text-[var(--color-brand-accent)] shadow-sm">
               <Calendar className="w-4 h-4 text-[var(--color-brand-accent)]" />
@@ -215,7 +219,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* 2. Counter Cards Grid */}
+        {/* Counter Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, idx) => (
             <StatCard
@@ -231,31 +235,32 @@ export default function AdminDashboardPage() {
           ))}
         </div>
 
-        {/* 3. Secondary Row: Recent Activities & Quick Actions */}
+        {/* Modular Birthday Celebrants Section */}
+        <BirthdayCelebrationsCard celebrants={todayBirthdays} />
+
+        {/* Secondary Row: Recent Activities & Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Left Sub-grid: Recent Activities (Col-span-2) */}
-          {/* Left Sub-grid: Recent Activities (Col-span-2) */}
-<div className="lg:col-span-2 panel p-6 flex flex-col justify-between gap-6 min-w-0">
-<div className="min-w-0">
-    <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
-      <div>
-        <h2 className="text-base font-semibold text-[var(--color-content-main)]">Recent System Activity</h2>
-        <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Real-time log of administrative events.</p>
-      </div>
-      <Link href="/admin/activity" className="text-xs font-semibold text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] transition cursor-pointer">
-        View All Activity
-      </Link>
-    </div>
+          {/* Recent Activities */}
+          <div className="lg:col-span-2 panel p-6 flex flex-col justify-between gap-6 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+                <div>
+                  <h2 className="text-base font-semibold text-[var(--color-content-main)]">Recent System Activity</h2>
+                  <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Real-time log of administrative events.</p>
+                </div>
+                <Link href="/admin/activity" className="text-xs font-semibold text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] transition cursor-pointer">
+                  View All Activity
+                </Link>
+              </div>
 
-    {/* Live database backed Activity Feed */}
-    <div className="mt-2">
-      <RecentActivityPanel />
-    </div>
-  </div>
-</div>
+              <div className="mt-2">
+                <RecentActivityPanel />
+              </div>
+            </div>
+          </div>
 
-          {/* Right Sub-grid: Quick HR Actions Panel */}
+          {/* Quick HR Actions Panel */}
           <div className="lg:col-span-1 panel p-6 space-y-5 flex flex-col justify-between">
             <div className="space-y-4">
               <div>
@@ -264,7 +269,6 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="space-y-3">
-                {/* Action 1: Add New Employee - open modal */}
                 <button
                   type="button"
                   onClick={() => {
@@ -286,8 +290,7 @@ export default function AdminDashboardPage() {
                   <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
                 </button>
 
-                {/* Action 2: Process Leave Approvals */}
-                <a
+                <Link
                   href="/admin/leaves"
                   className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group"
                 >
@@ -301,10 +304,9 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
-                </a>
+                </Link>
 
-                {/* Action 3: Review Payslips */}
-                <a
+                <Link
                   href="/admin/payslips"
                   className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group"
                 >
@@ -318,7 +320,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
-                </a>
+                </Link>
               </div>
 
               <div className="pt-4 border-t border-[var(--color-line-subtle)] text-center">
@@ -333,7 +335,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Add Employee Modal */}
         <AddEmployeeModal
           isOpen={isAddModalOpen}
           onClose={() => {

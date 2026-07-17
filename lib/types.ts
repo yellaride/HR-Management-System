@@ -28,3 +28,14 @@ export interface LeaveBalances {
   SICK: LeaveBalance;
   CASUAL: LeaveBalance;
 }
+export interface EmployeeBirthday {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  designation: string;
+  birthDate: string;
+  birthDay: number;
+  birthMonth: number;
+  birthdayEmailStatus?: "Sent" | "Scheduled" | "Pending";
+}

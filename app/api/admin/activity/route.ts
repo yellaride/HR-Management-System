@@ -10,8 +10,11 @@ const mapActivityTypeToFrontendType = (activityType: string): string => {
   if (upper.includes("CHECK_IN") || upper.includes("CHECK_OUT") || upper.includes("ATTENDANCE")) {
     return "attendance";
   }
-  if (upper.includes("LEAVE")) {
+  if (upper.includes("LEAVE_REQUEST") || upper.includes("LEAVE_APPROVED") || upper.includes("LEAVE_REJECTED") || upper.includes("LEAVE")) {
     return "leave";
+  }
+  if (upper.includes("BIRTHDAY")) {
+    return "birthday";
   }
   if (upper.includes("PAYSLIP") || upper.includes("SALARY") || upper.includes("PAYROLL")) {
     return "payslip";
@@ -26,8 +29,6 @@ export async function GET(request: Request) {
     const typeFilter = searchParams.get("type") || "all";
     const searchQuery = searchParams.get("search") || "";
 
-    const today = new Date();
-
     // 1. Resolve user ID mappings if searching by name
     let matchingUserIds: string[] = [];
     if (searchQuery) {
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
       matchingUserIds = matchingEmployees.map((emp: any) => emp._id.toString());
     }
 
-    // 2. Build Database Query mapping your actual database attributes
+    // 2. Build Database Query mapping actual database attributes
     const dbQuery: Record<string, any> = {};
 
     if (typeFilter !== "all") {
@@ -68,7 +69,6 @@ export async function GET(request: Request) {
       .lean();
 
     // 3. Retrieve all employees to map activityLog.userId to employee name + designation
-    // NOTE: Some installations may store ActivityLog.userId as Employee._id, others as Employee.userId.
     const employees = await Employee.find({}).lean();
 
     const employeeIdToName = new Map<string, string>();
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
     });
 
     // 4. Normalize logs so they have the proper structure the React frontend expects
-    let logsToRender = (dbLogs || []).map((log: any) => {
+    const logsToRender = (dbLogs || []).map((log: any) => {
       const rawUserId = log.userId;
       const userIdStr = rawUserId?.toString();
 
@@ -114,46 +114,10 @@ export async function GET(request: Request) {
       };
     });
 
-    // 5. Fetch and generate birthday logs dynamically from the active Employees list
-    let birthdayLogs: any[] = [];
-    if (typeFilter === "all" || typeFilter === "birthday") {
-      const currentMonth = today.getUTCMonth() + 1; // 1-indexed (Jan is 1, Dec is 12)
-      const currentDay = today.getUTCDate();
+    // 5. Sort remaining database logs descending by creation date
+    logsToRender.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      const activeEmployees = employees.filter((emp: any) => emp.status !== "Inactive");
-      
-      birthdayLogs = activeEmployees
-        .filter((emp: any) => {
-          const dobField = emp.dob || emp.dateOfBirth || emp.birthday;
-          if (!dobField) return false;
-          
-          const date = new Date(dobField);
-          return date.getUTCMonth() + 1 === currentMonth && date.getUTCDate() === currentDay;
-        })
-        .map((emp: any) => ({
-          _id: `birthday-${emp._id}`,
-          user: emp.name,
-          action: "is celebrating their birthday today! 🎂🎉",
-          type: "birthday",
-          createdAt: new Date().toISOString(),
-        }));
-
-      // Apply filter matching to dynamic birthday items
-      if (searchQuery) {
-        const lowerQuery = searchQuery.toLowerCase();
-        birthdayLogs = birthdayLogs.filter(
-          log => log.user.toLowerCase().includes(lowerQuery) || log.action.toLowerCase().includes(lowerQuery)
-        );
-      }
-    }
-
-    // 6. Combine real normalized database logs with dynamic birthdays
-    const combinedLogs = [...logsToRender, ...birthdayLogs];
-
-    // 7. Sort all logs descending by creation date
-    combinedLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return NextResponse.json({ logs: combinedLogs }, { status: 200 });
+    return NextResponse.json({ logs: logsToRender }, { status: 200 });
   } catch (error: any) {
     console.error("Failed to fetch activity logs:", error);
     return NextResponse.json(

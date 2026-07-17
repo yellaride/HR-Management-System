@@ -264,6 +264,10 @@ export default function ManageLeavePolicyModal({
                     >
                       <span className="block font-bold text-xs text-gray-800">{emp.name}</span>
                       <span className="block text-[10px] text-gray-400">{emp.email}</span>
+                      {(emp as any).designation && (
+                        <span className="block text-[10px] text-gray-500">{(emp as any).designation}</span>
+                      )}
+
                     </button>
                   ))
                 )}

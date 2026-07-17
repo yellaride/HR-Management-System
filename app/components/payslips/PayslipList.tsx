@@ -29,7 +29,8 @@ interface PayslipListProps {
   emptyMessage?: string;
   showAdminControls?: boolean;
   showEmployeeColumn?: boolean; 
-  showDetailedBreakdown?: boolean; 
+  showDetailedBreakdown?: boolean;
+  showVersion?: boolean;
   formatCurrency?: (amount: number) => string;
   companyDetails?: CompanyDetailsData | null; // Keep companyDetails in the prop definitions
 }
@@ -52,7 +53,8 @@ export default function PayslipList({
   emptyMessage = "No matching paid payslips found.",
   showAdminControls = false,
   showEmployeeColumn = true, 
-  showDetailedBreakdown = false, 
+  showDetailedBreakdown = false,
+  showVersion = false,
   formatCurrency,
   companyDetails = null,
 }: PayslipListProps): React.JSX.Element {
@@ -98,9 +100,11 @@ export default function PayslipList({
       if (onDownloadEnd) onDownloadEnd(slip._id);
     }
   };
+
   let totalColumns = 5; 
   if (showEmployeeColumn) totalColumns += 1;
   if (showDetailedBreakdown) totalColumns += 3; 
+  if (showVersion) totalColumns += 1;
 
   return (
     <div className="table-card">
@@ -134,7 +138,9 @@ export default function PayslipList({
               )}
               
               <th className="px-6 py-4 text-right">Net Take-Home</th>
-              <th className="px-6 py-4 text-center">Version</th>
+              {showVersion && (
+                <th className="px-6 py-4 text-center">Version</th>
+              )}
               <th className="px-6 py-4 text-center">Status</th>
               <th className="px-6 py-4 text-right">Action</th>
             </tr>
@@ -177,9 +183,39 @@ export default function PayslipList({
                     {showEmployeeColumn && (
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px]">
-                            {initials}
-                          </div>
+                          {(() => {
+                            const imageUrl =
+                              (employeeObj as any)?.profilePhotoUrl ||
+                              (employeeObj as any)?.profilePhotoURL ||
+                              (employeeObj as any)?.profilePhoto ||
+                              (employeeObj as any)?.image ||
+                              (employeeObj as any)?.picture ||
+                              (employeeObj as any)?.profilePicture ||
+                              (employeeObj as any)?.profilePic;
+
+                            if (typeof imageUrl === "string" && imageUrl.trim()) {
+                              return (
+                                <div className="w-9 h-9 rounded-xl bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border border-[var(--color-line-subtle)] overflow-hidden">
+                                  <img
+                                    src={imageUrl}
+                                    alt={employeeName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      target.onerror = null;
+                                      target.style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="w-9 h-9 rounded-xl bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px]">
+                                {initials}
+                              </div>
+                            );
+                          })()}
                           <div>
                             <span className="font-bold text-[var(--color-content-main)] block leading-tight">{employeeName}</span>
                             <span className="text-[10px] text-[var(--color-content-muted)] font-medium mt-0.5 block">{employeeRole}</span>
@@ -219,15 +255,17 @@ export default function PayslipList({
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 text-center">
-                      {String((slip as any).version ?? (slip as any).Version ?? "").trim() ? (
-                        <span className="font-bold text-[var(--color-content-secondary)]">
-                          {String((slip as any).version ?? (slip as any).Version)}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--color-content-muted)]">-</span>
-                      )}
-                    </td>
+                    {showVersion && (
+                      <td className="px-6 py-4 text-center">
+                        {String((slip as any).version ?? (slip as any).Version ?? "").trim() ? (
+                          <span className="font-bold text-[var(--color-content-secondary)]">
+                            {String((slip as any).version ?? (slip as any).Version)}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--color-content-muted)]">-</span>
+                        )}
+                      </td>
+                    )}
 
                     <td className="px-6 py-4 text-center">
                       <div className="inline-flex items-center justify-center">

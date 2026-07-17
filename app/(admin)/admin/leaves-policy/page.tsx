@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Users, Edit2, RotateCcw, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
-import ManageLeavePolicyModal from "@/app/components/admin/ManageLeavePolicyModal";
+import ManageLeavePolicyModal from "@/app/components/admin/leave-policy/ManageLeavePolicyModal";
 
 interface EmployeePolicy {
   userId: string;
@@ -129,7 +129,7 @@ export default function AdminLeavesPolicyPage() {
   const standardBaselineCount = employees.length - customOverrideEmployees.length;
 
   return (
-    <div className="px-4 md:px-6 space-y-6 min-h-screen pb-12">
+    <div className="space-y-6 min-h-screen pb-12">
       {/* Header Info */}
       <div className="pb-6 border-b border-[var(--color-line-subtle,#e2e0e8)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -268,9 +268,40 @@ export default function AdminLeavesPolicyPage() {
                         >
                           {/* Name & Contact */}
                           <td className="table-cell">
-                            <div className="font-bold text-xs text-[#181124]">{emp.name}</div>
-                            <div className="text-[10px] text-gray-400 mt-0.5">{emp.email}</div>
+                            <div className="flex items-center gap-3">
+                              {/* Profile photo (optional) */}
+                              <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center overflow-hidden shrink-0 relative">
+                                {emp.name
+                                  ? emp.name
+                                      .split(" ")
+                                      .filter(Boolean)
+                                      .map((n) => n[0])
+                                      .join("")
+                                      .slice(0, 2)
+                                      .toUpperCase()
+                                  : "??"}
+                                {(emp as any).profilePhotoUrl ? (
+                                  <img
+                                    src={(emp as any).profilePhotoUrl}
+                                    alt={emp.name}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : null}
+                              </div>
+                              <div>
+                                <div className="font-bold text-xs text-[#181124] capitalize">{emp.name}</div>
+                                <div className="text-[10px] text-gray-400 mt-0.5">{emp.email}</div>
+                                {/* Designation if available */}
+                                {(emp as any).designation && (
+                                  <div className="text-[10px] text-gray-500 mt-0.5">{(emp as any).designation}</div>
+                                )}
+                              </div>
+                            </div>
                           </td>
+
 
                           {/* Custom Override Indicator Badge */}
                           <td className="table-cell text-center">

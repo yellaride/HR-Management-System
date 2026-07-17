@@ -124,16 +124,32 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
             const rawStatus = String(leave.status || "Pending").toUpperCase();
 
             // Resolve title-case leave type robustly from backend keys.
-            // Backend currently sends: { type: "Annual Leave" | ... , typeUpper: "ANNUAL" | "SICK" | "CASUAL" }
             const resolvedType = resolveLeaveTypeTitle(leave as LeaveRequest);
+
+            // Safely retrieve the profile photo URL by asserting to any
+            const profilePhotoUrl = (leave as any).profilePhotoUrl as string | undefined;
 
             return (
               <tr key={leave.id} className="table-row-hover">
                 {/* Employee Column (Name & Avatar) */}
                 <td className="table-cell">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px]">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px] overflow-hidden shrink-0 relative">
+                      {/* Fallback Initials rendered underneath */}
                       {initials}
+
+                      {/* Layered Profile Image */}
+                      {profilePhotoUrl && (
+                        <img 
+                          src={profilePhotoUrl} 
+                          alt={leave.employeeName} 
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            // Hide the image immediately if loading fails (e.g., bad Cloudinary URL)
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      )}
                     </div>
                     <div>
                       <span className="font-bold text-[var(--color-content-main)] block leading-tight capitalize">
@@ -153,7 +169,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                 {/* Leave Type Column */}
                 <td className="table-cell">
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase border ${getLeaveTypeStyles(resolvedType)}`}>
-                    {leave.type}
+                    {resolvedType}
                   </span>
                 </td>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   LogIn, 
   LogOut, 
@@ -20,6 +20,16 @@ interface AttendanceRecord {
   workingHours?: number;
   formattedDuration?: string;
   status: "On Time" | "Late" | "Absent";
+}
+
+interface ActiveSettings {
+  shiftStart: string;
+  shiftEnd: string;
+  gracePeriod: number;
+  checkInDisplayBefore: number;
+  checkOutDisplayAfter: number;
+  autoCheckOut: boolean;
+  autoCheckOutTime: string;
 }
 
 function ClockWidget() {
@@ -50,15 +60,32 @@ function ClockWidget() {
 export default function EmployeeAttendancePage() {
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+  const [settings, setSettings] = useState<ActiveSettings>({
+    shiftStart: "09:00",
+    shiftEnd: "17:00",
+    gracePeriod: 15,
+    checkInDisplayBefore: 30,
+    checkOutDisplayAfter: 0,
+    autoCheckOut: false,
+    autoCheckOutTime: "18:00"
+  });
+
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Prevention mechanism for accidental clicks
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    action: "check-in" | "check-out" | null;
+  }>({ isOpen: false, action: null });
+
   // States to hold the validation rules for the interactive UI buttons
   const [isSunday, setIsSunday] = useState<boolean>(false);
   const [isWithinWindow, setIsWithinWindow] = useState<boolean>(false);
+  const [isPastAutoCheckOut, setIsPastAutoCheckOut] = useState<boolean>(false);
 
-  // Validate operational hour rules dynamically (11:30 AM to 8:30 PM)
+  // Validate operational hour rules dynamically against database settings
   const evaluateTimeConstraints = useCallback(() => {
     const now = new Date();
     const day = now.getDay();
@@ -74,11 +101,30 @@ export default function EmployeeAttendancePage() {
     const minutes = now.getMinutes();
     const currentMins = hours * 60 + minutes;
 
-    const startLimit = 11 * 60 + 30; // 11:30 AM
-    const endLimit = 20 * 60 + 30;   // 8:30 PM
+    // Convert shift Start/End strings to minutes dynamically
+    const [startH, startM] = settings.shiftStart.split(":").map(Number);
+    const [endH, endM] = settings.shiftEnd.split(":").map(Number);
+
+    const shiftStartMin = startH * 60 + startM;
+    const shiftEndMin = endH * 60 + endM;
+
+    // Display offsets
+    const checkInOffset = settings.checkInDisplayBefore || 30;
+    const checkOutOffset = settings.checkOutDisplayAfter || 0;
+
+    const startLimit = shiftStartMin - checkInOffset; 
+    const endLimit = shiftEndMin + checkOutOffset; 
 
     setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
-  }, []);
+
+    if (settings.autoCheckOut) {
+      const [autoH, autoM] = settings.autoCheckOutTime.split(":").map(Number);
+      const autoMins = autoH * 60 + autoM;
+      setIsPastAutoCheckOut(currentMins >= autoMins);
+    } else {
+      setIsPastAutoCheckOut(false);
+    }
+  }, [settings]);
 
   const fetchAttendanceData = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = !!opts?.silent;
@@ -89,6 +135,9 @@ export default function EmployeeAttendancePage() {
       if (res.ok) {
         setTodayRecord(data.todayRecord || null);
         setHistory(data.history || []);
+        if (data.settings) {
+          setSettings(data.settings);
+        }
       } else {
         setErrorMessage(data.error || "Failed to fetch attendance history.");
       }
@@ -102,11 +151,19 @@ export default function EmployeeAttendancePage() {
   // Sync constraints and data on load
   useEffect(() => {
     fetchAttendanceData();
+  }, [fetchAttendanceData]);
+
+  useEffect(() => {
     evaluateTimeConstraints();
-    
     const interval = setInterval(evaluateTimeConstraints, 15000); // Check constraints every 15 seconds
     return () => clearInterval(interval);
-  }, [fetchAttendanceData, evaluateTimeConstraints]);
+  }, [settings, evaluateTimeConstraints]);
+
+  // Sum total accumulated working hours from history to show progression (e.g. 77 hrs to 85 hrs)
+  const totalAccumulatedHours = useMemo(() => {
+    const total = history.reduce((sum, record) => sum + (record.workingHours || 0), 0);
+    return Math.round(total * 100) / 100;
+  }, [history]);
 
   const handleAction = async (actionType: "check-in" | "check-out") => {
     try {
@@ -150,6 +207,23 @@ export default function EmployeeAttendancePage() {
     return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
   };
 
+  const getReadableTime = (timeStr: string, minutesOffset: number) => {
+    const [h, m] = timeStr.split(":").map(Number);
+    let total = h * 60 + m + minutesOffset;
+    if (total < 0) total += 24 * 60;
+    total = total % (24 * 60);
+    const finalH = Math.floor(total / 60);
+    const finalM = total % 60;
+    const finalHPadded = String(finalH).padStart(2, "0");
+    const finalMPadded = String(finalM).padStart(2, "0");
+
+    // Convert "HH:MM" 24 hour to 12 hour standard format
+    const hourNum = parseInt(finalHPadded, 10);
+    const ampm = hourNum >= 12 ? "PM" : "AM";
+    const formattedHour = hourNum % 12 || 12;
+    return `${formattedHour}:${finalMPadded} ${ampm}`;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px] text-xs text-content-secondary">
@@ -158,12 +232,48 @@ export default function EmployeeAttendancePage() {
     );
   }
 
-  // Determine if check-in or check-out buttons should be disabled based on time boundaries
-  const isButtonsDisabled = isSunday || !isWithinWindow || actionLoading;
+  // Disable evaluation parameters
+  const isButtonsDisabled = isSunday || !isWithinWindow || isPastAutoCheckOut || actionLoading;
 
   return (
-    <div className="space-y-6 pt-4 pb-12 bg-surface-main min-h-screen">
+    <div className="space-y-6 pt-4 pb-12 bg-surface-main min-h-screen relative">
       
+      {/* Confirmation Dialog to Prevent Accidental Clicks */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-line-subtle rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+            <div className="flex items-center gap-2.5 text-amber-600">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h3 className="text-sm font-bold text-content-main">Confirm Action</h3>
+            </div>
+            <p className="text-xs text-content-secondary leading-relaxed">
+              Are you sure you want to register your <span className="font-bold">{confirmModal.action === "check-in" ? "Check-In" : "Check-Out"}</span> session? Please verify before continuing.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setConfirmModal({ isOpen: false, action: null })}
+                className="px-4 py-2 border border-line-subtle rounded-xl text-xs font-semibold text-content-secondary hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmModal.action) {
+                    handleAction(confirmModal.action);
+                  }
+                  setConfirmModal({ isOpen: false, action: null });
+                }}
+                className={`px-4 py-2 text-white rounded-xl text-xs font-semibold transition ${
+                  confirmModal.action === "check-in" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-rose-600 hover:bg-rose-700"
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Page Header */}
       <div className="pb-6 border-b border-line-subtle flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -191,24 +301,31 @@ export default function EmployeeAttendancePage() {
       {!isSunday && !isWithinWindow && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
           <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <span>Outside Shift Margin: Attendance actions are restricted between 11:30 AM and 08:30 PM.</span>
+          <span>Outside Shift Margin: Attendance actions are restricted between {getReadableTime(settings.shiftStart, -(settings.checkInDisplayBefore || 0))} and {getReadableTime(settings.shiftEnd, (settings.checkOutDisplayAfter || 0))}.</span>
         </div>
       )}
 
-      {/* 2. Rule Alerts */}
+      {!isSunday && isWithinWindow && isPastAutoCheckOut && (
+        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <span>Shift Auto Checked-Out: System automatic threshold has run. Manual check-outs are disabled for this session.</span>
+        </div>
+      )}
+
+      {/* 2. Dynamic Rule Alerts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-indigo-50/50 border border-indigo-100/60 text-xs text-indigo-900 leading-relaxed">
         <div className="flex gap-2">
           <AlertCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
           <div>
             <strong className="font-semibold block">Check-In Grace Period:</strong>
-            Shift begins at 12:00 PM. Arrivals after 12:30 PM will flag your state as <span className="text-amber-700 font-bold">Late</span>.
+            Shift starts active check-ins at {getReadableTime(settings.shiftStart, -(settings.checkInDisplayBefore || 0))}. Arrivals after {getReadableTime(settings.shiftStart, (settings.gracePeriod || 15))} will flag your session status as <span className="text-amber-700 font-bold">Late</span>.
           </div>
         </div>
         <div className="flex gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <div>
             <strong className="font-semibold block">Operational Limits:</strong>
-            Working hours count only between 11:30 AM and 8:30 PM. Hours worked outside this interval will not accumulate.
+            Working hours count only between {settings.shiftStart} and {settings.shiftEnd}. Hours worked outside this interval will not accumulate, and are capped at 8 hours maximum.
           </div>
         </div>
       </div>
@@ -242,9 +359,10 @@ export default function EmployeeAttendancePage() {
             </div>
           </div>
           <button
-            onClick={() => handleAction("check-in")}
+            type="button"
+            onClick={() => setConfirmModal({ isOpen: true, action: "check-in" })}
             disabled={!!todayRecord || isButtonsDisabled}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition cursor-pointer"
           >
             {actionLoading ? "Executing..." : todayRecord ? "Checked In Successfully" : "Register Check-In"}
           </button>
@@ -268,9 +386,10 @@ export default function EmployeeAttendancePage() {
             </div>
           </div>
           <button
-            onClick={() => handleAction("check-out")}
+            type="button"
+            onClick={() => setConfirmModal({ isOpen: true, action: "check-out" })}
             disabled={!todayRecord || !!todayRecord?.checkOut || isButtonsDisabled}
-            className="w-full bg-rose-600 text-white hover:bg-rose-700 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition"
+            className="w-full bg-rose-600 text-white hover:bg-rose-700 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition cursor-pointer"
           >
             {actionLoading ? "Executing..." : todayRecord?.checkOut ? "Checked Out Successfully" : "Register Check-Out"}
           </button>
@@ -285,10 +404,18 @@ export default function EmployeeAttendancePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-line-subtle pb-2.5">
               <span className="text-xs text-content-secondary font-medium flex items-center gap-1.5">
-                <Timer className="w-3.5 h-3.5 text-content-muted" /> Working Hours
+                <Timer className="w-3.5 h-3.5 text-content-muted" /> Today's Session Hours
               </span>
               <span className="text-xs font-bold text-content-main">
                 {todayRecord?.formattedDuration || "0 hrs 0 mins"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-b border-line-subtle pb-2.5">
+              <span className="text-xs text-content-secondary font-medium flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-content-muted" /> Total Monthly Accumulation
+              </span>
+              <span className="text-xs font-bold text-indigo-600">
+                {totalAccumulatedHours} hrs
               </span>
             </div>
             <div className="flex items-center justify-between">

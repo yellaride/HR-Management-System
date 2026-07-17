@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { Users, CheckCircle, XCircle, Clock, Calendar } from "lucide-react";
 
@@ -10,25 +12,19 @@ interface SummaryProps {
     lateCount: number;
   };
   filterDate: string;
-  onDateChange: (val: string) => void;
 }
 
-export default function AttendanceSummaryCards({ metrics, filterDate, onDateChange }: SummaryProps) {
+export default function AttendanceSummaryCards({ metrics, filterDate }: SummaryProps) {
   return (
     <div className="space-y-3">
-      {/* Header and Interactive Date Picker */}
+      {/* Header with static, read-only date card representing Pakistan Time today */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
           Attendance Indicators
         </span>
-        <div className="flex items-center gap-2 bg-white border border-[var(--color-line-subtle)] rounded-xl px-3 py-1.5 shadow-3xs focus-within:ring-2 focus-within:ring-[var(--color-brand-accent)]/20 focus-within:border-[var(--color-brand-accent)] transition-all duration-200">
+        <div className="flex items-center gap-2 bg-slate-50 border border-[var(--color-line-subtle)] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--color-content-main)]">
           <Calendar className="w-3.5 h-3.5 text-[var(--color-brand-accent)]" />
-          <input
-            type="date"
-            value={filterDate}
-            onChange={(e) => e.target.value && onDateChange(e.target.value)}
-            className="text-xs font-bold text-[var(--color-content-main)] outline-none bg-transparent cursor-pointer [color-scheme:light]"
-          />
+          <span>Today: {filterDate}</span>
         </div>
       </div>
 

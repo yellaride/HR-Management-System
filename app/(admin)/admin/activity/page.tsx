@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, Calendar, RefreshCw, CheckSquare, Heart, User, ChevronDown } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, CheckSquare, User, ChevronDown } from "lucide-react";
 
 interface Activity {
   _id: string;
@@ -44,17 +44,12 @@ function ActivityLogPage() {
           fetchedLogs = fetchedLogs.filter((log: Activity) => log.type === typeFilter);
         }
 
-        // Apply interactive client-side date filters.
-        // For birthday logs, `createdAt` is synthetic (set to "now"), so date ranges
-        // would incorrectly hide birthday entries. Therefore, apply range filters only
-        // to non-birthday logs.
+        // Apply interactive client-side date filters
         if (dateFilter !== "all") {
           const now = new Date();
           const startOfToday = new Date(now.setHours(0, 0, 0, 0));
 
           fetchedLogs = fetchedLogs.filter((log: Activity) => {
-            if (log.type === "birthday") return true;
-
             const logDate = new Date(log.createdAt);
             if (dateFilter === "today") {
               return logDate >= startOfToday;
@@ -133,17 +128,11 @@ function ActivityLogPage() {
           badge: "bg-amber-50 text-amber-700 border-amber-100",
           label: "Leave Request",
         };
-      case "birthday":
-        return {
-          icon: Heart,
-          badge: "bg-pink-50 text-pink-700 border-pink-100",
-          label: "Birthday Celebration",
-        };
       default:
         return {
           icon: User,
           badge: "bg-slate-50 text-slate-700 border-slate-100",
-          label: "System Log",
+          label: "Birthday Mail",
         };
     }
   };
@@ -154,8 +143,6 @@ function ActivityLogPage() {
         return "Attendance";
       case "leave":
         return "Leaves";
-      case "birthday":
-        return "Birthdays";
       default:
         return "All Types";
     }
@@ -202,7 +189,7 @@ function ActivityLogPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f9f8fc] text-[#181124] pb-16">
+    <div className="min-h-screen bg-[#f9f8fc] text-[#181124]">
       <div className="pr-2 py-10 space-y-6">
         
         {/* Page Title & Navigation Area */}
@@ -216,7 +203,7 @@ function ActivityLogPage() {
               </span>
             </h1>
             <p className="text-xs text-[#534a60] mt-1.5 font-medium">
-              Real-time administrative feed tracking attendance records, leave queries, and employee birthdays.
+              Real-time administrative feed tracking attendance records, leave queries, and core system logs.
             </p>
           </div>
 
@@ -242,7 +229,7 @@ function ActivityLogPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-            {/* Filter Dropdown (Custom styling matching the payslip modal) */}
+            {/* Filter Dropdown */}
             <div className="flex items-center gap-2 w-full sm:w-auto relative" ref={typeRef}>
               <span className="text-xs font-semibold text-[#534a60] flex items-center gap-1.5 shrink-0">
                 <Filter className="w-3.5 h-3.5 text-[#7c3aed]" /> Filter:
@@ -293,7 +280,7 @@ function ActivityLogPage() {
               </div>
             </div>
 
-            {/* Time Range Filter (Custom styling matching the payslip modal) */}
+            {/* Time Range Filter */}
             <div className="flex items-center gap-2 w-full sm:w-auto relative" ref={dateRef}>
               <span className="text-xs font-semibold text-[#534a60] flex items-center gap-1.5 shrink-0">
                 <Calendar className="w-3.5 h-3.5 text-[#7c3aed]" /> Range:
@@ -356,12 +343,10 @@ function ActivityLogPage() {
           ) : logs.length === 0 ? (
             <div className="py-24 text-center px-4">
               <p className="text-sm font-semibold text-[#181124]">
-                {typeFilter === "birthday" ? "No birthday celebrations found." : "No matching logs found."}
+                No matching logs found.
               </p>
               <p className="text-xs text-[#8e859c] mt-1">
-                {typeFilter === "birthday" 
-                  ? "There are no employee birthdays scheduled or recorded for this period." 
-                  : "Try resetting selected parameters or search input."}
+                Try resetting selected parameters or search input.
               </p>
             </div>
           ) : (

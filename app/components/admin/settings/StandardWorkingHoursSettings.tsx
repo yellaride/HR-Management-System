@@ -31,15 +31,22 @@ export default function StandardWorkingHoursSettings({
       ) : (
         <div className="flex items-center gap-2 mt-0.5">
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             min={0}
             step={1}
             required
-            value={Number.isFinite(tempValue) ? tempValue : 0}
+            value={Number.isFinite(tempValue) ? String(tempValue) : "0"}
             disabled={saving}
             onChange={(e) => {
               const raw = e.target.value;
-              const next = raw === "" ? 0 : Number.parseInt(raw, 10);
+              // Allow temporary empty input while typing.
+              if (raw === "") {
+                onChangeTempValue(0);
+                return;
+              }
+              // Convert to number for saving/validation, but UI will keep the raw text.
+              const next = Number.parseInt(raw, 10);
               onChangeTempValue(Number.isFinite(next) ? next : 0);
             }}
 

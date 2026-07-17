@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 // Updated import to resolve the new default-exported EmployeeTable
-import EmployeeTable, { Employee } from "../../../components/admin/EmployeeTable";
-import AddEmployeeModal from "../../../components/admin/AddEmployeeModal";
-import EditEmployeeModal from "../../../components/admin/EditEmployeeModal";
-import ViewEmployeeModal from "../../../components/admin/ViewEmployeeModal";
-import EmptyState from "../../../components/admin/EmptyState";
+import EmployeeTable, { Employee } from "../../../components/admin/employees/EmployeeTable";
+
+import AddEmployeeModal from "../../../components/admin/employees/AddEmployeeModal";
+import EditEmployeeModal from "../../../components/admin/employees/EditEmployeeModal";
+import ViewEmployeeModal from "../../../components/admin/employees/ViewEmployeeModal";
+import EmptyState from "../../../components/admin/employees/EmptyState";
 
 /**
  * Translates raw backend errors, database codes, or network issues 
@@ -38,6 +39,7 @@ function getFriendlyErrorMessage(error: string | null): string | null {
 
 export default function AdminEmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]); // State to hold fetched departments
   const [searchQuery, setSearchQuery] = useState("");
   
   // Modal triggers
@@ -71,8 +73,26 @@ export default function AdminEmployeesPage() {
     }
   };
 
+  // New function to fetch departments from your company settings API
+  const fetchDepartments = async () => {
+    try {
+      // NOTE: Ensure this URL matches the path of your company-settings API.
+      // E.g., "/api/admin/company-settings" or "/api/company-settings"
+      const res = await fetch("/api/settings/company-settings"); 
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.departments)) {
+          setDepartments(data.departments);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load departments:", err);
+    }
+  };
+
   useEffect(() => {
     fetchEmployees();
+    fetchDepartments(); // Fetching company settings departments on component mount
   }, []);
 
   // CREATE profile handler
@@ -274,7 +294,6 @@ export default function AdminEmployeesPage() {
             <span className="text-content-secondary text-xs">No employees match your search query.</span>
           </div>
         ) : (
-          /* Replaced the grid-mapping loop with a single responsive table element */
           <EmployeeTable
             employees={filteredEmployees}
             onEdit={handleOpenEdit}
@@ -283,15 +302,16 @@ export default function AdminEmployeesPage() {
         )}
       </div>
 
-      {/* 1. Add Employee Modal */}
+      {/* 1. Add Employee Modal (Fixed Syntax & Passed Departments) */}
       <AddEmployeeModal
         isOpen={isAddModalOpen}
         onClose={() => {
           setIsAddModalOpen(false);
           setAddEmployeeError(null);
         }}
-        errorMessage={getFriendlyErrorMessage(addEmployeeError)} 
+        errorMessage={getFriendlyErrorMessage(addEmployeeError)}
         onSave={handleCreateEmployee}
+        departments={departments} // Pass fetched departments state here
       />
 
       {/* 2. Edit Employee Modal */}
@@ -305,6 +325,8 @@ export default function AdminEmployeesPage() {
         errorMessage={getFriendlyErrorMessage(editEmployeeError)}
         employee={selectedEmployee}
         onSave={handleEditEmployee}
+        // If EditEmployeeModal also has a department drop-down, pass the prop here:
+        // departments={departments}
       />
 
       {/* 3. View Employee Portal Modal */}

@@ -5,7 +5,6 @@ import Swal from "sweetalert2";
 import { 
   CalendarCheck, 
   Clock, 
-  FileText, 
   Fingerprint, 
   CalendarPlus, 
   X, 
@@ -15,14 +14,15 @@ import {
   AlertTriangle,
   LogIn,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  UserMinus,
+  Activity
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import PayslipList from "@/app/components/payslips/PayslipList";
 import { PayslipRecord } from "@/app/components/payslips/payslipPdf";
-import { CountUp } from "@/app/components/admin/StatCard";
-
-
+import {MetricCard} from "@/app/components/admin/dashbord/MetricCard";
+import BirthdayGreetingBanner from "@/app/components/employee/dashbord/BirthdayGreetingBanner";
 
 const swalCustomClass = {
   popup: "bg-white rounded-2xl border border-[var(--color-line-subtle)] shadow-xl font-sans",
@@ -69,28 +69,29 @@ export default function EmployeeDashboardPage() {
   const { data: session } = useSession();
   const leaveTypeRef = useRef<HTMLDivElement>(null);
 
-  // Core Metrics State
-  const [presentDays, setPresentDays] = useState(18);
-  const [pendingLeaves, setPendingLeaves] = useState(2);
+  const [presentDays, setPresentDays] = useState(0);
+  const [absentDays, setAbsentDays] = useState(0);
+  const [totalWorkedHours, setTotalWorkedHours] = useState(0);
+  const [pendingLeaves, setPendingLeaves] = useState(0);
+  
   const [payslips, setPayslips] = useState<PayslipRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Attendance Integration States
   const [todayRecord, setTodayRecord] = useState<any | null>(null);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
-  // Time & Constraints Validation
   const [isSunday, setIsSunday] = useState(false);
   const [isWithinWindow, setIsWithinWindow] = useState(false);
 
-  // Interactivity state
+  const [isBirthday, setIsBirthday] = useState(false);
+  const [birthdayName, setBirthdayName] = useState("");
+
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isLeaveTypeDropdownOpen, setIsLeaveTypeDropdownOpen] = useState(false);
   const [leaveAppliedNotice, setLeaveAppliedNotice] = useState(false);
 
-  // Form parameters
   const [leaveForm, setLeaveForm] = useState({
     type: "Annual Leave",
     startDate: "",
@@ -98,7 +99,6 @@ export default function EmployeeDashboardPage() {
     reason: "",
   });
 
-  // Evaluate operational shift hour constraints (11:30 AM to 8:30 PM)
   const evaluateTimeConstraints = useCallback(() => {
     const now = new Date();
     const day = now.getDay();
@@ -114,13 +114,12 @@ export default function EmployeeDashboardPage() {
     const minutes = now.getMinutes();
     const currentMins = hours * 60 + minutes;
 
-    const startLimit = 11 * 60 + 30; // 11:30 AM
-    const endLimit = 20 * 60 + 30;   // 8:30 PM
+    const startLimit = 11 * 60 + 30;
+    const endLimit = 20 * 60 + 30;
 
     setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
   }, []);
 
-  // Fetch attendance logs
   const fetchAttendanceStatus = useCallback(async () => {
     try {
       setAttendanceLoading(true);
@@ -129,11 +128,26 @@ export default function EmployeeDashboardPage() {
         const data = await res.json();
         setTodayRecord(data.todayRecord || null);
         
-        if (data.history && data.history.length > 0) {
+        if (data.monthlyRecord) {
+          setPresentDays(data.monthlyRecord.presentDays ?? 0);
+          setAbsentDays(data.monthlyRecord.absentDays ?? 0);
+          setTotalWorkedHours(data.monthlyRecord.totalWorkingHours ?? 0);
+
+        } else if (data.history && data.history.length > 0) {
           const actualPresents = data.history.filter(
             (r: any) => r.status === "On Time" || r.status === "Late"
           ).length;
           setPresentDays(actualPresents);
+          
+          const actualAbsents = data.history.filter(
+            (r: any) => r.status === "Absent"
+          ).length;
+          setAbsentDays(actualAbsents);
+
+          const totalHours = data.history.reduce((acc: number, curr: any) => {
+            return acc + (curr.workedHours || 0);
+          }, 0);
+          setTotalWorkedHours(totalHours || actualPresents * 8); 
         }
       }
     } catch (err) {
@@ -143,7 +157,6 @@ export default function EmployeeDashboardPage() {
     }
   }, []);
 
-  // Attendance Clock-in Actions
   const handleAttendanceAction = async (actionType: "check-in" | "check-out") => {
     try {
       setAttendanceError(null);
@@ -164,20 +177,17 @@ export default function EmployeeDashboardPage() {
     }
   };
 
-  // Self-healing, resilient payslip fetching routine
   const fetchEmployeePayslips = useCallback(async () => {
     if (!session?.user?.email) return;
 
     try {
       setIsLoading(true);
       
-      // Step 1: Attempt dedicated employee scoped endpoint
       let res = await fetch("/api/employee/payslips");
       let isEmployeeScopedEndpoint = true;
 
       if (!res.ok) {
-        console.warn(`Dedicated employee API returned status ${res.status}. Falling back to general query...`);
-        // Fallback to administrator query if employee-specific route is not configured
+        console.warn(`Dedicated employee API returned status ${res.status}. Falling back...`);
         res = await fetch("/api/admin/payslips");
         isEmployeeScopedEndpoint = false;
       }
@@ -188,7 +198,6 @@ export default function EmployeeDashboardPage() {
 
       const data = await res.json();
       
-      // Extract structure array securely
       let slips: PayslipRecord[] = [];
       if (Array.isArray(data)) {
         slips = data;
@@ -198,17 +207,14 @@ export default function EmployeeDashboardPage() {
         slips = data.data;
       }
 
-      // Step 2: Conditionally filter if fetching from administrative fallback route
       if (!isEmployeeScopedEndpoint) {
         const currentUserEmail = (session.user as any)?.email?.toLowerCase?.().trim();
         const currentUserName = (session.user as any)?.name?.toLowerCase?.().trim() || "";
-
 
         slips = slips.filter((slip: PayslipRecord) => {
           const empObj = typeof slip.employeeId === "object" && slip.employeeId !== null ? slip.employeeId : null;
           const empName = (empObj?.name || slip.employeeName || "").toLowerCase().trim();
           const empEmail = (empObj as any)?.email || (slip as any).employeeEmail || "";
-          const empEmailStr = String(empEmail).toLowerCase().trim();
 
           const emailMatches = empEmail && currentUserEmail && empEmail === currentUserEmail;
           const nameMatches = empName && currentUserName && empName === currentUserName;
@@ -225,10 +231,37 @@ export default function EmployeeDashboardPage() {
     }
   }, [session]);
 
+  const fetchPendingLeaves = useCallback(async () => {
+    try {
+      const res = await fetch("/api/employee/leaves-request");
+      if (!res.ok) return;
+      const data = await res.json();
+      const leaves = Array.isArray(data?.leaves) ? data.leaves : (Array.isArray(data) ? data : []);
+      const pendingCount = leaves.filter((l: any) => String(l?.status || "").toUpperCase() === "PENDING").length;
+      setPendingLeaves(pendingCount);
+    } catch (e) {
+      console.error("Failed to fetch pending leaves", e);
+    }
+  }, []);
+
+  const fetchBirthdayStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/employee/my-birthday");
+      if (res.ok) {
+        const data = await res.json();
+        setIsBirthday(!!data.isBirthday);
+        setBirthdayName(data.name || "");
+      }
+    } catch (e) {
+      console.error("Failed to fetch birthday validation values:", e);
+    }
+  }, []);
 
   useEffect(() => {
     fetchEmployeePayslips();
     fetchAttendanceStatus();
+    fetchPendingLeaves();
+    fetchBirthdayStatus();
     evaluateTimeConstraints();
 
     const timer = setInterval(() => {
@@ -236,9 +269,8 @@ export default function EmployeeDashboardPage() {
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [fetchEmployeePayslips, fetchAttendanceStatus, evaluateTimeConstraints]);
+  }, [fetchEmployeePayslips, fetchAttendanceStatus, fetchPendingLeaves, fetchBirthdayStatus, evaluateTimeConstraints]);
 
-  // Click tracking outside leave dropdown
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
       if (leaveTypeRef.current && !leaveTypeRef.current.contains(event.target as Node)) {
@@ -263,44 +295,66 @@ export default function EmployeeDashboardPage() {
     }).format(amount).replace(/\u0024/g, "");
   };
 
-  const handleLeaveSubmit = (e: React.FormEvent) => {
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveForm.startDate || !leaveForm.endDate || !leaveForm.reason) return;
 
-    setPendingLeaves(prev => prev + 1);
-    setIsLeaveModalOpen(false);
-    setLeaveAppliedNotice(true);
+    try {
+      const res = await fetch("/api/employee/leaves-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(leaveForm),
+      });
 
-    setLeaveForm({
-      type: "Annual Leave",
-      startDate: "",
-      endDate: "",
-      reason: "",
-    });
+      if (!res.ok) {
+        throw new Error("API call was unsuccessful");
+      }
 
-    setTimeout(() => {
-      setLeaveAppliedNotice(false);
-    }, 4000);
+      setIsLeaveModalOpen(false);
+      setLeaveAppliedNotice(true);
+
+      await fetchPendingLeaves();
+
+      setLeaveForm({
+        type: "Annual Leave",
+        startDate: "",
+        endDate: "",
+        reason: "",
+      });
+
+      setTimeout(() => {
+        setLeaveAppliedNotice(false);
+      }, 4000);
+
+    } catch (err) {
+      console.error("Error submitting leave request:", err);
+      Swal.fire({
+        title: "Error",
+        text: "Could not submit your leave application. Please try again.",
+        icon: "error",
+        customClass: swalCustomClass,
+      });
+    }
   };
 
   const isShiftButtonsDisabled = isSunday || !isWithinWindow;
+  const attendanceProgressPercentage = Math.min(100, Math.round((presentDays / 30) * 100));
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased py-4 lg:py-8 md:py-6">
-      <div className="w-full max-w-6xl mx-auto px-4">
+    <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased py-6 md:py-8">
+      <div className="w-full max-w-6xl mx-auto px-4 space-y-6">
         
         {/* Header Block */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
-          <div>
-                          <span className="h-2 w-2 rounded-full bg-[var(--color-brand-accent)] animate-pulse" />
-
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-accent)]">
-                Employee Portal
-              </span>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] text-[10px] font-bold uppercase tracking-wider">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-brand-accent)] animate-pulse" />
+              Employee Portal
+            </div>
             <h1 className="text-2xl font-black tracking-tight text-[var(--color-content-main)] sm:text-3xl">
               Employee Dashboard
             </h1>
-            <p className="mt-1 text-xs text-[var(--color-content-secondary)]">
+            <p className="text-xs text-[var(--color-content-secondary)]">
               Overview of your current work schedule, salary statements, and attendance records.
             </p>
           </div>
@@ -311,7 +365,10 @@ export default function EmployeeDashboardPage() {
           </div>
         </div>
 
-        {/* Notices */}
+        {/* Modular Birthday Banner */}
+        <BirthdayGreetingBanner isBirthday={isBirthday} birthdayName={birthdayName} />
+
+        {/* Notice Alerts */}
         {leaveAppliedNotice && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs animate-in fade-in duration-200">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -322,128 +379,139 @@ export default function EmployeeDashboardPage() {
           </div>
         )}
 
-        {/* Metric Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Core Metrics Grid using Reusable MetricCard */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           
-          <div className="panel panel-section flex flex-col justify-between hover:shadow-md hover:border-[var(--color-brand-accent)]/30 transition-all duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)]">
-                Attendance Period
-              </span>
-              <div className="p-2.5 rounded-xl bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border border-[var(--color-line-subtle)]">
-                <CalendarCheck className="w-5 h-5" />
+          <MetricCard
+            label="Present Days"
+            value={presentDays}
+            icon={CalendarCheck}
+            iconBgClass="bg-emerald-50"
+            iconColorClass="text-emerald-600 border-emerald-100"
+            subtext="/ 30 Days"
+          >
+            <div className="space-y-1">
+              <div className="w-full bg-[var(--color-surface-main)] h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${attendanceProgressPercentage}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] text-[var(--color-content-muted)]">
+                <span>Attendance Rate</span>
+                <span>{attendanceProgressPercentage}%</span>
               </div>
             </div>
-            <div>
-              <span className="text-3xl font-black text-[var(--color-content-main)] block tracking-tight">
-                <CountUp end={presentDays} /> <span className="text-sm font-normal text-[var(--color-content-muted)]">/ 30 Days</span>
+          </MetricCard>
 
-              </span>
-              <span className="text-[11px] text-[var(--color-content-secondary)] block mt-2">
-                Active working shifts recorded this cycle.
-              </span>
-            </div>
-          </div>
+          <MetricCard
+            label="Absent Days"
+            value={absentDays}
+            icon={UserMinus}
+            iconBgClass="bg-rose-50"
+            iconColorClass="text-rose-600 border-rose-100"
+            subtext="Days"
+          >
+            <p className="text-[10px] text-[var(--color-content-secondary)] leading-relaxed">
+              Missed shifts during this payroll lifecycle.
+            </p>
+          </MetricCard>
 
-          <div className="panel panel-section flex flex-col justify-between hover:shadow-md hover:border-amber-300 transition-all duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)]">
-                Leave Requests
-              </span>
-              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-                <Clock className="w-5 h-5" />
-              </div>
-            </div>
-            <div>
-              <span className="text-3xl font-black text-[var(--color-content-main)] block tracking-tight">
-                <CountUp end={pendingLeaves} /> <span className="text-sm font-normal text-[var(--color-content-muted)]">Pending</span>
+          <MetricCard
+            label="Worked Hours"
+            value={totalWorkedHours}
+            icon={Activity}
+            iconBgClass="bg-blue-50"
+            iconColorClass="text-blue-600 border-blue-100"
+            subtext="Hrs"
+          >
+            <p className="text-[10px] text-[var(--color-content-secondary)] leading-relaxed">
+              Cumulative logged check-in hours this month.
+            </p>
+          </MetricCard>
 
-              </span>
-              <span className="text-[11px] text-[var(--color-content-secondary)] block mt-2">
-                Days currently awaiting coordinator approval.
-              </span>
-            </div>
-          </div>
-
-          <div className="panel panel-section flex flex-col justify-between hover:shadow-md hover:border-teal-300 transition-all duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)]">
-                Latest Net Payout
-              </span>
-              <div className="p-2.5 rounded-xl bg-teal-50 text-teal-600 border border-teal-100">
-                <FileText className="w-5 h-5" />
-              </div>
-            </div>
-            <div>
-              <span className="text-3xl font-black text-[var(--color-content-main)] block tracking-tight">
-                {payslips[0] ? formatCurrency(payslips[0].netPay) : "—"}
-              </span>
-              <span className="text-[11px] text-[var(--color-content-secondary)] block mt-2">
-                {payslips[0] ? `Dispatched statement for ${payslips[0].period}.` : "No payslips available yet."}
-              </span>
-            </div>
-          </div>
+          <MetricCard
+            label="Leave Requests"
+            value={pendingLeaves}
+            icon={Clock}
+            iconBgClass="bg-amber-50"
+            iconColorClass="text-amber-600 border-amber-100"
+            subtext="Pending"
+          >
+            <p className="text-[10px] text-[var(--color-content-secondary)] leading-relaxed">
+              Requests currently awaiting operational sign-off.
+            </p>
+          </MetricCard>
 
         </div>
 
         {/* Grid Split Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
+          {/* Payslips List Segment */}
           <div className="lg:col-span-2 space-y-4">
-            <div>
-              <h2 className="text-[10px] font-bold tracking-wider text-[var(--color-content-muted)] uppercase">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold tracking-wider text-[var(--color-content-muted)] uppercase">
                 Recent Pay Statements
               </h2>
+              {payslips[0] && (
+                <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                  Latest: {payslips[0] ? formatCurrency(payslips[0].netPay) : ""}
+                </span>
+              )}
             </div>
             
-            <PayslipList
-              payslips={payslips}
-              isLoading={isLoading}
-              downloadingId={downloadingId}
-              onDownloadStart={(id) => setDownloadingId(id)}
-              onDownloadEnd={() => setDownloadingId(null)}
-              title="Statement Dispatch History"
-              emptyMessage="No dispatch records are mapped to your account yet."
-              formatCurrency={formatCurrency}
-              showEmployeeColumn={false}
-            />
+            <div className="rounded-2xl border border-[var(--color-line-subtle)] bg-[var(--color-surface-card)] overflow-hidden">
+              <PayslipList
+                payslips={payslips}
+                isLoading={isLoading}
+                downloadingId={downloadingId}
+                onDownloadStart={(id) => setDownloadingId(id)}
+                onDownloadEnd={() => setDownloadingId(null)}
+                title="Statement Dispatch History"
+                emptyMessage="No dispatch records are mapped to your account yet."
+                formatCurrency={formatCurrency}
+                showEmployeeColumn={false}
+              />
+            </div>
           </div>
 
+          {/* Actions Console Component */}
           <div className="lg:col-span-1 space-y-4">
             <div>
-              <h2 className="text-[10px] font-bold tracking-wider text-[var(--color-content-muted)] uppercase">
+              <h2 className="text-xs font-bold tracking-wider text-[var(--color-content-muted)] uppercase">
                 Daily Actions Console
               </h2>
             </div>
 
-            <div className="panel panel-section space-y-6">
+            <div className="rounded-2xl border border-[var(--color-line-subtle)] bg-[var(--color-surface-card)] p-5 space-y-5">
               <div>
                 <h3 className="text-sm font-bold text-[var(--color-content-main)]">Shift Activity Panel</h3>
-                <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Register daily workspace entries or request planned leaves.</p>
+                <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5">Register daily workspace entries or request planned leaves.</p>
               </div>
 
               {isSunday && (
-                <div className="alert-warn">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                  <span className="text-[10px] leading-relaxed font-semibold text-amber-800">
+                <div className="alert-warn flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-snug font-medium text-amber-800">
                     Today is Sunday. Weekly off, attendance operations are locked.
                   </span>
                 </div>
               )}
 
               {!isSunday && !isWithinWindow && (
-                <div className="alert-warn">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                  <span className="text-[10px] leading-relaxed font-semibold text-amber-800">
+                <div className="alert-warn flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-snug font-medium text-amber-800">
                     Interactive panel is open only within shift margins (11:30 AM to 08:30 PM).
                   </span>
                 </div>
               )}
 
               {attendanceError && (
-                <div className="w-full flex items-start gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-left">
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
-                  <span className="text-[10px] leading-relaxed font-semibold text-rose-800">{attendanceError}</span>
+                <div className="w-full flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-100 text-left">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-snug font-medium text-rose-800">{attendanceError}</span>
                 </div>
               )}
 
@@ -543,7 +611,6 @@ export default function EmployeeDashboardPage() {
 
               <form onSubmit={handleLeaveSubmit} className="space-y-4 pt-4">
                 
-                {/* Leave Type Select with custom design tokens */}
                 <div className="space-y-1.5 relative" ref={leaveTypeRef}>
                   <label className="field-label block">Leave Type</label>
                   <button

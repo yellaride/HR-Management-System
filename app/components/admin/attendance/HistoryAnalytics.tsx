@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { TrendingUp, BarChart3, Clock, AlertCircle, FileText, ChevronDown } from "lucide-react";
+import { TrendingUp, BarChart3, ChevronDown, Lock, Edit2 } from "lucide-react";
+import RetroLogModal from "./RetroLogModal";
 
 interface Employee {
   id: string;
@@ -9,6 +10,25 @@ interface Employee {
   name: string;
   department: string;
   designation: string;
+}
+
+interface AttendanceLog {
+  _id: string;
+  date: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  status: "On Time" | "Late" | "Absent";
+  workingHours?: number | string;
+  formattedDuration?: string;
+}
+
+interface HistoryStats {
+  totalDays: number;
+  onTimeDays: number;
+  lateDays: number;
+  absentDays: number;
+  totalHours: number;
+  attendanceRate: number;
 }
 
 interface HistoryProps {
@@ -19,6 +39,23 @@ interface HistoryProps {
   onPeriodChange: (p: "this-month" | "last-month" | "all") => void;
 }
 
+function formatToLocalTimeInput(dateString: string | null | undefined, defaultTime: string): string {
+  if (!dateString) return defaultTime;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return defaultTime;
+  
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Karachi",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(date);
+  const hh = parts.find(p => p.type === "hour")?.value || "00";
+  const mm = parts.find(p => p.type === "minute")?.value || "00";
+  return `${hh}:${mm}`;
+}
+
 export default function HistoryAnalytics({
   employees,
   selectedEmployeeId,
@@ -26,8 +63,9 @@ export default function HistoryAnalytics({
   period,
   onPeriodChange,
 }: HistoryProps) {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({
+  const [logs, setLogs] = useState<AttendanceLog[]>([]);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [stats, setStats] = useState<HistoryStats>({
     totalDays: 0,
     onTimeDays: 0,
     lateDays: 0,
@@ -36,14 +74,24 @@ export default function HistoryAnalytics({
     attendanceRate: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
-  // Custom dropdown visibility and reference tracking
+  // Modular Retro Modal Controls
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [dialogForm, setDialogForm] = useState({
+    date: "",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "On Time" as "On Time" | "Late" | "Absent",
+  });
+
   const [isEmpOpen, setIsEmpOpen] = useState(false);
   const empRef = useRef<HTMLDivElement>(null);
 
   const selectedEmp = employees.find((e) => e.userId === selectedEmployeeId);
+  const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }).slice(0, 10);
 
-  // Close custom dropdown when clicking elsewhere
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (empRef.current && !empRef.current.contains(event.target as Node)) {
@@ -59,38 +107,104 @@ export default function HistoryAnalytics({
   }, [isEmpOpen]);
 
   useEffect(() => {
-    async function loadHistory() {
-      if (!selectedEmployeeId) return;
+    if (!selectedEmployeeId) return;
+    let isMounted = true;
+
+    async function fetchHistory() {
+      // Defer state update to a microtask, ensuring no synchronous state updates inside useEffect trigger cascading renders
+      await Promise.resolve();
+      if (!isMounted) return;
+
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/admin/attendance?userId=${selectedEmployeeId}&period=${period}`);
-        if (res.ok) {
+        const res = await fetch(`/api/admin/employee-attendance?userId=${selectedEmployeeId}&period=${period}`);
+        if (res.ok && isMounted) {
           const data = await res.json();
           setLogs(data.logs || []);
           setStats(data.stats || {});
+          setIsLocked(!!data.isLocked);
         }
       } catch (err) {
         console.error("Failed loading history statistics:", err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
-    loadHistory();
-  }, [selectedEmployeeId, period]);
+
+    fetchHistory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedEmployeeId, period, refreshCounter]);
+
+  const handleOpenAddModal = () => {
+    setEditingLogId(null);
+    setDialogForm({
+      date: todayStr,
+      checkIn: "09:00",
+      checkOut: "17:00",
+      status: "On Time",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (log: AttendanceLog) => {
+    setEditingLogId(log._id);
+    setDialogForm({
+      date: log.date,
+      checkIn: formatToLocalTimeInput(log.checkIn, "09:00"),
+      checkOut: formatToLocalTimeInput(log.checkOut, "17:00"),
+      status: log.status,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveRetroLog = async (payload: {
+    userId: string;
+    date: string;
+    checkIn: string | null;
+    checkOut: string | null;
+    status: "On Time" | "Late" | "Absent";
+  }) => {
+    const res = await fetch("/api/admin/employee-attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorMsg = await res.json();
+      throw new Error(errorMsg?.error || "Execution failed.");
+    }
+    setRefreshCounter((prev) => prev + 1);
+  };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
       {/* Configuration Controls & Aggregate Cards */}
       <div className="xl:col-span-4 space-y-6">
         <div className="bg-white border border-[var(--color-line-subtle)] rounded-2xl p-5 shadow-3xs space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <TrendingUp className="w-4 h-4 text-[var(--color-brand-accent)]" />
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-main)]">
-              Historical Lookup Parameters
-            </span>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[var(--color-brand-accent)]" />
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-main)]">
+                Historical Lookup Parameters
+              </span>
+            </div>
+            {selectedEmployeeId && !isLocked && (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-brand-accent)] text-white hover:bg-[var(--color-brand-hover)] text-[10px] font-bold rounded-lg cursor-pointer transition shadow-xs"
+              >
+                <span>Add Record Row</span>
+              </button>
+            )}
           </div>
 
-          {/* Select Target employee (Custom Dropdown) */}
+          {/* Select Target employee */}
           <div className="space-y-1.5 relative" ref={empRef}>
             <label className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
               Select Employee
@@ -123,7 +237,7 @@ export default function HistoryAnalytics({
                       onEmployeeChange(e.userId);
                       setIsEmpOpen(false);
                     }}
-                    className={`dropdown-option w-full text-left text-xs ${
+                    className={`dropdown-option w-full text-left text-xs cursor-pointer ${
                       selectedEmployeeId === e.userId ? "dropdown-option-active" : ""
                     }`}
                   >
@@ -140,7 +254,7 @@ export default function HistoryAnalytics({
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => onPeriodChange("last-month")}
-                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition ${
+                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                   period === "last-month"
                     ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]"
                     : "bg-white text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] hover:bg-slate-50"
@@ -150,7 +264,7 @@ export default function HistoryAnalytics({
               </button>
               <button
                 onClick={() => onPeriodChange("this-month")}
-                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition ${
+                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                   period === "this-month"
                     ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]"
                     : "bg-white text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] hover:bg-slate-50"
@@ -160,7 +274,7 @@ export default function HistoryAnalytics({
               </button>
               <button
                 onClick={() => onPeriodChange("all")}
-                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition ${
+                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                   period === "all"
                     ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]"
                     : "bg-white text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] hover:bg-slate-50"
@@ -174,7 +288,14 @@ export default function HistoryAnalytics({
           {/* Profile details block */}
           {selectedEmp && (
             <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-1">
-              <span className="text-[10px] text-[var(--color-content-muted)] font-bold uppercase tracking-wider block">Staff Profile</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-[var(--color-content-muted)] font-bold uppercase tracking-wider block">Staff Profile</span>
+                {isLocked && (
+                  <span className="flex items-center gap-1 text-rose-600 font-bold text-[10px] uppercase">
+                    <Lock className="w-3 h-3" /> Locked
+                  </span>
+                )}
+              </div>
               <div className="font-extrabold text-[var(--color-content-main)]">{selectedEmp.name}</div>
               <div className="text-[10px] text-[var(--color-content-secondary)]">Designation: {selectedEmp.designation}</div>
               <div className="text-[10px] text-[var(--color-content-secondary)]">Department: {selectedEmp.department}</div>
@@ -189,7 +310,7 @@ export default function HistoryAnalytics({
           </div>
 
           {isLoading ? (
-            <div className="py-6 text-center text-xs text-[var(--color-content-secondary)]">Recalculating stats...</div>
+            <div className="py-6 text-center text-xs text-[var(--color-content-secondary)] animate-pulse">Recalculating stats...</div>
           ) : (
             <>
               <div className="flex items-center gap-4">
@@ -247,18 +368,19 @@ export default function HistoryAnalytics({
                   <th className="px-6 py-4">Decimal Hours</th>
                   <th className="px-6 py-4">Duration</th>
                   <th className="px-6 py-4 text-center">Status</th>
+                  {!isLocked && <th className="px-6 py-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-[var(--color-content-secondary)] animate-pulse">
+                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-[var(--color-content-secondary)] animate-pulse">
                       Retrieving partitioned logs database...
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-[var(--color-content-secondary)]">
+                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-[var(--color-content-secondary)]">
                       No matching historical logs found for the selected date range.
                     </td>
                   </tr>
@@ -273,10 +395,10 @@ export default function HistoryAnalytics({
                       <tr key={log._id} className="hover:bg-slate-50/50 transition">
                         <td className="px-6 py-4 font-black text-[var(--color-content-main)]">{log.date}</td>
                         <td className="px-6 py-4 font-mono font-semibold">
-                          {log.checkIn ? new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--"}
+                          {log.checkIn ? new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" }) : "--"}
                         </td>
                         <td className="px-6 py-4 font-mono font-semibold">
-                          {log.checkOut ? new Date(log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--"}
+                          {log.checkOut ? new Date(log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" }) : "--"}
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-slate-500">{log.workingHours || "0"} hrs</td>
                         <td className="px-6 py-4 font-mono font-extrabold text-[var(--color-content-main)]">{log.formattedDuration || "--"}</td>
@@ -285,6 +407,17 @@ export default function HistoryAnalytics({
                             {log.status}
                           </span>
                         </td>
+                        {!isLocked && (
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(log)}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
@@ -294,6 +427,17 @@ export default function HistoryAnalytics({
           </div>
         </div>
       </div>
+
+      {/* Modularized Retro Modal Integration */}
+      <RetroLogModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        userId={selectedEmployeeId}
+        isLocked={isLocked}
+        editingLogId={editingLogId}
+        initialData={dialogForm}
+        onSave={handleSaveRetroLog}
+      />
     </div>
   );
 }

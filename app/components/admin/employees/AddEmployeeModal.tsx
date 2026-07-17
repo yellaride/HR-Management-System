@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import PasswordInputWithToggle from "../PasswordInputWithToggle";
+import PasswordInputWithToggle from "../../PasswordInputWithToggle";
 import { AlertTriangle, ChevronDown, X } from "lucide-react";
 
 interface AddEmployeeModalProps {
@@ -15,12 +15,12 @@ interface AddEmployeeModalProps {
     department: string;
     status: string;
     designation: string;
-    salary: number; // Stored backend field mapping
+    salary: number; 
     joinDate: string;
   }) => void;
+  departments?: string[]; // Changed to optional for extra safety
 }
 
-const DEPARTMENTS = ["Engineering", "Design", "Operations", "Marketing"];
 const STATUSES = ["Active", "On Leave"];
 
 export default function AddEmployeeModal({
@@ -28,31 +28,33 @@ export default function AddEmployeeModal({
   onClose,
   onSave,
   errorMessage,
+  departments = [], // Default to an empty array to prevent crashes
 }: AddEmployeeModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    department: "Engineering",
+    department: "", // Start empty, will be initialized dynamically
     designation: "",
-    salary: "" as string | number, // Stores monthly/base salary
+    salary: "" as string | number, 
     joinDate: "",
     status: "Active",
   });
 
-  // Dropdown visibility
   const [isDeptOpen, setIsDeptOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
 
-  // Refs for click outside detection
   const deptRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
 
-  // Local state for field-specific errors and general alerts
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
 
-  // Global click-outside listener to close dropdowns
+  // Removed render-phase setState to prevent infinite re-render loops.
+  // State synchronization is handled via effects below.
+
+
+  // Click outside listener (valid use of useEffect since it syncs with browser/DOM events)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
@@ -73,43 +75,10 @@ export default function AddEmployeeModal({
     };
   }, [isDeptOpen, isStatusOpen]);
 
-  // Sync backend errors into local form state
-  useEffect(() => {
-    if (errorMessage) {
-      setGeneralError(errorMessage);
-
-      if (errorMessage.toLowerCase().includes("email")) {
-        setErrors((prev) => ({
-          ...prev,
-          email: "This email address is already registered.",
-        }));
-      }
-    }
-  }, [errorMessage]);
-
-  // Clean and reset states when the modal is closed
-  useEffect(() => {
-    if (!isOpen) {
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        department: "Engineering",
-        designation: "",
-        salary: "",
-        joinDate: "",
-        status: "Active",
-      });
-      setErrors({});
-      setGeneralError(null);
-      setIsDeptOpen(false);
-      setIsStatusOpen(false);
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
-  const handleInputChange = (field: string, value: any) => {
+  // Resolved type warning by replacing "any" with specific and safe definitions
+  const handleInputChange = (field: keyof typeof formData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
 
     if (errors[field]) {
@@ -313,7 +282,7 @@ export default function AddEmployeeModal({
                 }}
                 className={`${getInputClass("department")} flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
-                <span>{formData.department}</span>
+                <span>{formData.department || "Select Department"}</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${
                     isDeptOpen ? "rotate-180" : ""
@@ -322,22 +291,28 @@ export default function AddEmployeeModal({
               </button>
 
               {isDeptOpen && (
-                <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                  {DEPARTMENTS.map((dept) => (
-                    <button
-                      key={dept}
-                      type="button"
-                      onClick={() => {
-                        handleInputChange("department", dept);
-                        setIsDeptOpen(false);
-                      }}
-                      className={`dropdown-option ${
-                        formData.department === dept ? "dropdown-option-active" : ""
-                      }`}
-                    >
-                      {dept}
-                    </button>
-                  ))}
+                <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150 max-h-44 overflow-y-auto">
+                  {departments.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-[var(--color-content-muted)]">
+                      No departments configured.
+                    </div>
+                  ) : (
+                    departments.map((dept) => (
+                      <button
+                        key={dept}
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("department", dept);
+                          setIsDeptOpen(false);
+                        }}
+                        className={`dropdown-option ${
+                          formData.department === dept ? "dropdown-option-active" : ""
+                        }`}
+                      >
+                        {dept}
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>

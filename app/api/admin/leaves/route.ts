@@ -99,12 +99,20 @@ export async function GET() {
 
         const resolvedName = employeeDoc?.name || leave.employeeName || "Employee";
         const resolvedDesignation = employeeDoc?.designation || leave.designation || "Staff Member";
+        const resolvedProfilePhotoUrl =
+          employeeDoc?.profilePhotoUrl ||
+          employeeDoc?.profilePhotoURL ||
+          employeeDoc?.profilePicture ||
+          employeeDoc?.image ||
+          employeeDoc?.picture ||
+          "";
 
         return {
           id: String(leave._id),
           userId: String(leave.userId || ""),
           employeeName: resolvedName,
-          designation: resolvedDesignation,
+         profilePhotoUrl: resolvedProfilePhotoUrl, 
+         designation: resolvedDesignation,
           type: typeTitle,
           typeUpper: matchedKey || "UNPAID",
           startDate: formatDateString(leave.startDate),

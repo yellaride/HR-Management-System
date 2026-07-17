@@ -451,7 +451,7 @@ export default function ProfileClient() {
     : "EE";
 
   return (
-    <div className={`space-y-6 max-w-[1100px] mx-auto pb-12 px-4 transition-all ${uploadingPhoto ? "cursor-wait select-none" : ""}`}>
+    <div className={`space-y-6  pb-12 px-4 transition-all ${uploadingPhoto ? "cursor-wait select-none" : ""}`}>
       
       {/* Header Panel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[var(--color-line-subtle)] gap-4">

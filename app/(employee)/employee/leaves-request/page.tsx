@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Plus } from "lucide-react";
 import LeaveHistoryTable, { LeaveRecord } from "@/app/components/employee/LeaveHistoryTable";
-import { LeaveDetailsModal } from "@/app/components/admin/LeaveDetailsModal";
+import { LeaveDetailsModal } from "@/app/components/admin/leaves/LeaveDetailsModal";
 import ApplyLeaveModal from "@/app/components/employee/ApplyLeaveModal";
 import { LeaveRequest, LeaveBalances } from "@/lib/types";
 
@@ -41,7 +41,6 @@ export default function EmployeeLeavesPage() {
           setMessage({ type: "error", text: errorData.error || "Failed to load leave records" });
         }
       } catch (err) {
-        console.error("Failed to load employee history", err);
         setMessage({ type: "error", text: "Failed to load leave records" });
       } finally {
         setLoading(false);
@@ -50,7 +49,7 @@ export default function EmployeeLeavesPage() {
     fetchEmployeeData();
   }, []);
 
- const handleRowClick = (record: LeaveRecord) => {
+  const handleRowClick = (record: LeaveRecord) => {
     // Map LeaveRecord to LeaveRequest structure required by LeaveDetailsModal
     const mappedType: LeaveRequest["type"] =
       record.type === "ANNUAL"
@@ -137,7 +136,7 @@ export default function EmployeeLeavesPage() {
               }
             }
           } catch (err) {
-            console.error("Failed to refresh history", err);
+            // Swallow refresh errors; UI shows the last known state.
           }
         };
         fetchUpdated();
@@ -155,7 +154,7 @@ export default function EmployeeLeavesPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
+    <div className="p-4 md:p-6 space-y-6  w-full">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

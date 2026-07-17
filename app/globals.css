@@ -239,3 +239,84 @@ p {
 @utility form-input-with-icon {
   @apply form-input pl-10;
 }
+
+/* 9. Birthday UI Utilities (shared across admin + employee dashboards) */
+
+@keyframes birthdaySlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility birthday-banner {
+  @apply relative overflow-hidden p-6 rounded-2xl text-white shadow-md
+         bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600;
+  animation: birthdaySlideIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@utility birthday-banner-orbs {
+  @apply absolute rounded-full bg-white/10 pointer-events-none;
+}
+
+@utility birthday-banner-orb-top-right {
+  @apply top-0 right-0 -mt-4 -mr-4 w-32 h-32 blur-xl;
+}
+
+@utility birthday-banner-orb-bottom-left {
+  @apply bottom-0 left-0 -mb-6 -ml-6 w-48 h-48 blur-2xl;
+}
+
+@utility birthday-banner-icon-shell {
+  @apply p-3 bg-white/20 rounded-2xl backdrop-blur-md shrink-0 border border-white/20 shadow-inner;
+}
+
+@utility birthday-card {
+  @apply p-5 rounded-2xl border border-[var(--color-line-subtle)] bg-[var(--color-surface-card)] shadow-xs relative overflow-hidden transition duration-150;
+}
+
+@utility birthday-card-overlay {
+  @apply absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-pink-500/10 to-indigo-500/10 rounded-full blur-lg pointer-events-none;
+}
+
+@utility birthday-card-header {
+  @apply flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-line-subtle)];
+}
+
+@utility birthday-card-header-title {
+  @apply text-sm font-extrabold text-[var(--color-content-main)];
+}
+
+@utility birthday-card-header-subtitle {
+  @apply text-[11px] text-[var(--color-content-secondary)];
+}
+
+@utility birthday-card-celebrants-chip {
+  @apply text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 border border-pink-100 shrink-0;
+}
+
+@utility birthday-card-bday-icon {
+  @apply p-2 bg-gradient-to-tr from-pink-500 to-indigo-500 text-white rounded-xl shadow-xs;
+}
+
+@utility birthday-celebrants-list {
+  @apply mt-4 max-h-52 overflow-y-auto pr-1;
+}
+
+@utility birthday-celebrant-tile {
+  @apply flex items-center gap-3 p-3 rounded-xl bg-[var(--color-surface-main)]/70 border border-[var(--color-line-subtle)]
+         hover:border-pink-200 transition-colors duration-150;
+}
+
+@utility birthday-celebrant-avatar {
+  @apply h-9 w-9 rounded-full bg-gradient-to-tr from-pink-100 to-indigo-100 flex items-center justify-center
+         border border-[var(--color-line-subtle)] font-bold text-xs text-indigo-700 uppercase shrink-0;
+}
+
+@utility birthday-celebrant-emoji {
+  @apply text-lg shrink-0;
+}

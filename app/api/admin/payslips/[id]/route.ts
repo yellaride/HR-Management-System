@@ -18,7 +18,10 @@ export async function GET(
     const id = context.params.id;
 
     const payslip = await Payslip.findById(id)
-      .populate("employeeId", "name jobTitle")
+      .populate(
+        "employeeId",
+        "name jobTitle profilePhotoUrl"
+      )
       .lean();
 
     if (!payslip) {

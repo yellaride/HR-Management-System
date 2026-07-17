@@ -28,6 +28,8 @@ export async function GET() {
         emp.hourlyRate !== undefined && emp.hourlyRate !== null
           ? Number(emp.hourlyRate)
           : 0,
+      // Cloudinary image link stored in DB
+      profilePhotoUrl: emp.profilePhotoUrl || emp.profilePhotoURL || "",
     }));
 
     return NextResponse.json(formattedEmployees, { status: 200 });

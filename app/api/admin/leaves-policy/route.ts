@@ -59,17 +59,32 @@ export async function GET() {
         ? emp.userId.email
         : "";
 
-      const balance = leaveBalances.find(
-        (b) => b.userId === userIdStr
-      );
-
+      const balance = leaveBalances.find((b) => b.userId === userIdStr);
       const isCustom = balance ? !!balance.customPolicy : false;
+
+      // Profile fields may live either on Employee or User docs depending on your schema.
+      const profilePhotoUrl =
+        emp.profilePhotoUrl ||
+        emp.profilePhotoURL ||
+        emp.profilePicture ||
+        emp.image ||
+        emp.picture ||
+        emp.userId?.profilePhotoUrl ||
+        emp.userId?.profilePhotoURL ||
+        emp.userId?.profilePicture ||
+        emp.userId?.image ||
+        emp.userId?.picture ||
+        "";
+
+      const designation = emp.designation || emp.role || "";
 
       return {
         userId: userIdStr,
         name: emp.name || "Unnamed Employee",
         email: emailStr || "No Registered Email",
         isCustom,
+        designation,
+        profilePhotoUrl,
         policy: {
           // Using optional chaining (?.allocated) and fallback values (??)
           // to prevent crashes on legacy documents missing nested sub-objects.
@@ -80,6 +95,7 @@ export async function GET() {
         },
       };
     }).filter((emp: any) => emp.userId !== ""); // Filter out null userId objects safely
+
 
     return NextResponse.json(employeesList);
   } catch (error: any) {

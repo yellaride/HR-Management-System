@@ -129,8 +129,34 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
         {/* Content Details */}
         <div className="space-y-4 py-6">
           <div className="flex items-center gap-4 pb-4 border-b border-slate-50">
-            <div className="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-sm uppercase">
-              {employee.name ? employee.name.split(" ").map(n => n[0]).join("") : "EE"}
+            <div className="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-sm uppercase overflow-hidden">
+              {(() => {
+                const imageUrl =
+                  (employee as any).image ||
+                  (employee as any).picture ||
+                  (employee as any).profilePicture ||
+                  (employee as any).profilePhotoUrl ||
+                  // Your backend stores Cloudinary link here
+                  (employee as any).profilePhotoURL;
+
+
+                const initials = employee.name ? employee.name.split(" ").map(n => n[0]).join("") : "EE";
+
+                if (typeof imageUrl !== "string" || !imageUrl.trim()) return initials;
+
+                return (
+                  <img
+                    src={imageUrl}
+                    alt={employee.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.onerror = null;
+                      target.style.display = "none";
+                    }}
+                  />
+                );
+              })()}
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">{employee.name}</h3>
