@@ -1,4 +1,5 @@
 import { resend } from "@/lib/resend";
+import { getResendFromAddress, isResendConfigured } from "@/lib/email/config";
 
 function getWelcomeEmailTemplate(name: string, email: string, temporaryPassword: string): string {
   const portalUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -88,20 +89,16 @@ function getWelcomeEmailTemplate(name: string, email: string, temporaryPassword:
 }
 
 export async function sendWelcomeEmail(name: string, email: string, tempPassword: string): Promise<boolean> {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isResendConfigured()) {
     console.error("Resend API Key (RESEND_API_KEY) is missing. Onboarding email skipped.");
     return false;
   }
 
   try {
-    const fromAddress = process.env.NODE_ENV === "production"
-      ? "HR Team <hr@yourverifieddomain.com>"
-      : "onboarding@resend.dev";
-
     const htmlContent = getWelcomeEmailTemplate(name, email, tempPassword);
 
     const emailResponse = await resend.emails.send({
-      from: fromAddress,
+      from: getResendFromAddress(),
       to: [email],
       subject: "Welcome to the Team - Your Workspace Account Credentials",
       html: htmlContent,

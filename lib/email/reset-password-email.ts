@@ -1,4 +1,5 @@
 import { resend } from "@/lib/resend";
+import { getResendFromAddress, isResendConfigured } from "@/lib/email/config";
 
 function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
   const currentYear = new Date().getFullYear();
@@ -77,20 +78,16 @@ function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
 }
 
 export async function sendPasswordResetEmail(name: string, email: string, resetUrl: string): Promise<boolean> {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isResendConfigured()) {
     console.error("Resend API Key (RESEND_API_KEY) is missing. Password reset email skipped.");
     return false;
   }
 
   try {
-    const fromAddress = process.env.NODE_ENV === "production"
-      ? "Security Team <security@yourverifieddomain.com>"
-      : "onboarding@resend.dev";
-
     const htmlContent = getPasswordResetEmailTemplate(name, resetUrl);
 
     const emailResponse = await resend.emails.send({
-      from: fromAddress,
+      from: getResendFromAddress(),
       to: [email],
       subject: "Reset Password Link - VibeFlow Workspace",
       html: htmlContent,

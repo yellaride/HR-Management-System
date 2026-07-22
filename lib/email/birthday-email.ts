@@ -1,4 +1,5 @@
 import { resend } from "@/lib/resend";
+import { getResendFromAddress, isResendConfigured } from "@/lib/email/config";
 
 export function getBirthdayEmailTemplate(name: string): string {
   const currentYear = new Date().getFullYear();
@@ -74,26 +75,20 @@ export async function sendBirthdayEmail(
   void designation;
   void department;
 
-  if (!process.env.RESEND_API_KEY) {
+  if (!isResendConfigured()) {
     console.error("Resend API Key (RESEND_API_KEY) is missing. Birthday email dispatch skipped.");
     return false;
   }
 
   try {
-    const fromAddress = process.env.NODE_ENV === "production"
-      ? "People Team <team@yourverifieddomain.com>"
-      : "onboarding@resend.dev";
-
     const htmlContent = getBirthdayEmailTemplate(name);
 
     const emailResponse = await resend.emails.send({
-      from: fromAddress,
+      from: getResendFromAddress(),
       to: [email],
       subject: `Happy Birthday, ${name}! 🎂 - VibeFlow Workspace`,
       html: htmlContent,
     });
-
-    console.log("Resend response:", emailResponse);
 
     if (emailResponse.error) {
       console.error(`Resend birthday delivery failed for ${name}:`, emailResponse.error);

@@ -3,14 +3,7 @@ import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Employee } from "@/modals/Employee"; // Preserving exact model path
-import { v2 as cloudinary } from "cloudinary";
-
-// Configure Cloudinary SDK
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import { cloudinary, ensureCloudinaryConfigured } from "@/lib/cloudinary";
 
 /**
  * Utility to extract Cloudinary's public_id from a full URL
@@ -152,6 +145,7 @@ export async function PUT(request: Request) {
         const publicId = extractPublicIdFromUrl(oldPhotoUrl);
         if (publicId) {
           try {
+            ensureCloudinaryConfigured();
             await cloudinary.uploader.destroy(publicId);
           } catch (cloudinaryError) {
             // Logs error if Cloudinary fails, but doesn't halt the DB update to prevent stuck states

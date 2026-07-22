@@ -49,42 +49,23 @@ const Toast = Swal.mixin({
   },
 });
 
-function getCloudinaryConfig() {
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-  return {
-    cloudName,
-    uploadPreset,
-  };
-}
-
 async function uploadToCloudinary(file: File): Promise<string> {
-  const { cloudName, uploadPreset } = getCloudinaryConfig();
-
-  if (!cloudName || !uploadPreset) {
-    throw new Error(
-      "Missing Cloudinary configuration parameters. Set up environment variables."
-    );
-  }
-
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("upload_preset", uploadPreset);
 
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+  const res = await fetch("/api/employee/profile/photo", {
     method: "POST",
     body: formData,
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Cloudinary upload failed: ${res.status} ${text}`);
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Photo upload failed (${res.status})`);
   }
 
   const data = (await res.json()) as { secure_url?: string };
   if (!data.secure_url) {
-    throw new Error("Cloudinary upload succeeded but no secure_url was returned");
+    throw new Error("Upload succeeded but no image URL was returned");
   }
   return data.secure_url;
 }
