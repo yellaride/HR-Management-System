@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { Employee } from "@/modals/Employee";
 import { Payslip } from "@/modals/Payslip";
 
@@ -18,7 +18,7 @@ export async function GET() {
 
     const employee = await Employee.findOne({ userId })
       .select("_id")
-      .lean<{ _id: any }>();
+      .lean<{ _id: unknown }>();
 
     const employeeId = employee?._id;
     if (!employeeId) {
@@ -39,10 +39,10 @@ export async function GET() {
       .lean();
 
     return NextResponse.json(payslips, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to fetch employee payslips:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

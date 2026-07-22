@@ -36,9 +36,12 @@ function ClockWidget() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    setCurrentTime(new Date());
+    const initial = setTimeout(() => setCurrentTime(new Date()), 0);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
   }, []);
 
   if (!currentTime) {
@@ -129,7 +132,8 @@ export default function EmployeeAttendancePage() {
   const fetchAttendanceData = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = !!opts?.silent;
     try {
-      if (!silent) setLoading(true);
+      // `loading` is initialized to true, so the initial (non-silent) fetch
+      // already renders the loading state without setting it again here.
       const res = await fetch("/api/employee/attendance");
       const data = await res.json();
       if (res.ok) {
@@ -150,13 +154,17 @@ export default function EmployeeAttendancePage() {
 
   // Sync constraints and data on load
   useEffect(() => {
-    fetchAttendanceData();
+    const initialLoad = setTimeout(() => fetchAttendanceData(), 0);
+    return () => clearTimeout(initialLoad);
   }, [fetchAttendanceData]);
 
   useEffect(() => {
-    evaluateTimeConstraints();
+    const initial = setTimeout(evaluateTimeConstraints, 0);
     const interval = setInterval(evaluateTimeConstraints, 15000); // Check constraints every 15 seconds
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
   }, [settings, evaluateTimeConstraints]);
 
   // Sum total accumulated working hours from history to show progression (e.g. 77 hrs to 85 hrs)
@@ -182,7 +190,7 @@ export default function EmployeeAttendancePage() {
       } else {
         await fetchAttendanceData({ silent: true }); 
       }
-    } catch (err) {
+    } catch {
       setErrorMessage("Network error processing your request.");
     } finally {
       setActionLoading(false);
@@ -293,21 +301,21 @@ export default function EmployeeAttendancePage() {
       {/* Dynamic Alerts for Sundays or Shift Closures */}
       {isSunday && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
-          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>Today is Sunday (Weekly Off). Shift actions are currently disabled.</span>
         </div>
       )}
 
       {!isSunday && !isWithinWindow && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
-          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>Outside Shift Margin: Attendance actions are restricted between {getReadableTime(settings.shiftStart, -(settings.checkInDisplayBefore || 0))} and {getReadableTime(settings.shiftEnd, (settings.checkOutDisplayAfter || 0))}.</span>
         </div>
       )}
 
       {!isSunday && isWithinWindow && isPastAutoCheckOut && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs font-semibold">
-          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>Shift Auto Checked-Out: System automatic threshold has run. Manual check-outs are disabled for this session.</span>
         </div>
       )}
@@ -333,7 +341,7 @@ export default function EmployeeAttendancePage() {
       {/* Error Output banner if any */}
       {errorMessage && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-xs font-semibold">
-          <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
@@ -345,7 +353,7 @@ export default function EmployeeAttendancePage() {
         <div className="p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-6">
           <div className="space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Entrance Check-In</span>
-            <h2 className="text-lg font-extrabold text-content-main">Start Today's Work Session</h2>
+            <h2 className="text-lg font-extrabold text-content-main">Start Today&apos;s Work Session</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600">
@@ -372,7 +380,7 @@ export default function EmployeeAttendancePage() {
         <div className="p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-sm flex flex-col justify-between gap-6">
           <div className="space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Departure Check-Out</span>
-            <h2 className="text-lg font-extrabold text-content-main">End Today's Work Session</h2>
+            <h2 className="text-lg font-extrabold text-content-main">End Today&apos;s Work Session</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-rose-50 text-rose-600">
@@ -404,7 +412,7 @@ export default function EmployeeAttendancePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-line-subtle pb-2.5">
               <span className="text-xs text-content-secondary font-medium flex items-center gap-1.5">
-                <Timer className="w-3.5 h-3.5 text-content-muted" /> Today's Session Hours
+                <Timer className="w-3.5 h-3.5 text-content-muted" /> Today&apos;s Session Hours
               </span>
               <span className="text-xs font-bold text-content-main">
                 {todayRecord?.formattedDuration || "0 hrs 0 mins"}

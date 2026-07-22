@@ -2,27 +2,32 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { Payslip } from "@/modals/Payslip";
+import { Employee } from "@/modals/Employee";
+import { getSessionUser } from "@/lib/auth";
 
 // Returns fresh payslip + company details for PDF generation.
-// Used by app/components/payslips/PayslipList.tsx via:
-//   fetch(`/api/admin/payslips?id=${slip._id}`)
-// but having this route prevents build-time type-check issues.
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectDB();
 
-    const id = context.params.id;
+    const { id } = await params;
 
-    const payslip = await Payslip.findById(id)
-      .populate(
-        "employeeId",
-        "name jobTitle profilePhotoUrl"
-      )
-      .lean();
+    // Lean payslip doc; only employeeId is inspected directly, the rest is returned as-is
+    interface LeanPayslip extends Record<string, unknown> {
+      employeeId?: { _id?: { toString(): string } } | null;
+    }
+    const payslip = (await Payslip.findById(id)
+      .populate("employeeId", "name jobTitle profilePhotoUrl")
+      .lean()) as unknown as LeanPayslip | null;
 
     if (!payslip) {
       return NextResponse.json(
@@ -31,15 +36,27 @@ export async function GET(
       );
     }
 
+    // Ownership check: employees may only fetch their own payslips
+    if (sessionUser.role !== "admin") {
+      const ownEmployee = (await Employee.findOne({ userId: sessionUser.id })
+        .select("_id")
+        .lean()) as { _id: { toString(): string } } | null;
+      const ownEmployeeId = ownEmployee?._id?.toString() || "";
+      const payslipEmployeeId =
+        payslip.employeeId?._id?.toString() || payslip.employeeId?.toString() || "";
+      if (!ownEmployeeId || payslipEmployeeId !== ownEmployeeId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const companyDetails = await CompanyDetails.findOne().lean();
 
     return NextResponse.json({ payslip, companyDetails }, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to fetch payslip by id:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }
 }
-

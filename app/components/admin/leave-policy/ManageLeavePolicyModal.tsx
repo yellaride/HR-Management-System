@@ -8,6 +8,7 @@ interface EmployeePolicy {
   name: string;
   email: string;
   isCustom: boolean;
+  designation?: string;
   policy: {
     ANNUAL: number;
     SICK: number;
@@ -50,8 +51,24 @@ export default function ManageLeavePolicyModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localBanner, setLocalBanner] = useState<{ status: "success" | "error"; message: string } | null>(null);
 
-  // Update form inputs when initial employee changes
-  useEffect(() => {
+  const resetForm = () => {
+    setTempAnnual(15);
+    setTempSick(8);
+    setTempCasual(6);
+    setTempMonthly(2);
+    setDropdownSearch("");
+    setLocalBanner(null);
+  };
+
+  // Sync form inputs from props during render when the initial employee or the
+  // open state changes (official "adjust state when a prop changes" pattern).
+  // Sentinel `undefined` ensures the first render syncs, matching mount-effect semantics.
+  const [prevInitialEmployee, setPrevInitialEmployee] = useState<EmployeePolicy | null | undefined>(undefined);
+  const [prevIsOpen, setPrevIsOpen] = useState<boolean | undefined>(undefined);
+  if (initialSelectedEmployee !== prevInitialEmployee || isOpen !== prevIsOpen) {
+    setPrevInitialEmployee(initialSelectedEmployee);
+    setPrevIsOpen(isOpen);
+
     if (initialSelectedEmployee) {
       setSelectedEmp(initialSelectedEmployee);
       setTempAnnual(initialSelectedEmployee.policy.ANNUAL);
@@ -62,7 +79,7 @@ export default function ManageLeavePolicyModal({
       setSelectedEmp(null);
       resetForm();
     }
-  }, [initialSelectedEmployee, isOpen]);
+  }
 
   // Handle dropdown outside clicks
   useEffect(() => {
@@ -78,15 +95,6 @@ export default function ManageLeavePolicyModal({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isDropdownOpen]);
-
-  const resetForm = () => {
-    setTempAnnual(15);
-    setTempSick(8);
-    setTempCasual(6);
-    setTempMonthly(2);
-    setDropdownSearch("");
-    setLocalBanner(null);
-  };
 
   const showBanner = (status: "success" | "error", message: string) => {
     setLocalBanner({ status, message });
@@ -124,8 +132,8 @@ export default function ManageLeavePolicyModal({
         MONTHLY: Number(tempMonthly || 0),
       });
       showBanner("success", `Leave policy updated successfully for ${selectedEmp.name}`);
-    } catch (err: any) {
-      showBanner("error", err?.message || "Failed to update configurations.");
+    } catch (err) {
+      showBanner("error", (err as Error | undefined)?.message || "Failed to update configurations.");
     } finally {
       setIsSubmitting(false);
     }
@@ -149,7 +157,7 @@ export default function ManageLeavePolicyModal({
   );
 
   const inputClass =
-    "w-full px-3.5 py-2.5 bg-[var(--color-surface-card,white)] border border-[var(--color-line-subtle,#e2e0e8)] rounded-xl text-xs text-[var(--color-content-main,#181124)] placeholder-[var(--color-content-muted,#a19da9)] transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500";
+    "w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500";
 
   if (!isOpen) return null;
 
@@ -189,9 +197,9 @@ export default function ManageLeavePolicyModal({
             }`}
           >
             {localBanner.status === "success" ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             )}
             <div className="flex-1">
               <span className="block font-bold">
@@ -264,8 +272,8 @@ export default function ManageLeavePolicyModal({
                     >
                       <span className="block font-bold text-xs text-gray-800">{emp.name}</span>
                       <span className="block text-[10px] text-gray-400">{emp.email}</span>
-                      {(emp as any).designation && (
-                        <span className="block text-[10px] text-gray-500">{(emp as any).designation}</span>
+                      {emp.designation && (
+                        <span className="block text-[10px] text-gray-500">{emp.designation}</span>
                       )}
 
                     </button>

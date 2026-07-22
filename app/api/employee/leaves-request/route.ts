@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import Leave from "@/modals/LeaveRequest";
 import LeaveBalance from "@/modals/LeaveBalance";
 import LeavePolicy from "@/modals/LeavePolicy"; 
@@ -9,6 +9,25 @@ import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
 
 type TrackedLeaveType = "ANNUAL" | "SICK" | "CASUAL";
+
+// Session user fields read by this route (userId is a legacy fallback key)
+interface SessionUserInfo {
+  id?: string;
+  userId?: string;
+  role?: string;
+  name?: string | null;
+}
+
+// Shape of the lean Leave docs read by this route
+interface LeanEmployeeLeave {
+  _id: unknown;
+  type?: unknown;
+  startDate: string | Date;
+  endDate: string | Date;
+  days?: unknown;
+  reason?: unknown;
+  status?: unknown;
+}
 
 function formatDate(value: Date): string {
   try {
@@ -38,7 +57,7 @@ export async function GET() {
   try {
     await connectDB();
     const session = await getServerSession(authOptions);
-    const currentUser = session?.user as any;
+    const currentUser = session?.user as SessionUserInfo | undefined;
 
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
@@ -56,7 +75,7 @@ export async function GET() {
 
     const leaves = await Leave.find({ userId }).sort({ createdAt: -1 }).lean();
 
-    const formattedLeaves = (leaves as Array<Record<string, any>>).map((leave) => ({
+    const formattedLeaves = (leaves as unknown as LeanEmployeeLeave[]).map((leave) => ({
       id: String(leave._id),
       type: String(leave.type),
       startDate: formatDate(new Date(leave.startDate)),
@@ -108,7 +127,7 @@ export async function POST(req: Request) {
   try {
     await connectDB();
     const session = await getServerSession(authOptions);
-    const currentUser = session?.user as any;
+    const currentUser = session?.user as SessionUserInfo | undefined;
 
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
@@ -149,7 +168,7 @@ export async function POST(req: Request) {
     const isTracked = ["ANNUAL", "SICK", "CASUAL"].includes(rawType);
 
     // Fetch the employee's current name and designation details to attach to the Leave model
-    const employeeDoc = await Employee.findOne({ userId }).lean() as any;
+    const employeeDoc = await Employee.findOne({ userId }).lean() as { name?: string; designation?: string } | null;
     const resolvedName = employeeDoc?.name || currentUser.name || "Employee";
     const resolvedDesignation = employeeDoc?.designation || "Staff Member";
 
@@ -167,7 +186,7 @@ export async function POST(req: Request) {
         });
       }
 
-      const leaveTypeBalance = (balanceDoc as any)[trackedType];
+      const leaveTypeBalance = (balanceDoc as Partial<Record<TrackedLeaveType, { allocated?: number; used?: number }>>)[trackedType];
       const allocated = Number(leaveTypeBalance?.allocated ?? policy[trackedType]);
       const used = Number(leaveTypeBalance?.used ?? 0);
       const remaining = Math.max(0, allocated - used);

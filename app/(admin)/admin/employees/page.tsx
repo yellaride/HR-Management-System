@@ -59,15 +59,13 @@ export default function AdminEmployeesPage() {
   const [editEmployeeError, setEditEmployeeError] = useState<string | null>(null);
 
   const fetchEmployees = async () => {
-    setIsLoading(true);
-    setError(null);
     try {
       const res = await fetch("/api/admin/employees");
       if (!res.ok) throw new Error("Failed to load database profiles.");
       const data = await res.json();
       setEmployees(data);
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -91,8 +89,11 @@ export default function AdminEmployeesPage() {
   };
 
   useEffect(() => {
-    fetchEmployees();
-    fetchDepartments(); // Fetching company settings departments on component mount
+    async function loadInitialData() {
+      fetchEmployees();
+      fetchDepartments(); // Fetching company settings departments on component mount
+    }
+    loadInitialData();
   }, []);
 
   // CREATE profile handler
@@ -132,7 +133,7 @@ export default function AdminEmployeesPage() {
             const text = await res.text();
             serverErrorMsg = text || serverErrorMsg;
           }
-        } catch (_) {}
+        } catch {}
         throw new Error(serverErrorMsg);
       }
 
@@ -142,8 +143,8 @@ export default function AdminEmployeesPage() {
         setAddEmployeeError(null);
         setIsAddModalOpen(false);
       }
-    } catch (err: any) {
-      setAddEmployeeError(err.message || "An error occurred during registration.");
+    } catch (err) {
+      setAddEmployeeError(err instanceof Error ? err.message : "An error occurred during registration.");
     }
   };
 
@@ -168,7 +169,7 @@ export default function AdminEmployeesPage() {
             const text = await res.text();
             serverErrorMsg = text || serverErrorMsg;
           }
-        } catch (_) {}
+        } catch {}
         throw new Error(serverErrorMsg);
       }
 
@@ -181,8 +182,8 @@ export default function AdminEmployeesPage() {
         setIsEditModalOpen(false);
         setSelectedEmployee(null);
       }
-    } catch (err: any) {
-      setEditEmployeeError(err.message || "Could not update user info.");
+    } catch (err) {
+      setEditEmployeeError(err instanceof Error ? err.message : "Could not update user info.");
       throw err;
     }
   };
@@ -200,8 +201,8 @@ export default function AdminEmployeesPage() {
       setEmployees((prev) => prev.filter((emp) => emp.id !== id));
       setIsViewModalOpen(false);
       setSelectedEmployee(null);
-    } catch (err: any) {
-      setError(err.message || "Could not delete database records.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete database records.");
     }
   };
 
@@ -281,7 +282,11 @@ export default function AdminEmployeesPage() {
           <div className="flex flex-col items-center justify-center p-12 bg-amber-50/50 rounded-2xl border border-amber-100/80 text-amber-800 shadow-sm">
             <span className="text-xs font-semibold text-center">{getFriendlyErrorMessage(error)}</span>
             <button 
-              onClick={fetchEmployees}
+              onClick={() => {
+                setIsLoading(true);
+                setError(null);
+                fetchEmployees();
+              }}
               className="mt-3 px-3.5 py-1.5 bg-brand-accent hover:bg-brand-hover text-white text-[10px] font-bold rounded-lg shadow-sm transition-all duration-150 active:scale-[0.95]"
             >
               Retry Loading Directory

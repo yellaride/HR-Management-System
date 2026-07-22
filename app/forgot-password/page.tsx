@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
       }
 
       setSuccess(true);
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please verify your connection and try again.");
     } finally {
       setLoading(false);
@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-bg-base,#fafafa)] text-[var(--color-content-main)]">
+    <div className="min-h-screen flex flex-col bg-bg-base text-content-main">
       
       {/* Animation Styles injected to match the main login behavior */}
       <style>{`
@@ -74,11 +74,11 @@ export default function ForgotPasswordPage() {
       <header className="w-full py-3 px-6 md:px-12 border-b border-slate-100 dark:border-slate-800/40 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2.5 group cursor-pointer">
-            <div className="w-9 h-9 rounded-lg bg-[var(--color-brand-accent)] text-white flex items-center justify-center font-black text-lg shadow-sm transition-transform group-hover:scale-105 duration-200">
+            <div className="w-9 h-9 rounded-lg bg-brand-accent text-white flex items-center justify-center font-black text-lg shadow-sm transition-transform group-hover:scale-105 duration-200">
               V
             </div>
-            <span className="font-bold text-lg tracking-tight text-[var(--color-content-main)]">
-              VibeFlow<span className="text-[var(--color-brand-accent)]">.</span>
+            <span className="font-bold text-lg tracking-tight text-content-main">
+              VibeFlow<span className="text-brand-accent">.</span>
             </span>
           </Link>
           <div />
@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
                 priority
                 className="object-cover filter brightness-[0.7] contrast-[0.95]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-900/40 to-transparent" />
             </div>
 
             {/* Upper Badge */}
@@ -126,9 +126,9 @@ export default function ForgotPasswordPage() {
                   Security Level Verified
                 </span>
                 <div className="flex gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-accent)]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-accent)]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-accent)]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
                 </div>
               </div>
             </div>
@@ -142,10 +142,10 @@ export default function ForgotPasswordPage() {
                 
                 {/* Unified Modern Title & Subtitle */}
                 <div className="min-h-[82px] flex flex-col justify-start">
-                  <h2 className="text-xl md:text-2xl font-bold text-[var(--color-content-main)] tracking-tight leading-none">
+                  <h2 className="text-xl md:text-2xl font-bold text-content-main tracking-tight leading-none">
                     Reset Password
                   </h2>
-                  <p className="mt-2 text-xs md:text-sm text-[var(--color-content-secondary)] leading-relaxed font-normal opacity-90">
+                  <p className="mt-2 text-xs md:text-sm text-content-secondary leading-relaxed font-normal opacity-90">
                     Provide your workspace email to obtain a secure password recovery connection link.
                   </p>
                 </div>
@@ -153,7 +153,7 @@ export default function ForgotPasswordPage() {
                 {/* Error Notifications */}
                 {error && (
                   <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-xs font-semibold leading-relaxed">
-                    <svg className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <span>{error}</span>
@@ -163,7 +163,7 @@ export default function ForgotPasswordPage() {
                 {/* Success Notifications */}
                 {success && (
                   <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-semibold leading-relaxed">
-                    <svg className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>We have sent a secure recovery link to your registered workspace address. Please review your inbox.</span>
@@ -202,7 +202,7 @@ export default function ForgotPasswordPage() {
                         <span>Sending Link...</span>
                       ) : (
                         <>
-                          <svg className="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <svg className="w-4.5 h-4.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                           </svg>
                           <span>Email Recovery Link</span>
@@ -215,7 +215,7 @@ export default function ForgotPasswordPage() {
                   <div className="text-center pt-2">
                     <Link
                       href="/"
-                      className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-brand-accent)] hover:underline transition duration-200"
+                      className="inline-flex items-center gap-2 text-xs font-semibold text-brand-accent hover:underline transition duration-200"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />

@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
-import CompanyDetails from "@/modals/CompanyDetails"; // Verify if this should be "@/models/CompanyDetails"
+import CompanyDetails from "@/modals/CompanyDetails";
+import dbConnect from "@/lib/mongodb";
+import { getAdminUser } from "@/lib/auth";
 
 // 1. Prevent Next.js from caching GET requests statically
 export const dynamic = "force-dynamic";
 
-// Helper function to ensure database connection
-async function dbConnect() {
-  if (mongoose.connection.readyState >= 1) return;
-  
-  if (!process.env.MONGODB_URI) {
-    throw new Error("MONGODB_URI is not defined in your environment variables.");
-  }
-  
-  await mongoose.connect(process.env.MONGODB_URI);
-}
-
 // GET: Retrieve company settings safely
 export async function GET() {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await dbConnect();
     
     let settings = await CompanyDetails.findOne();
@@ -55,6 +50,11 @@ export async function GET() {
 // Unified Update Handler (Shared by PUT and POST methods)
 async function handleUpdate(request: Request) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await dbConnect();
 
     // 2. Safely parse request body to avoid crashing on empty payloads
@@ -116,18 +116,6 @@ async function handleUpdate(request: Request) {
         { new: true, runValidators: true }
       );
     }
-
-    console.log("[company-settings] saved result:", {
-      _id: result?._id,
-      departments: result?.departments,
-      shiftStart: result?.shiftStart,
-      shiftEnd: result?.shiftEnd,
-      gracePeriod: result?.gracePeriod,
-      checkInDisplayBefore: result?.checkInDisplayBefore,
-      checkOutDisplayAfter: result?.checkOutDisplayAfter,
-      autoCheckOut: result?.autoCheckOut,
-      autoCheckOutTime: result?.autoCheckOutTime,
-    });
 
     return NextResponse.json(result);
   } catch (error: unknown) {

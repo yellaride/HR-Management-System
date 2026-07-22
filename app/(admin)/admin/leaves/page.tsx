@@ -41,6 +41,16 @@ const mapType = (
   return "Other Leave";
 };
 
+// Raw shape returned by /api/admin/leaves before UI normalization
+interface RawLeaveRecord extends Omit<LeaveRequest, "id" | "status" | "type" | "designation" | "department"> {
+  id?: string;
+  _id?: string;
+  status?: string;
+  type?: string;
+  designation?: string;
+  department?: string;
+}
+
 export default function AdminLeavesPage() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,8 +76,8 @@ export default function AdminLeavesPage() {
         const data = await res.json();
         
         if (!cancelled) {
-          const rawArray = Array.isArray(data) ? data : [];
-          const cleanedData = rawArray.map((item: any) => ({
+          const rawArray: RawLeaveRecord[] = Array.isArray(data) ? data : [];
+          const cleanedData = rawArray.map((item) => ({
             ...item,
             id: item.id || item._id,
             // Safe conversions of DB enums to UI formats
@@ -84,8 +94,8 @@ export default function AdminLeavesPage() {
 
           setLeaves(cleanedData);
         }
-      } catch (e: any) {
-        if (!cancelled) setErrorMsg(e?.message || "Failed to load leave records");
+      } catch (e) {
+        if (!cancelled) setErrorMsg(e instanceof Error ? e.message : "Failed to load leave records");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -113,7 +123,7 @@ export default function AdminLeavesPage() {
       if (!res.ok) throw new Error("Failed to approve leave");
 
       const updated = (await res.json()) as { id?: string; _id?: string; status?: string };
-      const updatedId = updated.id || (updated as any)._id || id;
+      const updatedId = updated.id || updated._id || id;
       setLeaves((prev) =>
         prev.map((item) =>
           item.id === updatedId 
@@ -142,7 +152,7 @@ export default function AdminLeavesPage() {
       if (!res.ok) throw new Error("Failed to reject leave");
 
       const updated = (await res.json()) as { id?: string; _id?: string; status?: string };
-      const updatedId = updated.id || (updated as any)._id || id;
+      const updatedId = updated.id || updated._id || id;
       setLeaves((prev) =>
         prev.map((item) =>
           item.id === updatedId 
@@ -187,7 +197,7 @@ export default function AdminLeavesPage() {
 
       {errorMsg && (
         <div className="p-4 bg-rose-50 border border-rose-100 text-rose-700 text-xs rounded-xl flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}

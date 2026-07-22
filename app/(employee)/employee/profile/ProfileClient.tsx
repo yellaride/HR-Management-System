@@ -31,10 +31,10 @@ type ProfileState = {
 
 // Obsidian-Amethyst SweetAlert configurations matching custom design tokens
 const swalCustomClass = {
-  popup: "bg-white rounded-2xl border border-[var(--color-line-subtle)] shadow-xl font-sans",
-  title: "text-sm font-bold text-[var(--color-content-main)]",
-  htmlContainer: "text-xs text-[var(--color-content-secondary)]",
-  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
+  popup: "bg-white rounded-2xl border border-line-subtle shadow-xl font-sans",
+  title: "text-sm font-bold text-content-main",
+  htmlContainer: "text-xs text-content-secondary",
+  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
 };
 
 const Toast = Swal.mixin({
@@ -195,12 +195,12 @@ export default function ProfileClient() {
 
         setProfile(initialData);
         setTempProfile(initialData);
-      } catch (e: any) {
+      } catch (e) {
         console.error(e);
         Swal.fire({
           icon: "error",
           title: "Profile Data Retrieval Failed",
-          text: e?.message || "Verify your connection or attempt again later.",
+          text: e instanceof Error && e.message ? e.message : "Verify your connection or attempt again later.",
           confirmButtonColor: "#7c3aed",
           customClass: swalCustomClass
         });
@@ -259,16 +259,16 @@ export default function ProfileClient() {
         icon: "success",
         title: "Profile details updated",
         customClass: {
-          popup: "bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xl p-4 font-sans text-xs",
-          title: "text-xs font-bold text-[var(--color-content-main)]",
+          popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          title: "text-xs font-bold text-content-main",
         }
       });
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       Swal.fire({
         icon: "error",
         title: "Save Failed",
-        text: e?.message || "Please check your inputs and try again.",
+        text: e instanceof Error && e.message ? e.message : "Please check your inputs and try again.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass
       });
@@ -303,16 +303,16 @@ export default function ProfileClient() {
         icon: "success",
         title: "Photo saved successfully",
         customClass: {
-          popup: "bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xl p-4 font-sans text-xs",
-          title: "text-xs font-bold text-[var(--color-content-main)]",
+          popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          title: "text-xs font-bold text-content-main",
         }
       });
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       Swal.fire({
         icon: "error",
         title: "Upload Failed",
-        text: e?.message || "Photo update failed. Please try again.",
+        text: e instanceof Error && e.message ? e.message : "Photo update failed. Please try again.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass
       });
@@ -346,16 +346,16 @@ export default function ProfileClient() {
           icon: "success",
           title: "Photo removed",
           customClass: {
-            popup: "bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xl p-4 font-sans text-xs",
-            title: "text-xs font-bold text-[var(--color-content-main)]",
+            popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+            title: "text-xs font-bold text-content-main",
           }
         });
-      } catch (e: any) {
+      } catch (e) {
         console.error(e);
         Swal.fire({
           icon: "error",
           title: "Failed to remove photo",
-          text: e?.message || "Please try again.",
+          text: e instanceof Error && e.message ? e.message : "Please try again.",
           confirmButtonColor: "#7c3aed",
           customClass: swalCustomClass
         });
@@ -419,16 +419,16 @@ export default function ProfileClient() {
         icon: "success",
         title: "Password changed successfully",
         customClass: {
-          popup: "bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xl p-4 font-sans text-xs",
-          title: "text-xs font-bold text-[var(--color-content-main)]",
+          popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          title: "text-xs font-bold text-content-main",
         }
       });
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       Swal.fire({
         icon: "error",
         title: "Password Change Failed",
-        text: e?.message || "Verify your current credentials and try again.",
+        text: e instanceof Error && e.message ? e.message : "Verify your current credentials and try again.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass
       });
@@ -440,8 +440,8 @@ export default function ProfileClient() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <Loader2 className="w-8 h-8 text-[var(--color-brand-accent)] animate-spin" />
-        <span className="text-sm font-semibold text-[var(--color-content-secondary)]">Retrieving your profile files...</span>
+        <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
+        <span className="text-sm font-semibold text-content-secondary">Retrieving your profile files...</span>
       </div>
     );
   }
@@ -454,12 +454,12 @@ export default function ProfileClient() {
     <div className={`space-y-6  pb-12 px-4 transition-all ${uploadingPhoto ? "cursor-wait select-none" : ""}`}>
       
       {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[var(--color-line-subtle)] gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-line-subtle gap-4">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-[var(--color-content-main)]">
+          <h1 className="text-xl font-black tracking-tight text-content-main">
             Profile Settings
           </h1>
-          <p className="mt-0.5 text-xs text-[var(--color-content-secondary)]">
+          <p className="mt-0.5 text-xs text-content-secondary">
             Keep your background details up to date.
           </p>
         </div>
@@ -470,7 +470,7 @@ export default function ProfileClient() {
             <button
               type="button"
               onClick={handleStartEditing}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] cursor-pointer"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>Edit Profile</span>
@@ -480,7 +480,7 @@ export default function ProfileClient() {
               <button
                 type="button"
                 onClick={handleCancelEditing}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--color-brand-subtle)] hover:bg-[var(--color-line-subtle)] text-[var(--color-brand-accent)] text-xs font-bold rounded-lg transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-subtle hover:bg-line-subtle text-brand-accent text-xs font-bold rounded-lg transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Cancel</span>
@@ -489,7 +489,7 @@ export default function ProfileClient() {
                 type="button"
                 onClick={handleSave}
                 disabled={!canSave}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
               >
                 {saving ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -515,7 +515,7 @@ export default function ProfileClient() {
               className="relative group rounded-full cursor-pointer"
               onClick={handleAvatarAction}
             >
-              <div className="h-28 w-28 rounded-full border-2 border-[var(--color-line-subtle)] bg-[var(--color-surface-main)] flex items-center justify-center overflow-hidden shadow-inner relative transition duration-150 group-hover:ring-2 group-hover:ring-[var(--color-brand-accent)]/20">
+              <div className="h-28 w-28 rounded-full border-2 border-line-subtle bg-surface-main flex items-center justify-center overflow-hidden shadow-inner relative transition duration-150 group-hover:ring-2 group-hover:ring-brand-accent/20">
                 {tempProfile.profilePhotoUrl ? (
                   <img 
                     src={tempProfile.profilePhotoUrl} 
@@ -523,7 +523,7 @@ export default function ProfileClient() {
                     className="h-full w-full object-cover" 
                   />
                 ) : (
-                  <span className="text-[var(--color-brand-accent)] font-extrabold text-xl tracking-wider">
+                  <span className="text-brand-accent font-extrabold text-xl tracking-wider">
                     {initials}
                   </span>
                 )}
@@ -543,8 +543,8 @@ export default function ProfileClient() {
 
                 {/* Loading State Spinner */}
                 {uploadingPhoto && (
-                  <div className="absolute inset-0 bg-[var(--color-content-main)]/80 flex items-center justify-center text-white">
-                    <Loader2 className="w-5 h-5 animate-spin text-[var(--color-brand-accent)]" />
+                  <div className="absolute inset-0 bg-content-main/80 flex items-center justify-center text-white">
+                    <Loader2 className="w-5 h-5 animate-spin text-brand-accent" />
                   </div>
                 )}
               </div>
@@ -559,22 +559,22 @@ export default function ProfileClient() {
               disabled={uploadingPhoto || !!tempProfile.profilePhotoUrl}
             />
 
-            <h2 className="mt-3 text-base font-bold text-[var(--color-content-main)] leading-tight">
+            <h2 className="mt-3 text-base font-bold text-content-main leading-tight">
               {profile.fullName || "User Account"}
             </h2>
-            <span className="text-xs text-[var(--color-content-secondary)] font-medium mt-0.5">
+            <span className="text-xs text-content-secondary font-medium mt-0.5">
               {profile.email}
             </span>
 
             {/* Profile Progress Completion Bar */}
-            <div className="w-full mt-4 pt-4 border-t border-[var(--color-line-subtle)] text-left">
-              <div className="flex items-center justify-between text-[11px] font-bold text-[var(--color-content-secondary)] mb-1.5">
+            <div className="w-full mt-4 pt-4 border-t border-line-subtle text-left">
+              <div className="flex items-center justify-between text-[11px] font-bold text-content-secondary mb-1.5">
                 <span>Profile Completion</span>
-                <span className="text-[var(--color-brand-accent)]">{completionPercentage}%</span>
+                <span className="text-brand-accent">{completionPercentage}%</span>
               </div>
-              <div className="w-full bg-[var(--color-line-subtle)]/50 rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-line-subtle/50 rounded-full h-1.5 overflow-hidden">
                 <div 
-                  className="bg-[var(--color-brand-accent)] h-1.5 rounded-full transition-all duration-500 ease-out" 
+                  className="bg-brand-accent h-1.5 rounded-full transition-all duration-500 ease-out" 
                   style={{ width: `${completionPercentage}%` }}
                 />
               </div>
@@ -597,7 +597,7 @@ export default function ProfileClient() {
             {/* Section 1: Basic Information */}
             <div className="panel panel-section space-y-3">
               <div className="panel-header">
-                <User className="w-4 h-4 text-[var(--color-brand-accent)]" />
+                <User className="w-4 h-4 text-brand-accent" />
                 <h3 className="panel-header-title">General Identity</h3>
               </div>
 
@@ -606,17 +606,17 @@ export default function ProfileClient() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-1">
                   <div>
                     <span className="field-label block">Date of Birth</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block">
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block">
                       {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString("en-US", { dateStyle: "medium" }) : "Not provided"}
                     </span>
                   </div>
                   <div>
                     <span className="field-label block">Gender</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block">{profile.gender || "Not provided"}</span>
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.gender || "Not provided"}</span>
                   </div>
                   <div>
                     <span className="field-label block">Marital Status</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block">{profile.maritalStatus || "Not provided"}</span>
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.maritalStatus || "Not provided"}</span>
                   </div>
                 </div>
               ) : (
@@ -644,7 +644,7 @@ export default function ProfileClient() {
                       className="dropdown-trigger flex items-center justify-between text-left cursor-pointer z-40 relative"
                     >
                       <span>{tempProfile.gender || "Select Gender"}</span>
-                      <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isGenderOpen ? "rotate-180" : ""}`} />
+                      <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isGenderOpen ? "rotate-180" : ""}`} />
                     </button>
 
                     {isGenderOpen && (
@@ -680,7 +680,7 @@ export default function ProfileClient() {
                       className="dropdown-trigger flex items-center justify-between text-left cursor-pointer z-40 relative"
                     >
                       <span>{tempProfile.maritalStatus || "Select Status"}</span>
-                      <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isMaritalOpen ? "rotate-180" : ""}`} />
+                      <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isMaritalOpen ? "rotate-180" : ""}`} />
                     </button>
 
                     {isMaritalOpen && (
@@ -710,7 +710,7 @@ export default function ProfileClient() {
             {/* Section 2: Contact Information */}
             <div className="panel panel-section space-y-3">
               <div className="panel-header">
-                <MapPin className="w-4 h-4 text-[var(--color-brand-accent)]" />
+                <MapPin className="w-4 h-4 text-brand-accent" />
                 <h3 className="panel-header-title">Contact Coordinates</h3>
               </div>
 
@@ -719,11 +719,11 @@ export default function ProfileClient() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-1">
                   <div className="md:col-span-1">
                     <span className="field-label block">Phone Number</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block">{profile.phoneNumber || "Not provided"}</span>
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.phoneNumber || "Not provided"}</span>
                   </div>
                   <div className="md:col-span-2">
                     <span className="field-label block">Physical Address</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block leading-relaxed">{profile.address || "Not provided"}</span>
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block leading-relaxed">{profile.address || "Not provided"}</span>
                   </div>
                 </div>
               ) : (
@@ -757,7 +757,7 @@ export default function ProfileClient() {
             {/* Section 3: Emergency Contacts */}
             <div className="panel panel-section space-y-3">
               <div className="panel-header">
-                <HeartHandshake className="w-4 h-4 text-[var(--color-brand-accent)]" />
+                <HeartHandshake className="w-4 h-4 text-brand-accent" />
                 <h3 className="panel-header-title">Emergency Contact</h3>
               </div>
 
@@ -766,11 +766,11 @@ export default function ProfileClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-1">
                   <div>
                     <span className="field-label block">Contact Person</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block">{profile.emergencyContactName || "Not provided"}</span>
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.emergencyContactName || "Not provided"}</span>
                   </div>
                   <div>
                     <span className="field-label block">Contact Number</span>
-                    <span className="text-xs font-semibold text-[var(--color-content-main)] mt-0.5 block">{profile.emergencyContactPhone || "Not provided"}</span>
+                    <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.emergencyContactPhone || "Not provided"}</span>
                   </div>
                 </div>
               ) : (
@@ -806,7 +806,7 @@ export default function ProfileClient() {
           <div className="panel">
             <div className="panel-section space-y-4">
               <div className="panel-header">
-                <ShieldAlert className="w-4 h-4 text-[var(--color-brand-accent)]" />
+                <ShieldAlert className="w-4 h-4 text-brand-accent" />
                 <h3 className="panel-header-title">Security & Credentials</h3>
               </div>
 
@@ -849,11 +849,11 @@ export default function ProfileClient() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2 border-t border-[var(--color-line-subtle)]">
+                <div className="flex justify-end pt-2 border-t border-line-subtle">
                   <button
                     type="submit"
                     disabled={passwordSaving}
-                    className="inline-flex items-center gap-1.5 px-4.5 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     {passwordSaving ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />

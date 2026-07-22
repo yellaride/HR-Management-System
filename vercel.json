@@ -1,9 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/birthday-emails",
-      "schedule": "9 42 * * *"
+      "path": "/api/admin/birthdays/cron",
+      "schedule": "0 4 * * *"
     }
   ]
 }
-

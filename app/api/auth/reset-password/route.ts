@@ -35,17 +35,6 @@ export async function GET(req: Request) {
       ]
     });
 
-    // 3. Debug logging in your console to verify matches
-    console.log("== Password Reset Validation Debug ==");
-    console.log("- User Email:", email);
-    console.log("- User ID:", user._id);
-    console.log("- Input Token (Raw):", token);
-    console.log("- Hashed Token:", hashedToken);
-    console.log("- Token Record Found in DB:", !!validTokenRecord);
-    console.log("- Server Current Time:", new Date().toISOString());
-    console.log("- Token Expire Time:", validTokenRecord?.expiresAt ? new Date(validTokenRecord.expiresAt).toISOString() : "N/A");
-    console.log("=====================================");
-
     if (!validTokenRecord) {
       return NextResponse.json({ valid: false, message: "Token is invalid or has expired." }, { status: 400 });
     }

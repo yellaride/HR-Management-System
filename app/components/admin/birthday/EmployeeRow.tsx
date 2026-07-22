@@ -2,6 +2,15 @@ import React from "react";
 import { Calendar, MailCheck } from "lucide-react";
 import { EmployeeBirthday } from "@/lib/types";
 
+// Optional profile photo fields (backend may provide any of these)
+interface EmployeePhotoFields {
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePicture?: string;
+  image?: string;
+  picture?: string;
+}
+
 interface EmployeeRowProps {
   employee: EmployeeBirthday;
   isToday: boolean;
@@ -17,6 +26,14 @@ export const EmployeeRow: React.FC<EmployeeRowProps> = ({
   formatBirthdate,
   getInitials,
 }) => {
+  const emp = employee as EmployeeBirthday & EmployeePhotoFields;
+  const photoUrl =
+    emp.profilePhotoUrl ||
+    emp.profilePhotoURL ||
+    emp.profilePicture ||
+    emp.image ||
+    emp.picture;
+
   return (
     <div
       className={`p-4 sm:px-6 transition-all duration-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-line-subtle last:border-b-0 hover:bg-surface-main/30 group ${
@@ -38,19 +55,9 @@ export const EmployeeRow: React.FC<EmployeeRowProps> = ({
           {getInitials(employee.name)}
 
           {/* optional profile photo */}
-          {(employee as any).profilePhotoUrl ||
-          (employee as any).profilePhotoURL ||
-          (employee as any).profilePicture ||
-          (employee as any).image ||
-          (employee as any).picture ? (
+          {photoUrl ? (
             <img
-              src={
-                (employee as any).profilePhotoUrl ||
-                (employee as any).profilePhotoURL ||
-                (employee as any).profilePicture ||
-                (employee as any).image ||
-                (employee as any).picture
-              }
+              src={photoUrl}
               alt={employee.name}
               className="absolute inset-0 w-full h-full object-cover rounded-xl"
               onError={(e) => {

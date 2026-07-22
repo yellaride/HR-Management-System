@@ -150,9 +150,9 @@ export default function AddEmployeeModal({
 
   const getInputClass = (fieldName: string) => {
     const baseClass =
-      "w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+      "w-full px-3.5 py-2.5 bg-surface-card border rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
     const normalClass =
-      "border-[var(--color-line-subtle)] hover:border-[var(--color-brand-accent)]/50 focus:ring-2 focus:ring-[var(--color-brand-accent)]/20 focus:border-[var(--color-brand-accent)]";
+      "border-line-subtle hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
     const errorClass =
       "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500";
 
@@ -167,16 +167,16 @@ export default function AddEmployeeModal({
       />
 
       <div
-        className="relative bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh] flex flex-col"
+        className="relative bg-surface-card border border-line-subtle rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh] flex flex-col"
       >
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--color-brand-accent)] to-[var(--color-brand-hover)]" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-brand-accent to-brand-hover" />
 
-        <div className="flex items-start justify-between pb-4 border-b border-[var(--color-line-subtle)] shrink-0">
+        <div className="flex items-start justify-between pb-4 border-b border-line-subtle shrink-0">
           <div>
-            <h2 className="text-base font-extrabold text-[var(--color-content-main)] tracking-tight">
+            <h2 className="text-base font-extrabold text-content-main tracking-tight">
               Add New Employee
             </h2>
-            <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5 font-medium">
+            <p className="text-[11px] text-content-secondary mt-0.5 font-medium">
               Fill in the fields below to register a new profile in the organization.
             </p>
           </div>
@@ -184,7 +184,7 @@ export default function AddEmployeeModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--color-content-muted)] hover:text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-subtle)] transition"
+            className="p-1.5 rounded-lg text-content-muted hover:text-brand-accent hover:bg-brand-subtle transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -210,7 +210,7 @@ export default function AddEmployeeModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3.5">
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Full Name
               </label>
               <input
@@ -226,7 +226,7 @@ export default function AddEmployeeModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Email Address
               </label>
               <input
@@ -255,7 +255,7 @@ export default function AddEmployeeModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Designation
               </label>
               <input
@@ -271,7 +271,7 @@ export default function AddEmployeeModal({
             </div>
 
             <div className="space-y-1.5 relative" ref={deptRef}>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Department
               </label>
               <button
@@ -284,7 +284,7 @@ export default function AddEmployeeModal({
               >
                 <span>{formData.department || "Select Department"}</span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${
+                  className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${
                     isDeptOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -293,7 +293,7 @@ export default function AddEmployeeModal({
               {isDeptOpen && (
                 <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150 max-h-44 overflow-y-auto">
                   {departments.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-[var(--color-content-muted)]">
+                    <div className="px-3 py-2 text-xs text-content-muted">
                       No departments configured.
                     </div>
                   ) : (
@@ -318,7 +318,7 @@ export default function AddEmployeeModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Salary (Rs)
               </label>
               <input
@@ -336,7 +336,7 @@ export default function AddEmployeeModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Join Date
               </label>
               <input
@@ -351,7 +351,7 @@ export default function AddEmployeeModal({
             </div>
 
             <div className="space-y-1.5 relative" ref={statusRef}>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Initial Status
               </label>
               <button
@@ -364,7 +364,7 @@ export default function AddEmployeeModal({
               >
                 <span>{formData.status}</span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${
+                  className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${
                     isStatusOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -392,17 +392,17 @@ export default function AddEmployeeModal({
             </div>
           </div>
 
-          <div className="flex justify-end items-center gap-2 pt-4 border-t border-[var(--color-line-subtle)] shrink-0">
+          <div className="flex justify-end items-center gap-2 pt-4 border-t border-line-subtle shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4.5 py-2.5 text-xs font-bold text-[var(--color-content-secondary)] bg-[var(--color-surface-main)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)] rounded-xl border border-[var(--color-line-subtle)] transition cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-content-secondary bg-surface-main hover:bg-brand-subtle hover:text-brand-accent rounded-xl border border-line-subtle transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4.5 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] cursor-pointer"
             >
               Create Profile
             </button>

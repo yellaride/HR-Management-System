@@ -3,9 +3,15 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
 import mongoose from "mongoose";
+import { getAdminUser } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
 
     const activeEmployeesFilter = { status: { $ne: "Inactive" } };
@@ -94,7 +100,7 @@ export async function GET() {
     }
 
     // 5. Fetch Today's Birthday Celebrants dynamically (Asia/Karachi)
-    let todayBirthdays: any[] = [];
+    let todayBirthdays: unknown[] = [];
     try {
       const now = new Date();
       const formatter = new Intl.DateTimeFormat("en-US", {
@@ -133,10 +139,11 @@ export async function GET() {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to fetch dashboard stats:", error);
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message || "Internal Server Error" },
       { status: 500 }
     );
   }

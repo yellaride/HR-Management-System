@@ -5,17 +5,39 @@ import { Employee } from "@/modals/Employee";
 import CompanyDetails from "@/modals/CompanyDetails"; // Adjust this path to match where your model is saved
 import bcrypt from "bcryptjs";
 import { sendWelcomeEmail } from "@/lib/email/welcome-email";
+import { getAdminUser } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
 
     // DEBUG: verify numeric values exist
-    const employees = await Employee.find({ status: { $ne: "Inactive" } }).populate("userId", "email");
+    interface EmployeeDoc {
+      _id: { toString(): string };
+      name: string;
+      department?: string;
+      status?: string;
+      designation?: string;
+      joinDate?: string | Date;
+      salary?: number | null;
+      hourlyRate?: number | null;
+      profilePhotoUrl?: string;
+      profilePhotoURL?: string;
+      userId?: { email?: string } | null;
+    }
+    const employees = (await Employee.find({ status: { $ne: "Inactive" } }).populate(
+      "userId",
+      "email"
+    )) as unknown as EmployeeDoc[];
 
 
     // Map backend properties so frontend gets consistent keys for dates + compensation
-    const formattedEmployees = employees.map((emp: any) => ({
+    const formattedEmployees = employees.map((emp) => ({
       id: emp._id.toString(),
       name: emp.name,
       email: emp.userId?.email || "",
@@ -33,10 +55,11 @@ export async function GET() {
     }));
 
     return NextResponse.json(formattedEmployees, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Fetch employees error:", error);
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: error.message || "Failed to load directory" },
+      { error: message || "Failed to load directory" },
       { status: 500 }
     );
   }
@@ -44,6 +67,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
 
     const body = await request.json();
@@ -102,12 +130,6 @@ try {
 // 2. Calculate Hourly Rate
 const parsedHourlyRate = parsedSalary / standardHours;
 
-    console.log("[Employee POST] received salary:", salary);
-    console.log("[Employee POST] parsedSalary:", parsedSalary);
-    console.log("[Employee POST] standardHours:", standardHours);
-    console.log("[Employee POST] parsedHourlyRate:", parsedHourlyRate);
-
-
     const assignedRole = "employee"; 
 
     const newUser = await User.create({
@@ -130,6 +152,8 @@ const parsedHourlyRate = parsedSalary / standardHours;
 
     const emailSent = await sendWelcomeEmail(name, normalizedEmail, password);
 
+    const newEmployeeHourlyRate = (newEmployee as { hourlyRate?: unknown }).hourlyRate;
+
     const formattedNewEmployee = {
       id: newEmployee._id.toString(),
       name: newEmployee.name,
@@ -141,7 +165,7 @@ const parsedHourlyRate = parsedSalary / standardHours;
       joinDate: newEmployee.joinDate ? newEmployee.joinDate.toISOString() : undefined,
       salary: typeof newEmployee.salary === "number" ? newEmployee.salary : undefined,
       hourlyRate:
-        typeof (newEmployee as any).hourlyRate === "number" ? (newEmployee as any).hourlyRate : undefined,
+        typeof newEmployeeHourlyRate === "number" ? newEmployeeHourlyRate : undefined,
     };
 
 
@@ -156,10 +180,11 @@ const parsedHourlyRate = parsedSalary / standardHours;
       { status: 201 }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Database registration error:", error);
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message || "Internal Server Error" },
       { status: 500 }
     );
   }

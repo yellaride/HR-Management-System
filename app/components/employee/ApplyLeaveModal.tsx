@@ -35,14 +35,16 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
   // Ref to track clicks outside the leave type selector
   const typeRef = useRef<HTMLDivElement>(null);
 
-  // Clear states when opening/closing modal
-  useEffect(() => {
+  // Clear states when opening/closing modal (render-time adjustment pattern)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (!isOpen) {
       setForm({ type: "ANNUAL", startDate: "", endDate: "", reason: "" });
       setValidationError("");
       setIsTypeOpen(false);
     }
-  }, [isOpen]);
+  }
 
   // Click outside listener for the custom dropdown
   useEffect(() => {
@@ -99,8 +101,8 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
 
   // Helper mapping validation error borders to fields
   const getInputClass = (hasError = false) => {
-    const baseClass = "w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
-    const normalClass = "border-[var(--color-line-subtle)] hover:border-[var(--color-brand-accent)]/50 focus:ring-2 focus:ring-[var(--color-brand-accent)]/20 focus:border-[var(--color-brand-accent)]";
+    const baseClass = "w-full px-3.5 py-2.5 bg-surface-card border rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+    const normalClass = "border-line-subtle hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
     const errorClass = "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500";
     
     return `${baseClass} ${hasError ? errorClass : normalClass}`;
@@ -117,20 +119,20 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
       />
 
       {/* Modal Container */}
-      <div className="relative bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl max-w-md w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative bg-surface-card border border-line-subtle rounded-2xl max-w-md w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Subtle purple accent line at the top */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--color-brand-accent)] to-[var(--color-brand-hover)]" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-brand-accent to-brand-hover" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+        <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
           <div>
-            <h2 className="text-base font-extrabold text-[var(--color-content-main)] tracking-tight">Request Leave</h2>
-            <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5 font-medium">Prepare details to queue leave request.</p>
+            <h2 className="text-base font-extrabold text-content-main tracking-tight">Request Leave</h2>
+            <p className="text-[11px] text-content-secondary mt-0.5 font-medium">Prepare details to queue leave request.</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--color-content-muted)] hover:text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-subtle)] transition cursor-pointer"
+            className="p-1.5 rounded-lg text-content-muted hover:text-brand-accent hover:bg-brand-subtle transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -161,7 +163,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
               className={`${getInputClass()} flex items-center justify-between text-left cursor-pointer z-40 relative`}
             >
               <span>{selectedTypeLabel}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isTypeOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isTypeOpen ? "rotate-180" : ""}`} />
             </button>
 
             {isTypeOpen && (
@@ -230,19 +232,19 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
           </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-end items-center gap-2 pt-4 border-t border-[var(--color-line-subtle)] shrink-0">
+          <div className="flex justify-end items-center gap-2 pt-4 border-t border-line-subtle shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4.5 py-2.5 text-xs font-bold text-[var(--color-content-secondary)] bg-[var(--color-surface-main)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)] rounded-xl border border-[var(--color-line-subtle)] transition disabled:opacity-50 cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-content-secondary bg-surface-main hover:bg-brand-subtle hover:text-brand-accent rounded-xl border border-line-subtle transition disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4.5 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
             >
               {loading ? "Dispatching..." : "Dispatch Request"}
             </button>

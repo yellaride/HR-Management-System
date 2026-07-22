@@ -14,6 +14,13 @@ import {
 // Import the centralized LeaveRequest type. 
 import { LeaveRequest } from "@/lib/types";
 
+// Extra fields the backend may attach to a leave record beyond the base type.
+type LeaveRequestWithExtras = LeaveRequest & {
+  leaveType?: string;
+  typeUpper?: string;
+  profilePhotoUrl?: string;
+};
+
 interface LeaveTableProps {
   leaves: LeaveRequest[];
   loading: boolean;
@@ -58,15 +65,15 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
   // Resolve leave type consistently from multiple possible backend keys.
   // Backend currently sends: { type: "Annual Leave" | "Sick Leave" | ... , typeUpper: "ANNUAL" | "SICK" | "CASUAL" }
   const resolveLeaveTypeTitle = (leave: LeaveRequest) => {
-    const anyLeave = leave as any;
+    const extendedLeave = leave as LeaveRequestWithExtras;
 
     const titleFromType = leave.type; // expected title-case
     if (titleFromType) return titleFromType;
 
-    const titleFromLegacy = anyLeave.leaveType as string | undefined;
+    const titleFromLegacy = extendedLeave.leaveType;
     if (titleFromLegacy) return titleFromLegacy;
 
-    const key = String(anyLeave.typeUpper || "").toUpperCase();
+    const key = String(extendedLeave.typeUpper || "").toUpperCase();
     if (key === "ANNUAL") return "Annual Leave";
     if (key === "SICK") return "Sick Leave";
     if (key === "CASUAL") return "Casual Leave";
@@ -77,9 +84,9 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
 
   if (loading) {
     return (
-      <div className="py-12 text-center text-[var(--color-content-muted)]">
+      <div className="py-12 text-center text-content-muted">
         <div className="flex justify-center items-center gap-2">
-          <div className="w-4 h-4 border-2 border-[var(--color-brand-accent)] border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
           <span>Loading leave records...</span>
         </div>
       </div>
@@ -88,9 +95,9 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
 
   if (leaves.length === 0) {
     return (
-      <div className="px-6 py-12 text-center text-[var(--color-content-muted)]">
+      <div className="px-6 py-12 text-center text-content-muted">
         <div className="flex flex-col items-center justify-center gap-2">
-          <AlertCircle className="w-6 h-6 text-[var(--color-content-muted)]/70" />
+          <AlertCircle className="w-6 h-6 text-content-muted/70" />
           <span>No matching leave records found.</span>
         </div>
       </div>
@@ -111,7 +118,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
             <th className="table-cell text-right">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--color-line-subtle)] text-[var(--color-content-secondary)] text-xs">
+        <tbody className="divide-y divide-line-subtle text-content-secondary text-xs">
           {leaves.map((leave) => {
             const initials = (leave.employeeName || "Employee")
               .split(" ")
@@ -126,15 +133,15 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
             // Resolve title-case leave type robustly from backend keys.
             const resolvedType = resolveLeaveTypeTitle(leave as LeaveRequest);
 
-            // Safely retrieve the profile photo URL by asserting to any
-            const profilePhotoUrl = (leave as any).profilePhotoUrl as string | undefined;
+            // Safely retrieve the optional profile photo URL
+            const profilePhotoUrl = (leave as LeaveRequestWithExtras).profilePhotoUrl;
 
             return (
               <tr key={leave.id} className="table-row-hover">
                 {/* Employee Column (Name & Avatar) */}
                 <td className="table-cell">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px] overflow-hidden shrink-0 relative">
+                    <div className="w-9 h-9 rounded-xl bg-surface-main text-content-secondary border border-line-subtle flex items-center justify-center font-bold text-[11px] overflow-hidden shrink-0 relative">
                       {/* Fallback Initials rendered underneath */}
                       {initials}
 
@@ -152,7 +159,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                       )}
                     </div>
                     <div>
-                      <span className="font-bold text-[var(--color-content-main)] block leading-tight capitalize">
+                      <span className="font-bold text-content-main block leading-tight capitalize">
                         {leave.employeeName}
                       </span>
                     </div>
@@ -161,7 +168,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
 
                 {/* Designation Column */}
                 <td className="table-cell">
-                  <span className="text-[var(--color-content-secondary)] font-medium capitalize">
+                  <span className="text-content-secondary font-medium capitalize">
                     {leave.designation || "No Designation Specified"}
                   </span>
                 </td>
@@ -176,11 +183,11 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                 {/* Duration & Dates Column */}
                 <td className="table-cell">
                   <div className="flex flex-col">
-                    <span className="font-bold text-[var(--color-content-main)] flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
+                    <span className="font-bold text-content-main flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-content-muted" />
                       {leave.days || 0} {leave.days === 1 ? "day" : "days"}
                     </span>
-                    <span className="text-[10px] text-[var(--color-content-muted)] mt-1">
+                    <span className="text-[10px] text-content-muted mt-1">
                       {leave.startDate || "N/A"} to {leave.endDate || "N/A"}
                     </span>
                   </div>
@@ -190,10 +197,10 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                 <td className="table-cell max-w-xs">
                   <button
                     onClick={() => onSelect(leave)}
-                    className="flex items-start gap-1.5 text-[var(--color-content-secondary)] text-left hover:text-[var(--color-brand-accent)] group transition duration-150"
+                    className="flex items-start gap-1.5 text-content-secondary text-left hover:text-brand-accent group transition duration-150"
                     title="Click to view full details"
                   >
-                    <FileText className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-brand-accent)]/80 flex-shrink-0 mt-0.5" />
+                    <FileText className="w-4 h-4 text-content-muted group-hover:text-brand-accent/80 shrink-0 mt-0.5" />
                     <span className="truncate block font-medium underline decoration-dotted underline-offset-2">
                       {leave.reason || "No reason provided"}
                     </span>
@@ -216,7 +223,7 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                 <td className="table-cell text-right">
                   <button
                     onClick={() => onSelect(leave)}
-                    className="p-1.5 rounded-lg text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] hover:bg-[var(--color-brand-subtle)] border border-transparent hover:border-[var(--color-brand-accent)]/20 transition inline-flex items-center gap-1 ml-auto cursor-pointer"
+                    className="p-1.5 rounded-lg text-brand-accent hover:text-brand-hover hover:bg-brand-subtle border border-transparent hover:border-brand-accent/20 transition inline-flex items-center gap-1 ml-auto cursor-pointer"
                   >
                     <Eye className="w-4 h-4" />
                     <span className="text-[10px] font-bold">Review</span>

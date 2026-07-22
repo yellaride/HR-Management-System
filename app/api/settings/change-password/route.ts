@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 
 import dbConnect from "@/lib/mongodb";
 import User from "@/modals/User";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -72,9 +72,10 @@ export async function POST(req: Request) {
       { message: "Password updated successfully." },
       { status: 200 }
     );
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
     return NextResponse.json(
-      { message: err?.message || "Failed to update password." },
+      { message: message || "Failed to update password." },
       { status: 500 }
     );
   }

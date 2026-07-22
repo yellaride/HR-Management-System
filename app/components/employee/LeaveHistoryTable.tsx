@@ -98,7 +98,7 @@ export default function LeaveHistoryTable({ history }: LeaveHistoryTableProps) {
 
                       <td className="px-6 py-4 max-w-sm">
                         <div className="flex items-start gap-1.5 leading-normal">
-                          <FileText className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                          <FileText className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
                           <span className="truncate block text-gray-500" title={record.reason}>
                             {record.reason}
                           </span>

@@ -8,6 +8,8 @@ interface EmployeePolicy {
   userId: string;
   name: string;
   email: string;
+  profilePhotoUrl?: string;
+  designation?: string;
   isCustom: boolean;
   policy: {
     ANNUAL: number;
@@ -25,6 +27,11 @@ export default function AdminLeavesPolicyPage() {
   // Modal Control States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeePolicy | null>(null);
+
+  const showBanner = (status: "success" | "error", message: string) => {
+    setBanner({ status, message });
+    setTimeout(() => setBanner(null), 8000);
+  };
 
   // Load baseline employee list on mount
   useEffect(() => {
@@ -49,11 +56,6 @@ export default function AdminLeavesPolicyPage() {
     }
     loadInitialData();
   }, []);
-
-  const showBanner = (status: "success" | "error", message: string) => {
-    setBanner({ status, message });
-    setTimeout(() => setBanner(null), 8000);
-  };
 
   const handleOpenCreateModal = () => {
     setSelectedEmployee(null);
@@ -131,18 +133,18 @@ export default function AdminLeavesPolicyPage() {
   return (
     <div className="space-y-6 min-h-screen pb-12">
       {/* Header Info */}
-      <div className="pb-6 border-b border-[var(--color-line-subtle,#e2e0e8)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="pb-6 border-b border-line-subtle flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-[var(--color-content-main,#181124)] tracking-tight font-sans">
+          <h1 className="text-2xl font-extrabold text-content-main tracking-tight font-sans">
             Manage Overrides Leaves Policy
           </h1>
-          <p className="text-xs text-[var(--color-content-muted,#a19da9)] mt-1 font-medium">
+          <p className="text-xs text-content-muted mt-1 font-medium">
             Configure, manage, and customize leave policies for individual profiles.
           </p>
         </div>
         <button
           onClick={handleOpenCreateModal}
-          className="self-start inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] transition cursor-pointer"
+          className="self-start inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover transition cursor-pointer"
         >
           Create Policy Override
         </button>
@@ -158,9 +160,9 @@ export default function AdminLeavesPolicyPage() {
           }`}
         >
           {banner.status === "success" ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           )}
           <div className="flex-1">
             <span className="block font-bold font-sans">
@@ -177,7 +179,7 @@ export default function AdminLeavesPolicyPage() {
           <div className="panel panel-section flex items-center justify-between">
             <div>
               <p className="field-label">Total Staff Monitored</p>
-              <h3 className="text-xl font-extrabold mt-1 text-[var(--color-content-main)]">{employees.length}</h3>
+              <h3 className="text-xl font-extrabold mt-1 text-content-main">{employees.length}</h3>
             </div>
             <div className="p-2.5 bg-gray-100 rounded-xl text-gray-500">
               <Users className="w-4.5 h-4.5" />
@@ -187,11 +189,11 @@ export default function AdminLeavesPolicyPage() {
           <div className="panel panel-section flex items-center justify-between">
             <div>
               <p className="field-label">Active Overrides</p>
-              <h3 className="text-xl font-extrabold mt-1 text-[var(--color-brand-accent)]">
+              <h3 className="text-xl font-extrabold mt-1 text-brand-accent">
                 {customOverrideEmployees.length}
               </h3>
             </div>
-            <div className="p-2.5 bg-[var(--color-brand-subtle)] rounded-xl text-[var(--color-brand-accent)]">
+            <div className="p-2.5 bg-brand-subtle rounded-xl text-brand-accent">
               <CheckCircle2 className="w-4.5 h-4.5" />
             </div>
           </div>
@@ -209,17 +211,17 @@ export default function AdminLeavesPolicyPage() {
       )}
 
       {initialLoading ? (
-        <div className="text-center py-12 text-xs text-[var(--color-content-muted,#a19da9)] font-semibold">
+        <div className="text-center py-12 text-xs text-content-muted font-semibold">
           Loading active configurations...
         </div>
       ) : (
         <div className="space-y-4 animate-in fade-in duration-150">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xs font-extrabold text-[var(--color-content-main,#181124)] uppercase tracking-wider">
+              <h2 className="text-xs font-extrabold text-content-main uppercase tracking-wider">
                 Active Custom Overrides
               </h2>
-              <p className="text-[10px] text-[var(--color-content-muted,#a19da9)] font-medium mt-0.5">
+              <p className="text-[10px] text-content-muted font-medium mt-0.5">
                 Profiles utilizing custom leave configurations.
               </p>
             </div>
@@ -270,7 +272,7 @@ export default function AdminLeavesPolicyPage() {
                           <td className="table-cell">
                             <div className="flex items-center gap-3">
                               {/* Profile photo (optional) */}
-                              <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center overflow-hidden shrink-0 relative">
+                              <div className="w-9 h-9 rounded-xl bg-surface-main text-content-secondary border border-line-subtle flex items-center justify-center overflow-hidden shrink-0 relative">
                                 {emp.name
                                   ? emp.name
                                       .split(" ")
@@ -280,9 +282,9 @@ export default function AdminLeavesPolicyPage() {
                                       .slice(0, 2)
                                       .toUpperCase()
                                   : "??"}
-                                {(emp as any).profilePhotoUrl ? (
+                                {emp.profilePhotoUrl ? (
                                   <img
-                                    src={(emp as any).profilePhotoUrl}
+                                    src={emp.profilePhotoUrl}
                                     alt={emp.name}
                                     className="absolute inset-0 w-full h-full object-cover"
                                     onError={(e) => {
@@ -295,8 +297,8 @@ export default function AdminLeavesPolicyPage() {
                                 <div className="font-bold text-xs text-[#181124] capitalize">{emp.name}</div>
                                 <div className="text-[10px] text-gray-400 mt-0.5">{emp.email}</div>
                                 {/* Designation if available */}
-                                {(emp as any).designation && (
-                                  <div className="text-[10px] text-gray-500 mt-0.5">{(emp as any).designation}</div>
+                                {emp.designation && (
+                                  <div className="text-[10px] text-gray-500 mt-0.5">{emp.designation}</div>
                                 )}
                               </div>
                             </div>
@@ -305,7 +307,7 @@ export default function AdminLeavesPolicyPage() {
 
                           {/* Custom Override Indicator Badge */}
                           <td className="table-cell text-center">
-                            <span className="status-pill bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]/20">
+                            <span className="status-pill bg-brand-subtle text-brand-accent border-brand-accent/20">
                               Custom
                             </span>
                           </td>
@@ -339,9 +341,9 @@ export default function AdminLeavesPolicyPage() {
                           </td>
 
                           {/* Computed Annual Sum Column (Hidden on mobile) */}
-                          <td className="table-cell text-center font-mono font-bold text-xs text-[var(--color-content-main)] hidden md:table-cell">
-                            <div className="text-xs font-extrabold text-[var(--color-content-main)]">{totalPool} Days</div>
-                            <div className="text-[9px] text-[var(--color-content-muted)] font-medium">Accumulative</div>
+                          <td className="table-cell text-center font-mono font-bold text-xs text-content-main hidden md:table-cell">
+                            <div className="text-xs font-extrabold text-content-main">{totalPool} Days</div>
+                            <div className="text-[9px] text-content-muted font-medium">Accumulative</div>
                           </td>
 
                           {/* Action Buttons */}
@@ -351,7 +353,7 @@ export default function AdminLeavesPolicyPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(emp)}
-                                className="p-1.5 rounded-xl icon-button hover:text-[var(--color-brand-accent)] hover:border-[var(--color-brand-accent)]/35 hover:bg-[var(--color-brand-subtle)]"
+                                className="p-1.5 rounded-xl icon-button hover:text-brand-accent hover:border-brand-accent/35 hover:bg-brand-subtle"
                                 title="Edit override settings"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />

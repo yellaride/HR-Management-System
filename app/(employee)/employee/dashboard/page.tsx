@@ -24,30 +24,47 @@ import { PayslipRecord } from "@/app/components/payslips/payslipPdf";
 import {MetricCard} from "@/app/components/admin/dashbord/MetricCard";
 import BirthdayGreetingBanner from "@/app/components/employee/dashbord/BirthdayGreetingBanner";
 
+// Minimal shapes of the API payload fields actually consumed by this page
+interface TodayAttendanceRecord {
+  checkOut?: string;
+}
+
+interface AttendanceHistoryEntry {
+  status?: string;
+  workedHours?: number;
+}
+
+interface EmployeeLeaveSummary {
+  status?: string;
+}
+
 const swalCustomClass = {
-  popup: "bg-white rounded-2xl border border-[var(--color-line-subtle)] shadow-xl font-sans",
-  title: "text-sm font-bold text-[var(--color-content-main)]",
-  htmlContainer: "text-xs text-[var(--color-content-secondary)]",
-  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
+  popup: "bg-white rounded-2xl border border-line-subtle shadow-xl font-sans",
+  title: "text-sm font-bold text-content-main",
+  htmlContainer: "text-xs text-content-secondary",
+  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
 };
 
 function DynamicHeaderClock() {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    setCurrentDateTime(new Date());
+    const initial = setTimeout(() => setCurrentDateTime(new Date()), 0);
     const interval = setInterval(() => {
       setCurrentDateTime(new Date());
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
   }, []);
 
   if (!currentDateTime) {
-    return <span className="text-xs font-semibold text-[var(--color-content-muted)]">Loading time...</span>;
+    return <span className="text-xs font-semibold text-content-muted">Loading time...</span>;
   }
 
   return (
-    <span className="text-xs font-semibold text-[var(--color-content-secondary)] tabular-nums">
+    <span className="text-xs font-semibold text-content-secondary tabular-nums">
       {currentDateTime.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -78,7 +95,7 @@ export default function EmployeeDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const [todayRecord, setTodayRecord] = useState<any | null>(null);
+  const [todayRecord, setTodayRecord] = useState<TodayAttendanceRecord | null>(null);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
@@ -122,7 +139,8 @@ export default function EmployeeDashboardPage() {
 
   const fetchAttendanceStatus = useCallback(async () => {
     try {
-      setAttendanceLoading(true);
+      // `attendanceLoading` starts as true, so the initial fetch already
+      // renders the loading state; refresh callers set it before invoking.
       const res = await fetch("/api/employee/attendance");
       if (res.ok) {
         const data = await res.json();
@@ -135,16 +153,16 @@ export default function EmployeeDashboardPage() {
 
         } else if (data.history && data.history.length > 0) {
           const actualPresents = data.history.filter(
-            (r: any) => r.status === "On Time" || r.status === "Late"
+            (r: AttendanceHistoryEntry) => r.status === "On Time" || r.status === "Late"
           ).length;
           setPresentDays(actualPresents);
           
           const actualAbsents = data.history.filter(
-            (r: any) => r.status === "Absent"
+            (r: AttendanceHistoryEntry) => r.status === "Absent"
           ).length;
           setAbsentDays(actualAbsents);
 
-          const totalHours = data.history.reduce((acc: number, curr: any) => {
+          const totalHours = data.history.reduce((acc: number, curr: AttendanceHistoryEntry) => {
             return acc + (curr.workedHours || 0);
           }, 0);
           setTotalWorkedHours(totalHours || actualPresents * 8); 
@@ -170,6 +188,7 @@ export default function EmployeeDashboardPage() {
       if (!res.ok) {
         setAttendanceError(data.error || "Action execution failed.");
       } else {
+        setAttendanceLoading(true);
         await fetchAttendanceStatus();
       }
     } catch {
@@ -181,23 +200,16 @@ export default function EmployeeDashboardPage() {
     if (!session?.user?.email) return;
 
     try {
-      setIsLoading(true);
-      
-      let res = await fetch("/api/employee/payslips");
-      let isEmployeeScopedEndpoint = true;
+      // `isLoading` starts as true, so the initial fetch already renders
+      // the loading state without setting it again here.
+      const res = await fetch("/api/employee/payslips");
 
       if (!res.ok) {
-        console.warn(`Dedicated employee API returned status ${res.status}. Falling back...`);
-        res = await fetch("/api/admin/payslips");
-        isEmployeeScopedEndpoint = false;
-      }
-
-      if (!res.ok) {
-        throw new Error(`Failed to load payslips from API paths (status: ${res.status})`);
+        throw new Error(`Failed to load payslips (status: ${res.status})`);
       }
 
       const data = await res.json();
-      
+
       let slips: PayslipRecord[] = [];
       if (Array.isArray(data)) {
         slips = data;
@@ -205,22 +217,6 @@ export default function EmployeeDashboardPage() {
         slips = data.payslips;
       } else if (Array.isArray(data.data)) {
         slips = data.data;
-      }
-
-      if (!isEmployeeScopedEndpoint) {
-        const currentUserEmail = (session.user as any)?.email?.toLowerCase?.().trim();
-        const currentUserName = (session.user as any)?.name?.toLowerCase?.().trim() || "";
-
-        slips = slips.filter((slip: PayslipRecord) => {
-          const empObj = typeof slip.employeeId === "object" && slip.employeeId !== null ? slip.employeeId : null;
-          const empName = (empObj?.name || slip.employeeName || "").toLowerCase().trim();
-          const empEmail = (empObj as any)?.email || (slip as any).employeeEmail || "";
-
-          const emailMatches = empEmail && currentUserEmail && empEmail === currentUserEmail;
-          const nameMatches = empName && currentUserName && empName === currentUserName;
-
-          return emailMatches || nameMatches;
-        });
       }
 
       setPayslips(slips);
@@ -237,7 +233,7 @@ export default function EmployeeDashboardPage() {
       if (!res.ok) return;
       const data = await res.json();
       const leaves = Array.isArray(data?.leaves) ? data.leaves : (Array.isArray(data) ? data : []);
-      const pendingCount = leaves.filter((l: any) => String(l?.status || "").toUpperCase() === "PENDING").length;
+      const pendingCount = leaves.filter((l: EmployeeLeaveSummary) => String(l?.status || "").toUpperCase() === "PENDING").length;
       setPendingLeaves(pendingCount);
     } catch (e) {
       console.error("Failed to fetch pending leaves", e);
@@ -258,17 +254,22 @@ export default function EmployeeDashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetchEmployeePayslips();
-    fetchAttendanceStatus();
-    fetchPendingLeaves();
-    fetchBirthdayStatus();
-    evaluateTimeConstraints();
+    const initialLoad = setTimeout(() => {
+      fetchEmployeePayslips();
+      fetchAttendanceStatus();
+      fetchPendingLeaves();
+      fetchBirthdayStatus();
+      evaluateTimeConstraints();
+    }, 0);
 
     const timer = setInterval(() => {
       evaluateTimeConstraints();
     }, 15000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(timer);
+    };
   }, [fetchEmployeePayslips, fetchAttendanceStatus, fetchPendingLeaves, fetchBirthdayStatus, evaluateTimeConstraints]);
 
   useEffect(() => {
@@ -341,26 +342,26 @@ export default function EmployeeDashboardPage() {
   const attendanceProgressPercentage = Math.min(100, Math.round((presentDays / 30) * 100));
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased py-6 md:py-8">
+    <div className="min-h-screen bg-surface-main text-content-main antialiased py-6 md:py-8">
       <div className="w-full max-w-6xl mx-auto px-4 space-y-6">
         
         {/* Header Block */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-line-subtle">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] text-[10px] font-bold uppercase tracking-wider">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-brand-accent)] animate-pulse" />
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-brand-subtle text-brand-accent text-[10px] font-bold uppercase tracking-wider">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-accent animate-pulse" />
               Employee Portal
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-[var(--color-content-main)] sm:text-3xl">
+            <h1 className="text-2xl font-black tracking-tight text-content-main sm:text-3xl">
               Employee Dashboard
             </h1>
-            <p className="text-xs text-[var(--color-content-secondary)]">
+            <p className="text-xs text-content-secondary">
               Overview of your current work schedule, salary statements, and attendance records.
             </p>
           </div>
 
-          <div className="self-start md:self-center inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-full text-xs font-semibold shadow-xs">
-            <CalendarDays className="w-4 h-4 text-[var(--color-brand-accent)]" />
+          <div className="self-start md:self-center inline-flex items-center gap-2 px-3 py-1.5 bg-surface-card border border-line-subtle rounded-full text-xs font-semibold shadow-xs">
+            <CalendarDays className="w-4 h-4 text-brand-accent" />
             <DynamicHeaderClock />
           </div>
         </div>
@@ -371,7 +372,7 @@ export default function EmployeeDashboardPage() {
         {/* Notice Alerts */}
         {leaveAppliedNotice && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs animate-in fade-in duration-200">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">Leave Application Received</span>
               <p className="text-[11px] text-emerald-700 mt-0.5">Your request was submitted and is undergoing administration evaluation.</p>
@@ -391,13 +392,13 @@ export default function EmployeeDashboardPage() {
             subtext="/ 30 Days"
           >
             <div className="space-y-1">
-              <div className="w-full bg-[var(--color-surface-main)] h-1.5 rounded-full overflow-hidden">
+              <div className="w-full bg-surface-main h-1.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${attendanceProgressPercentage}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[9px] text-[var(--color-content-muted)]">
+              <div className="flex justify-between text-[9px] text-content-muted">
                 <span>Attendance Rate</span>
                 <span>{attendanceProgressPercentage}%</span>
               </div>
@@ -412,7 +413,7 @@ export default function EmployeeDashboardPage() {
             iconColorClass="text-rose-600 border-rose-100"
             subtext="Days"
           >
-            <p className="text-[10px] text-[var(--color-content-secondary)] leading-relaxed">
+            <p className="text-[10px] text-content-secondary leading-relaxed">
               Missed shifts during this payroll lifecycle.
             </p>
           </MetricCard>
@@ -425,7 +426,7 @@ export default function EmployeeDashboardPage() {
             iconColorClass="text-blue-600 border-blue-100"
             subtext="Hrs"
           >
-            <p className="text-[10px] text-[var(--color-content-secondary)] leading-relaxed">
+            <p className="text-[10px] text-content-secondary leading-relaxed">
               Cumulative logged check-in hours this month.
             </p>
           </MetricCard>
@@ -438,7 +439,7 @@ export default function EmployeeDashboardPage() {
             iconColorClass="text-amber-600 border-amber-100"
             subtext="Pending"
           >
-            <p className="text-[10px] text-[var(--color-content-secondary)] leading-relaxed">
+            <p className="text-[10px] text-content-secondary leading-relaxed">
               Requests currently awaiting operational sign-off.
             </p>
           </MetricCard>
@@ -451,7 +452,7 @@ export default function EmployeeDashboardPage() {
           {/* Payslips List Segment */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold tracking-wider text-[var(--color-content-muted)] uppercase">
+              <h2 className="text-xs font-bold tracking-wider text-content-muted uppercase">
                 Recent Pay Statements
               </h2>
               {payslips[0] && (
@@ -461,7 +462,7 @@ export default function EmployeeDashboardPage() {
               )}
             </div>
             
-            <div className="rounded-2xl border border-[var(--color-line-subtle)] bg-[var(--color-surface-card)] overflow-hidden">
+            <div className="rounded-2xl border border-line-subtle bg-surface-card overflow-hidden">
               <PayslipList
                 payslips={payslips}
                 isLoading={isLoading}
@@ -479,15 +480,15 @@ export default function EmployeeDashboardPage() {
           {/* Actions Console Component */}
           <div className="lg:col-span-1 space-y-4">
             <div>
-              <h2 className="text-xs font-bold tracking-wider text-[var(--color-content-muted)] uppercase">
+              <h2 className="text-xs font-bold tracking-wider text-content-muted uppercase">
                 Daily Actions Console
               </h2>
             </div>
 
-            <div className="rounded-2xl border border-[var(--color-line-subtle)] bg-[var(--color-surface-card)] p-5 space-y-5">
+            <div className="rounded-2xl border border-line-subtle bg-surface-card p-5 space-y-5">
               <div>
-                <h3 className="text-sm font-bold text-[var(--color-content-main)]">Shift Activity Panel</h3>
-                <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5">Register daily workspace entries or request planned leaves.</p>
+                <h3 className="text-sm font-bold text-content-main">Shift Activity Panel</h3>
+                <p className="text-[11px] text-content-secondary mt-0.5">Register daily workspace entries or request planned leaves.</p>
               </div>
 
               {isSunday && (
@@ -515,27 +516,27 @@ export default function EmployeeDashboardPage() {
                 </div>
               )}
 
-              <div className="p-4 bg-[var(--color-surface-main)] rounded-xl border border-[var(--color-line-subtle)] space-y-4">
+              <div className="p-4 bg-surface-main rounded-xl border border-line-subtle space-y-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-lg text-[var(--color-brand-accent)] mt-0.5">
+                  <div className="p-2 bg-surface-card border border-line-subtle rounded-lg text-brand-accent mt-0.5">
                     <Fingerprint className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-bold text-xs text-[var(--color-content-main)] block">Self Service Shifts</span>
+                    <span className="font-bold text-xs text-content-main block">Self Service Shifts</span>
                     {todayRecord ? (
-                      <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5">
+                      <p className="text-[11px] text-content-secondary mt-0.5">
                         Active checked-in session tracked for today.
                       </p>
                     ) : (
-                      <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5">
-                        Register today's clock-in time to update database logs.
+                      <p className="text-[11px] text-content-secondary mt-0.5">
+                        Register today&apos;s clock-in time to update database logs.
                       </p>
                     )}
                   </div>
                 </div>
 
                 {attendanceLoading ? (
-                  <div className="text-center py-2 text-[11px] text-[var(--color-content-muted)]">
+                  <div className="text-center py-2 text-[11px] text-content-muted">
                     Checking database shift parameters...
                   </div>
                 ) : !todayRecord ? (
@@ -544,8 +545,8 @@ export default function EmployeeDashboardPage() {
                     onClick={() => handleAttendanceAction("check-in")}
                     className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
                       isShiftButtonsDisabled 
-                        ? "bg-[var(--color-surface-main)] text-[var(--color-content-muted)] border border-[var(--color-line-subtle)] cursor-not-allowed" 
-                        : "bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] text-white shadow-xs cursor-pointer"
+                        ? "bg-surface-main text-content-muted border border-line-subtle cursor-not-allowed" 
+                        : "bg-brand-accent hover:bg-brand-hover text-white shadow-xs cursor-pointer"
                     }`}
                   >
                     <LogIn className="w-3.5 h-3.5" />
@@ -557,7 +558,7 @@ export default function EmployeeDashboardPage() {
                     onClick={() => handleAttendanceAction("check-out")}
                     className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
                       isShiftButtonsDisabled 
-                        ? "bg-[var(--color-surface-main)] text-[var(--color-content-muted)] border border-[var(--color-line-subtle)] cursor-not-allowed" 
+                        ? "bg-surface-main text-content-muted border border-line-subtle cursor-not-allowed" 
                         : "bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
                     }`}
                   >
@@ -574,9 +575,9 @@ export default function EmployeeDashboardPage() {
 
               <button
                 onClick={() => setIsLeaveModalOpen(true)}
-                className="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-[var(--color-surface-card)] hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)] text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-surface-card hover:bg-surface-main border border-line-subtle text-content-secondary hover:text-content-main text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer"
               >
-                <CalendarPlus className="w-4 h-4 text-[var(--color-content-muted)]" />
+                <CalendarPlus className="w-4 h-4 text-content-muted" />
                 <span>Apply for Leaves</span>
               </button>
             </div>
@@ -592,18 +593,18 @@ export default function EmployeeDashboardPage() {
               onClick={() => setIsLeaveModalOpen(false)} 
             />
             
-            <div className="relative bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150">
+            <div className="relative bg-surface-card border border-line-subtle rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150">
               
-              <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--color-brand-accent)] to-[var(--color-brand-hover)]" />
+              <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-brand-accent to-brand-hover" />
 
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+              <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
                 <div>
-                  <h2 className="text-base font-extrabold text-[var(--color-content-main)]">Apply for Leaves</h2>
-                  <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Specify request parameter fields for manager review.</p>
+                  <h2 className="text-base font-extrabold text-content-main">Apply for Leaves</h2>
+                  <p className="text-xs text-content-secondary mt-0.5">Specify request parameter fields for manager review.</p>
                 </div>
                 <button 
                   onClick={() => setIsLeaveModalOpen(false)}
-                  className="p-1.5 rounded-lg text-[var(--color-content-muted)] hover:text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-subtle)] transition cursor-pointer"
+                  className="p-1.5 rounded-lg text-content-muted hover:text-brand-accent hover:bg-brand-subtle transition cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -619,7 +620,7 @@ export default function EmployeeDashboardPage() {
                     className="dropdown-trigger flex items-center justify-between text-left cursor-pointer z-40 relative"
                   >
                     <span>{leaveForm.type}</span>
-                    <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isLeaveTypeDropdownOpen ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isLeaveTypeDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
 
                   {isLeaveTypeDropdownOpen && (
@@ -677,17 +678,17 @@ export default function EmployeeDashboardPage() {
                   />
                 </div>
 
-                <div className="flex justify-end items-center gap-3 pt-4 border-t border-[var(--color-line-subtle)]">
+                <div className="flex justify-end items-center gap-3 pt-4 border-t border-line-subtle">
                   <button
                     type="button"
                     onClick={() => setIsLeaveModalOpen(false)}
-                    className="px-4.5 py-2.5 text-xs font-bold text-[var(--color-content-secondary)] bg-[var(--color-surface-main)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)] rounded-xl border border-[var(--color-line-subtle)] transition cursor-pointer"
+                    className="px-4.5 py-2.5 text-xs font-bold text-content-secondary bg-surface-main hover:bg-brand-subtle hover:text-brand-accent rounded-xl border border-line-subtle transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4.5 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs hover:shadow-md transition duration-150 cursor-pointer"
+                    className="px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs hover:shadow-md transition duration-150 cursor-pointer"
                   >
                     Submit Request
                   </button>

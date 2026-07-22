@@ -57,7 +57,7 @@ export default function PasswordInputWithToggle({
           type="button"
           onClick={() => setShow((s) => !s)}
           disabled={disabled}
-          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[var(--color-content-muted)] hover:text-[var(--color-content-secondary)] transition-colors focus:outline-none disabled:opacity-50"
+          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-content-muted hover:text-content-secondary transition-colors focus:outline-none disabled:opacity-50"
           aria-label={show ? "Hide password" : "Show password"}
         >
           {show ? (

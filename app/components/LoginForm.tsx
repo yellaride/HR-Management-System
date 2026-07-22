@@ -5,10 +5,6 @@ import Link from "next/link";
 import { getSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
-export interface LoginFormProps {
-  // role prop removed to make login role-neutral
-}
-
 export default function LoginForm() {
   const router = useRouter();
 
@@ -67,7 +63,7 @@ export default function LoginForm() {
       }
 
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again later.");
       setLoading(false);
     }
@@ -95,10 +91,10 @@ export default function LoginForm() {
         
         {/* Unified Modern Title & Subtitle */}
         <div className="min-h-[82px] flex flex-col justify-start">
-          <h2 className="text-xl md:text-2xl font-bold text-[var(--color-content-main)] tracking-tight leading-none">
+          <h2 className="text-xl md:text-2xl font-bold text-content-main tracking-tight leading-none">
             Workspace Access
           </h2>
-          <p className="mt-2 text-xs md:text-sm text-[var(--color-content-secondary)] leading-relaxed font-normal opacity-90">
+          <p className="mt-2 text-xs md:text-sm text-content-secondary leading-relaxed font-normal opacity-90">
             Verify your corporate credentials to sign into your secure workplace station.
           </p>
         </div>
@@ -106,7 +102,7 @@ export default function LoginForm() {
         {/* User-Friendly Error Notifications */}
         {error && (
           <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-xs font-semibold leading-relaxed">
-            <svg className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <span>{error}</span>
@@ -148,7 +144,7 @@ export default function LoginForm() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[var(--color-content-muted)] hover:text-[var(--color-content-secondary)] transition-colors focus:outline-none cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-content-muted hover:text-content-secondary transition-colors focus:outline-none cursor-pointer"
               >
                 {showPassword ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -167,17 +163,17 @@ export default function LoginForm() {
 
         {/* Options Row */}
         <div className="flex items-center justify-between text-xs font-medium">
-          <label className="flex items-center gap-2 text-[var(--color-content-secondary)] cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-content-secondary cursor-pointer select-none">
             <input
               type="checkbox"
               disabled={loading}
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="rounded border-[var(--color-line-subtle)] text-[var(--color-brand-accent)] focus:ring-[var(--color-brand-accent)] w-4 h-4 transition cursor-pointer"
+              className="rounded border-line-subtle text-brand-accent focus:ring-brand-accent w-4 h-4 transition cursor-pointer"
             />
             <span>Remember device</span>
           </label>
-          <Link href="/forgot-password" className="text-[var(--color-brand-accent)] hover:underline font-semibold transition">
+          <Link href="/forgot-password" className="text-brand-accent hover:underline font-semibold transition">
             Forgot password?
           </Link>
         </div>
@@ -192,7 +188,7 @@ export default function LoginForm() {
             <span>Signing in...</span>
           ) : (
             <>
-              <svg className="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-4.5 h-4.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 15l3-3m0 0l-3-3m3 3h-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>Sign In</span>

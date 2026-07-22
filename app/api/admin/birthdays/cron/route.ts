@@ -7,6 +7,15 @@ import { sendBirthdayEmail } from "@/lib/email/birthday-email";
 
 const TIMEZONE = "Asia/Karachi";
 
+// Shape of the lean employee docs read by this cron (with populated userId email)
+interface CelebrantEmployee {
+  _id: { toString(): string };
+  name: string;
+  designation: string;
+  department: string;
+  userId?: { _id?: { toString(): string }; email?: string } | null;
+}
+
 export const dynamic = "force-dynamic";
 
 function getKarachiDateComponents(date: Date) {
@@ -39,8 +48,9 @@ export async function GET(request: Request) {
 
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+
+    // CRON_SECRET is mandatory: without it this endpoint stays locked.
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
 
@@ -73,7 +83,7 @@ export async function GET(request: Request) {
       }
     })
     .populate("userId", "email")
-    .lean()) as any[];
+    .lean()) as unknown as CelebrantEmployee[];
 
     if (celebrants.length === 0) {
       return NextResponse.json({
@@ -154,10 +164,11 @@ export async function GET(request: Request) {
       results
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json({
       error: "Automated birthday cron execution failed",
-      details: error?.message || String(error)
+      details: message || String(error)
     }, { status: 500 });
   }
 }

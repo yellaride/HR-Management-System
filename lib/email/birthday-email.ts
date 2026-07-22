@@ -69,6 +69,11 @@ export async function sendBirthdayEmail(
   designation?: string,
   department?: string
 ): Promise<boolean> {
+  // Accepted for caller compatibility (cron route passes them) but not yet
+  // rendered in the email template. The void reads are intentional no-ops.
+  void designation;
+  void department;
+
   if (!process.env.RESEND_API_KEY) {
     console.error("Resend API Key (RESEND_API_KEY) is missing. Birthday email dispatch skipped.");
     return false;

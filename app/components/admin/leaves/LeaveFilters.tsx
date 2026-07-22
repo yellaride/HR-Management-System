@@ -20,7 +20,7 @@ export const LeaveFilters: React.FC<LeaveFiltersProps> = ({
   const tabs: TabType[] = ["All", "Pending", "Approved", "Rejected"];
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-[var(--color-line-subtle)] bg-[var(--color-surface-main)]/50">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-line-subtle bg-surface-main/50">
       <div className="flex flex-wrap gap-1.5">
         {tabs.map((tab) => (
           <button
@@ -28,8 +28,8 @@ export const LeaveFilters: React.FC<LeaveFiltersProps> = ({
             onClick={() => setActiveTab(tab)}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
               activeTab === tab
-                ? "bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] text-white shadow-xs"
-                : "text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)] hover:bg-[var(--color-brand-subtle)]/60"
+                ? "bg-brand-accent hover:bg-brand-hover text-white shadow-xs"
+                : "text-content-secondary hover:text-content-main hover:bg-brand-subtle/60"
             }`}
           >
             {tab}
@@ -37,8 +37,8 @@ export const LeaveFilters: React.FC<LeaveFiltersProps> = ({
         ))}
       </div>
 
-      <div className="inline-flex items-center gap-1.5 text-[var(--color-content-secondary)] text-[11px] font-semibold">
-        <Filter className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
+      <div className="inline-flex items-center gap-1.5 text-content-secondary text-[11px] font-semibold">
+        <Filter className="w-3.5 h-3.5 text-content-muted" />
         <span>Showing {loading ? "..." : count} leaves</span>
       </div>
     </div>

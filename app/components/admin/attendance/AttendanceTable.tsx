@@ -17,6 +17,11 @@ interface RecordRow {
   formattedDuration: string;
   status: "On Time" | "Late" | "Absent";
   isLocked: boolean;
+  // Optional profile photo fields (backend may provide any of these)
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePicture?: string;
+  image?: string;
 }
 
 interface TableProps {
@@ -31,11 +36,11 @@ export default function AttendanceTable({
   onDrillHistory,
 }: TableProps) {
   return (
-    <div className="bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xs overflow-hidden">
+    <div className="bg-white border border-line-subtle rounded-2xl shadow-xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-b border-[var(--color-line-subtle)] text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
+            <tr className="bg-slate-50 border-b border-line-subtle text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
               <th className="px-6 py-4">Employee Information</th>
               <th className="px-6 py-4">Department</th>
               <th className="px-6 py-4">Shift Time</th>
@@ -48,7 +53,7 @@ export default function AttendanceTable({
           <tbody className="divide-y divide-slate-100 text-xs">
             {records.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-[var(--color-content-secondary)]">
+                <td colSpan={7} className="px-6 py-12 text-center text-content-secondary">
                   No active employee timesheet logs match selected criteria.
                 </td>
               </tr>
@@ -65,7 +70,7 @@ export default function AttendanceTable({
                   <tr key={rec.userId} className="hover:bg-slate-50/50 transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-main)] text-[var(--color-content-secondary)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px] overflow-hidden shrink-0 relative">
+                        <div className="w-9 h-9 rounded-xl bg-surface-main text-content-secondary border border-line-subtle flex items-center justify-center font-bold text-[11px] overflow-hidden shrink-0 relative">
                           {/* initials fallback */}
                           {rec.name
                             ? rec.name
@@ -78,9 +83,9 @@ export default function AttendanceTable({
                             : "??"}
 
                           {/* optional profile photo */}
-                          {((rec as any).profilePhotoUrl || (rec as any).profilePhotoURL || (rec as any).profilePicture || (rec as any).image) ? (
+                          {(rec.profilePhotoUrl || rec.profilePhotoURL || rec.profilePicture || rec.image) ? (
                             <img
-                              src={(rec as any).profilePhotoUrl || (rec as any).profilePhotoURL || (rec as any).profilePicture || (rec as any).image}
+                              src={rec.profilePhotoUrl || rec.profilePhotoURL || rec.profilePicture || rec.image}
                               alt={rec.name}
                               className="absolute inset-0 w-full h-full object-cover"
                               onError={(e) => {
@@ -90,16 +95,16 @@ export default function AttendanceTable({
                           ) : null}
                         </div>
                         <div>
-                          <div className="font-bold text-[var(--color-content-main)] flex items-center gap-1.5">
+                          <div className="font-bold text-content-main flex items-center gap-1.5">
                             <span>{rec.name}</span>
                             {rec.isLocked && <Lock className="w-3 h-3 text-rose-500" />}
                           </div>
-                          <div className="text-[10px] font-mono text-[var(--color-content-muted)]">{rec.designation}</div>
+                          <div className="text-[10px] font-mono text-content-muted">{rec.designation}</div>
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-[var(--color-content-secondary)] font-semibold">
+                    <td className="px-6 py-4 text-content-secondary font-semibold">
                       <div className="flex items-center gap-1.5">
                         <Building className="w-3.5 h-3.5 text-slate-400" />
                         <span>{rec.department}</span>
@@ -122,7 +127,7 @@ export default function AttendanceTable({
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="bg-slate-50 px-2 border border-slate-100 rounded-lg text-[10px] py-1">
-                          In: <span className="font-extrabold text-[var(--color-content-main)]">{rec.checkIn || "--:--"}</span>
+                          In: <span className="font-extrabold text-content-main">{rec.checkIn || "--:--"}</span>
                         </div>
                         <div className="bg-slate-50 px-2 border border-slate-100 rounded-lg text-[10px] py-1">
                           Out: {isOnDuty ? (
@@ -131,13 +136,13 @@ export default function AttendanceTable({
                               On Duty
                             </span>
                           ) : (
-                            <span className="font-extrabold text-[var(--color-content-main)]">{rec.checkOut || "--:--"}</span>
+                            <span className="font-extrabold text-content-main">{rec.checkOut || "--:--"}</span>
                           )}
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-[var(--color-content-secondary)] font-mono font-bold">
+                    <td className="px-6 py-4 text-content-secondary font-mono font-bold">
                       {isOnDuty ? "Active Shift" : (rec.formattedDuration || "--")}
                     </td>
 
@@ -152,7 +157,7 @@ export default function AttendanceTable({
 
                         <button
                           onClick={() => onDrillHistory(rec.userId)}
-                          className="p-1.5 bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-accent)] hover:text-white rounded-lg transition cursor-pointer"
+                          className="p-1.5 bg-brand-subtle text-brand-accent hover:bg-brand-accent hover:text-white rounded-lg transition cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>

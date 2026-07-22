@@ -10,7 +10,7 @@ interface EditEmployeeModalProps {
   onClose: () => void;
   employee: Employee | null;
   errorMessage?: string | null;
-  onSave: (id: string | number, data: any) => Promise<void>;
+  onSave: (id: string | number, data: Omit<Employee, "id">) => Promise<void>;
 }
 
 const DEPARTMENTS = ["Engineering", "Design", "Operations", "Marketing"];
@@ -69,42 +69,49 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
     };
   }, [isDeptOpen, isStatusOpen]);
 
-  useEffect(() => {
-    if (!employee || !isOpen) return;
+  // Sync form state from props during render when the modal opens or the
+  // employee changes (official "adjust state when a prop changes" pattern).
+  const [prevEmployee, setPrevEmployee] = useState<Employee | null>(null);
+  const [prevIsOpen, setPrevIsOpen] = useState(false);
+  if (employee !== prevEmployee || isOpen !== prevIsOpen) {
+    setPrevEmployee(employee);
+    setPrevIsOpen(isOpen);
 
-    // 1. Convert Database ISO/Time strings into exact 'YYYY-MM-DD' for HTML5 date input
-    const rawDate = employee.joinDate || (employee as any).joiningDate || (employee as any).startDate || (employee as any).createdAt || "";
-    let formattedDate = "";
-    if (rawDate) {
-      const parsedDate = new Date(rawDate);
-      if (!isNaN(parsedDate.getTime())) {
-        formattedDate = parsedDate.toISOString().split("T")[0];
+    if (employee && isOpen) {
+      // 1. Convert Database ISO/Time strings into exact 'YYYY-MM-DD' for HTML5 date input
+      const rawDate = employee.joinDate || employee.joiningDate || employee.startDate || employee.createdAt || "";
+      let formattedDate = "";
+      if (rawDate) {
+        const parsedDate = new Date(rawDate);
+        if (!isNaN(parsedDate.getTime())) {
+          formattedDate = parsedDate.toISOString().split("T")[0];
+        }
       }
+
+      // 2. Safely parse salary / hourly rate (converting numbers to strings)
+      const rawSalary = employee.salary !== undefined && employee.salary !== null
+        ? employee.salary
+        : (employee.basicSalary || employee.baseSalary);
+      const salaryString = rawSalary !== undefined && rawSalary !== null ? String(rawSalary) : "";
+
+      setFormData({
+        name: employee.name || "",
+        email: employee.email || "",
+        designation: employee.designation || employee.role || "",
+        joinDate: formattedDate,
+        salary: salaryString,
+        department: employee.department || "Engineering",
+        status: employee.status || "Active",
+      });
+
+      setIsDeptOpen(false);
+      setIsStatusOpen(false);
     }
-
-    // 2. Safely parse salary / hourly rate (converting numbers to strings)
-    const rawSalary = employee.salary !== undefined && employee.salary !== null
-      ? employee.salary
-      : ((employee as any).basicSalary || (employee as any).baseSalary);
-    const salaryString = rawSalary !== undefined && rawSalary !== null ? String(rawSalary) : "";
-
-    setFormData({
-      name: employee.name || "",
-      email: employee.email || "",
-      designation: (employee as any).designation || employee.role || "",
-      joinDate: formattedDate,
-      salary: salaryString,
-      department: employee.department || "Engineering",
-      status: employee.status || "Active",
-    });
-
-    setIsDeptOpen(false);
-    setIsStatusOpen(false);
-  }, [employee, isOpen]);
+  }
 
   if (!isOpen || !employee) return null;
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -119,7 +126,9 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
 
     setIsSubmitting(true);
     try {
-      await onSave(employee.id, updatedPayload);
+      // The form intentionally omits fields like `role`; the API only reads
+      // the fields it needs, so the narrower payload is safe at runtime.
+      await onSave(employee.id, updatedPayload as unknown as Omit<Employee, "id">);
       onClose();
       
       Toast.fire({
@@ -141,7 +150,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
           popup: "bg-white rounded-2xl border border-[#e2e0e8] shadow-xl font-sans",
           title: "text-sm font-bold text-[#181124]",
           htmlContainer: "text-xs text-[#534a60]",
-          confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none",
+          confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none",
         }
       });
     } finally {
@@ -151,7 +160,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
 
   // Standard input class generator mapping the purple design scheme
   const getInputClass = () => {
-    return "w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm outline-none hover:border-[var(--color-brand-accent)]/50 focus:ring-2 focus:ring-[var(--color-brand-accent)]/20 focus:border-[var(--color-brand-accent)]";
+    return "w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
   };
 
   return (
@@ -161,18 +170,18 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
       <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs transition-opacity z-10" onClick={onClose} />
 
       {/* Modal Card wrapper */}
-      <div className="relative bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl max-w-md w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative bg-surface-card border border-line-subtle rounded-2xl max-w-md w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Subtle purple accent line at the top */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--color-brand-accent)] to-[var(--color-brand-hover)]" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-brand-accent to-brand-hover" />
 
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+        <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
           <div>
-            <h2 className="text-base font-extrabold text-[var(--color-content-main)] tracking-tight">Edit Employee Profile</h2>
-            <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5 font-medium">Modify database values for this team member.</p>
+            <h2 className="text-base font-extrabold text-content-main tracking-tight">Edit Employee Profile</h2>
+            <p className="text-[11px] text-content-secondary mt-0.5 font-medium">Modify database values for this team member.</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--color-content-muted)] hover:text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-subtle)] transition cursor-pointer">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-content-muted hover:text-brand-accent hover:bg-brand-subtle transition cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -180,7 +189,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Full Name</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Full Name</label>
             <input
               type="text"
               required
@@ -191,7 +200,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Email Address</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Email Address</label>
             <input
               type="email"
               required
@@ -202,7 +211,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Designation</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Designation</label>
             <input
               type="text"
               required
@@ -215,7 +224,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
           {/* Grid Layout containing Join Date, Salary, Department, and Status */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Join Date</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Join Date</label>
               <input
                 type="date"
                 required
@@ -226,7 +235,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Salary (Rs)</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Salary (Rs)</label>
               <input
                 type="number"
                 required
@@ -241,7 +250,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
 
             {/* Custom Styled Department Dropdown */}
             <div className="space-y-1.5 relative" ref={deptRef}>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Department</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Department</label>
               <button
                 type="button"
                 onClick={() => {
@@ -251,7 +260,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
                 className={`${getInputClass()} flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
                 <span>{formData.department}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isDeptOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isDeptOpen ? "rotate-180" : ""}`} />
               </button>
 
               {isDeptOpen && (
@@ -277,7 +286,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
 
             {/* Custom Styled Status Dropdown */}
             <div className="space-y-1.5 relative" ref={statusRef}>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">Status</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Status</label>
               <button
                 type="button"
                 onClick={() => {
@@ -287,7 +296,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
                 className={`${getInputClass()} flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
                 <span>{formData.status}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isStatusOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isStatusOpen ? "rotate-180" : ""}`} />
               </button>
 
               {isStatusOpen && (
@@ -313,19 +322,19 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
           </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-end items-center gap-2 pt-4 border-t border-[var(--color-line-subtle)] shrink-0">
+          <div className="flex justify-end items-center gap-2 pt-4 border-t border-line-subtle shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4.5 py-2.5 text-xs font-bold text-[var(--color-content-secondary)] bg-[var(--color-surface-main)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)] rounded-xl border border-[var(--color-line-subtle)] transition disabled:opacity-50 cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-content-secondary bg-surface-main hover:bg-brand-subtle hover:text-brand-accent rounded-xl border border-line-subtle transition disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4.5 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? "Saving..." : "Save Changes"}
             </button>

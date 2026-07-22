@@ -185,11 +185,11 @@ export default function HistoryAnalytics({
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
       {/* Configuration Controls & Aggregate Cards */}
       <div className="xl:col-span-4 space-y-6">
-        <div className="bg-white border border-[var(--color-line-subtle)] rounded-2xl p-5 shadow-3xs space-y-4">
+        <div className="bg-white border border-line-subtle rounded-2xl p-5 shadow-3xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[var(--color-brand-accent)]" />
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-main)]">
+              <TrendingUp className="w-4 h-4 text-brand-accent" />
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-main">
                 Historical Lookup Parameters
               </span>
             </div>
@@ -197,7 +197,7 @@ export default function HistoryAnalytics({
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-brand-accent)] text-white hover:bg-[var(--color-brand-hover)] text-[10px] font-bold rounded-lg cursor-pointer transition shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-accent text-white hover:bg-brand-hover text-[10px] font-bold rounded-lg cursor-pointer transition shadow-xs"
               >
                 <span>Add Record Row</span>
               </button>
@@ -206,14 +206,14 @@ export default function HistoryAnalytics({
 
           {/* Select Target employee */}
           <div className="space-y-1.5 relative" ref={empRef}>
-            <label className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
+            <label className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
               Select Employee
             </label>
             
             <button
               type="button"
               onClick={() => setIsEmpOpen(!isEmpOpen)}
-              className="w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] transition-all duration-200 shadow-sm outline-none hover:border-[var(--color-brand-accent)]/50 focus:ring-2 focus:ring-[var(--color-brand-accent)]/20 focus:border-[var(--color-brand-accent)] flex items-center justify-between text-left cursor-pointer relative font-semibold"
+              className="w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main transition-all duration-200 shadow-sm outline-none hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent flex items-center justify-between text-left cursor-pointer relative font-semibold"
             >
               <span>
                 {selectedEmp 
@@ -221,7 +221,7 @@ export default function HistoryAnalytics({
                   : "Select an Employee..."}
               </span>
               <ChevronDown 
-                className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${
+                className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${
                   isEmpOpen ? "rotate-180" : ""
                 }`} 
               />
@@ -250,14 +250,14 @@ export default function HistoryAnalytics({
 
           {/* Select period ranges */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">Time Period</label>
+            <label className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Time Period</label>
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => onPeriodChange("last-month")}
                 className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                   period === "last-month"
-                    ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]"
-                    : "bg-white text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] hover:bg-slate-50"
+                    ? "bg-brand-subtle text-brand-accent border-brand-accent"
+                    : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
                 }`}
               >
                 Last Month (June 2026)
@@ -266,8 +266,8 @@ export default function HistoryAnalytics({
                 onClick={() => onPeriodChange("this-month")}
                 className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                   period === "this-month"
-                    ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]"
-                    : "bg-white text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] hover:bg-slate-50"
+                    ? "bg-brand-subtle text-brand-accent border-brand-accent"
+                    : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
                 }`}
               >
                 This Month (July 2026)
@@ -276,8 +276,8 @@ export default function HistoryAnalytics({
                 onClick={() => onPeriodChange("all")}
                 className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                   period === "all"
-                    ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-brand-accent)]"
-                    : "bg-white text-[var(--color-content-secondary)] border-[var(--color-line-subtle)] hover:bg-slate-50"
+                    ? "bg-brand-subtle text-brand-accent border-brand-accent"
+                    : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
                 }`}
               >
                 All Partitioned Records
@@ -289,37 +289,37 @@ export default function HistoryAnalytics({
           {selectedEmp && (
             <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[var(--color-content-muted)] font-bold uppercase tracking-wider block">Staff Profile</span>
+                <span className="text-[10px] text-content-muted font-bold uppercase tracking-wider block">Staff Profile</span>
                 {isLocked && (
                   <span className="flex items-center gap-1 text-rose-600 font-bold text-[10px] uppercase">
                     <Lock className="w-3 h-3" /> Locked
                   </span>
                 )}
               </div>
-              <div className="font-extrabold text-[var(--color-content-main)]">{selectedEmp.name}</div>
-              <div className="text-[10px] text-[var(--color-content-secondary)]">Designation: {selectedEmp.designation}</div>
-              <div className="text-[10px] text-[var(--color-content-secondary)]">Department: {selectedEmp.department}</div>
+              <div className="font-extrabold text-content-main">{selectedEmp.name}</div>
+              <div className="text-[10px] text-content-secondary">Designation: {selectedEmp.designation}</div>
+              <div className="text-[10px] text-content-secondary">Department: {selectedEmp.department}</div>
             </div>
           )}
         </div>
 
         {/* Aggregate Stats Dashboard */}
-        <div className="bg-white border border-[var(--color-line-subtle)] rounded-2xl p-5 shadow-3xs space-y-4">
-          <div className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
+        <div className="bg-white border border-line-subtle rounded-2xl p-5 shadow-3xs space-y-4">
+          <div className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
             Aggregated Analytics
           </div>
 
           {isLoading ? (
-            <div className="py-6 text-center text-xs text-[var(--color-content-secondary)] animate-pulse">Recalculating stats...</div>
+            <div className="py-6 text-center text-xs text-content-secondary animate-pulse">Recalculating stats...</div>
           ) : (
             <>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full border-4 border-[var(--color-brand-accent)] flex items-center justify-center font-black text-lg text-[var(--color-brand-accent)] bg-[var(--color-brand-subtle)]">
+                <div className="w-16 h-16 rounded-full border-4 border-brand-accent flex items-center justify-center font-black text-lg text-brand-accent bg-brand-subtle">
                   {stats.attendanceRate || 0}%
                 </div>
                 <div>
-                  <div className="text-xs font-black text-[var(--color-content-main)]">Attendance Rate</div>
-                  <p className="text-[10px] text-[var(--color-content-secondary)] mt-0.5 leading-relaxed">
+                  <div className="text-xs font-black text-content-main">Attendance Rate</div>
+                  <p className="text-[10px] text-content-secondary mt-0.5 leading-relaxed">
                     Based on {stats.totalDays || 0} tracked schedule timesheet dates.
                   </p>
                 </div>
@@ -350,9 +350,9 @@ export default function HistoryAnalytics({
 
       {/* RIGHT COLUMN: DETAIL WORKLOG LIST */}
       <div className="xl:col-span-8">
-        <div className="bg-white border border-[var(--color-line-subtle)] rounded-2xl shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--color-line-subtle)] bg-slate-50/60 flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
+        <div className="bg-white border border-line-subtle rounded-2xl shadow-xs overflow-hidden">
+          <div className="px-6 py-4 border-b border-line-subtle bg-slate-50/60 flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
               Historical Worklogs Ledger
             </span>
             <BarChart3 className="w-4 h-4 text-slate-400" />
@@ -361,7 +361,7 @@ export default function HistoryAnalytics({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/20 border-b border-[var(--color-line-subtle)] text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-content-muted)]">
+                <tr className="bg-slate-50/20 border-b border-line-subtle text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
                   <th className="px-6 py-4">Punch Date</th>
                   <th className="px-6 py-4">Check-In</th>
                   <th className="px-6 py-4">Check-Out</th>
@@ -374,13 +374,13 @@ export default function HistoryAnalytics({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-[var(--color-content-secondary)] animate-pulse">
+                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-content-secondary animate-pulse">
                       Retrieving partitioned logs database...
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-[var(--color-content-secondary)]">
+                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-content-secondary">
                       No matching historical logs found for the selected date range.
                     </td>
                   </tr>
@@ -393,7 +393,7 @@ export default function HistoryAnalytics({
 
                     return (
                       <tr key={log._id} className="hover:bg-slate-50/50 transition">
-                        <td className="px-6 py-4 font-black text-[var(--color-content-main)]">{log.date}</td>
+                        <td className="px-6 py-4 font-black text-content-main">{log.date}</td>
                         <td className="px-6 py-4 font-mono font-semibold">
                           {log.checkIn ? new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" }) : "--"}
                         </td>
@@ -401,7 +401,7 @@ export default function HistoryAnalytics({
                           {log.checkOut ? new Date(log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" }) : "--"}
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-slate-500">{log.workingHours || "0"} hrs</td>
-                        <td className="px-6 py-4 font-mono font-extrabold text-[var(--color-content-main)]">{log.formattedDuration || "--"}</td>
+                        <td className="px-6 py-4 font-mono font-extrabold text-content-main">{log.formattedDuration || "--"}</td>
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${badgeStyle}`}>
                             {log.status}

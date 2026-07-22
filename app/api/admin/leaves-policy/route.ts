@@ -1,17 +1,36 @@
 ﻿import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import EmployeeLeavePolicy from "@/modals/LeavePolicy";
 import LeaveBalance from "@/modals/LeaveBalance";
 import { Employee } from "@/modals/Employee"; // Named export
 import User from "@/modals/User"; // Default export
 
-// Define TypeScript interface for Mongoose Lean user document
-interface IUserPopulated {
-  _id: any;
-  email?: string;
+// Shape of a lean Employee doc with the populated userId sub-document
+interface PolicyEmployee {
+  name?: string;
+  designation?: string;
+  role?: string;
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePicture?: string;
+  image?: string;
+  picture?: string;
+  // May be a populated User sub-document or a raw ObjectId (when not populated)
+  userId?: {
+    email?: string;
+    profilePhotoUrl?: string;
+    profilePhotoURL?: string;
+    profilePicture?: string;
+    image?: string;
+    picture?: string;
+    toString(): string;
+  } | null;
 }
+
+// Shape of a populated userId reference once the "_id" presence check has passed
+type PopulatedUserRef = { _id: { toString(): string } };
 
 // GET: Fetch ONLY active employees with their custom policy status and values
 export async function GET() {
@@ -20,7 +39,7 @@ export async function GET() {
 
     // Next.js hot-reload fix: Force reference User model so Mongoose registers the schema 
     // before the "populate" query runs on the Employee collection.
-    const _forceUserRegistration = User.modelName; 
+    void User.modelName;
 
     const session = await getServerSession(authOptions);
     const role = String(session?.user?.role ?? "").toLowerCase();
@@ -30,17 +49,17 @@ export async function GET() {
     }
 
     // Safer, index-friendly status check. Does not crash if status is missing or null.
-    const activeEmployees = await Employee.find({ 
+    const activeEmployees = (await Employee.find({ 
       status: { $in: ["Active", "active", "ACTIVE"] }
     }).populate({
       path: "userId",
       select: "email"
-    }).lean();
+    }).lean()) as unknown as PolicyEmployee[];
 
     // Map active user IDs as string keys
-    const activeUserIds = activeEmployees.map((emp: any) => {
+    const activeUserIds = activeEmployees.map((emp) => {
       if (emp.userId && typeof emp.userId === "object" && "_id" in emp.userId) {
-        return emp.userId._id.toString();
+        return (emp.userId as PopulatedUserRef)._id.toString();
       }
       return emp.userId?.toString();
     }).filter(Boolean);
@@ -50,9 +69,9 @@ export async function GET() {
       userId: { $in: activeUserIds }
     }).lean();
 
-    const employeesList = activeEmployees.map((emp: any) => {
+    const employeesList = activeEmployees.map((emp) => {
       const userIdStr = emp.userId && typeof emp.userId === "object" && "_id" in emp.userId
-        ? emp.userId._id.toString()
+        ? (emp.userId as PopulatedUserRef)._id.toString()
         : emp.userId?.toString() || "";
 
       const emailStr = emp.userId && typeof emp.userId === "object" && "email" in emp.userId
@@ -94,15 +113,15 @@ export async function GET() {
           MONTHLY: balance?.MONTHLY?.allocated ?? 2,
         },
       };
-    }).filter((emp: any) => emp.userId !== ""); // Filter out null userId objects safely
+    }).filter((emp) => emp.userId !== ""); // Filter out null userId objects safely
 
 
     return NextResponse.json(employeesList);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Employee leave policies fetch error:", error);
     return NextResponse.json({ 
       error: "Failed to load active employee list.", 
-      details: error.message 
+      details: error instanceof Error ? error.message : String(error) 
     }, { status: 500 });
   }
 }
@@ -165,11 +184,11 @@ export async function POST(req: Request) {
       message: "Leave allowances updated and active balance synced.",
       policy: updatedCustomPolicy,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Employee leave policies save error:", error);
     return NextResponse.json({ 
       error: "Failed to save customized configuration.", 
-      details: error.message 
+      details: error instanceof Error ? error.message : String(error) 
     }, { status: 500 });
   }
 }
@@ -213,11 +232,11 @@ export async function DELETE(req: Request) {
       success: true,
       message: "Policy reset back to standard baseline rules.",
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Employee leave policy delete error:", error);
     return NextResponse.json({ 
       error: "Database operation failed.", 
-      details: error.message 
+      details: error instanceof Error ? error.message : String(error) 
     }, { status: 500 });
   }
 }

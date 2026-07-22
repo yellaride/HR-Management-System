@@ -15,6 +15,18 @@ export interface Employee {
   salary?: number | null; // Unified base salary mapping
   hourlyRate?: number | null; // Added calculated hourly rate
   joiningDate?: string | null;
+  // Optional legacy/backend date fallbacks
+  startDate?: string | null;
+  createdAt?: string | null;
+  // Optional legacy/backend salary fallbacks (may arrive as strings)
+  basicSalary?: number | string | null;
+  baseSalary?: number | string | null;
+  // Optional profile photo fields (backend may provide any of these)
+  image?: string;
+  picture?: string;
+  profilePicture?: string;
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
 }
 
 interface EmployeeTableProps {
@@ -89,7 +101,6 @@ export default function EmployeeTable({ employees, onEdit, onViewPortal }: Emplo
                 const initials = getInitials(emp.name);
                 const isStatusActive = String(emp.status).toLowerCase() === "active";
                 const displayJoinDate = formatJoinDate(emp.joinDate || emp.joiningDate || null);
-                const displaySalary = emp.salary ?? null;
 
                 return (
                   <tr key={emp.id} className="hover:bg-slate-50/50 transition duration-150">
@@ -100,10 +111,10 @@ export default function EmployeeTable({ employees, onEdit, onViewPortal }: Emplo
                           {/** If backend provides an image/picture, prefer it; otherwise show initials */}
                           {(() => {
                             const imageUrl =
-                              (emp as any).image ||
-                              (emp as any).picture ||
-                              (emp as any).profilePicture ||
-                              (emp as any).profilePhotoUrl;
+                              emp.image ||
+                              emp.picture ||
+                              emp.profilePicture ||
+                              emp.profilePhotoUrl;
 
                             if (typeof imageUrl !== "string" || !imageUrl.trim()) return initials;
 
@@ -127,7 +138,7 @@ export default function EmployeeTable({ employees, onEdit, onViewPortal }: Emplo
                             {emp.name}
                           </span>
                           <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5" title={emp.email}>
-                            <Mail className="w-3 h-3 flex-shrink-0" />
+                            <Mail className="w-3 h-3 shrink-0" />
                             {emp.email}
                           </span>
                         </div>

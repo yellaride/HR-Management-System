@@ -136,7 +136,11 @@ export default function GeneratePayslipModal({
     fetchCalculation();
   }, [formData.employeeId, formData.period]);
 
-  useEffect(() => {
+  // Reset the form during render when the modal transitions to open
+  // (official "adjust state when a prop changes" pattern).
+  const [prevIsOpen, setPrevIsOpen] = useState(false);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setFormData({
         employeeId: "",
@@ -154,7 +158,7 @@ export default function GeneratePayslipModal({
       setIsEmployeeOpen(false);
       setIsPaymentMethodOpen(false);
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 
@@ -260,9 +264,9 @@ export default function GeneratePayslipModal({
 
   const getInputClass = (hasError = false) => {
     const baseClass =
-      "w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+      "w-full px-3.5 py-2.5 bg-surface-card border rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
     const normalClass =
-      "border-[var(--color-line-subtle)] hover:border-[var(--color-brand-accent)]/50 focus:ring-2 focus:ring-[var(--color-brand-accent)]/20 focus:border-[var(--color-brand-accent)]";
+      "border-line-subtle hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
     const errorClass =
       "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500";
 
@@ -278,20 +282,20 @@ export default function GeneratePayslipModal({
         onClick={onClose}
       />
 
-      <div className="relative bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl max-w-2xl w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[var(--color-brand-accent)] to-[var(--color-brand-hover)]" />
+      <div className="relative bg-surface-card border border-line-subtle rounded-2xl max-w-2xl w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-brand-accent to-brand-hover" />
 
-        <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+        <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
           <div>
-            <h2 className="text-base font-extrabold text-[var(--color-content-main)] tracking-tight">Generate Payslip</h2>
-            <p className="text-[11px] text-[var(--color-content-secondary)] mt-0.5 font-medium">
+            <h2 className="text-base font-extrabold text-content-main tracking-tight">Generate Payslip</h2>
+            <p className="text-[11px] text-content-secondary mt-0.5 font-medium">
               Record and issue a salary statement entry linked to an employee.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--color-content-muted)] hover:text-[var(--color-brand-accent)] hover:bg-[var(--color-brand-subtle)] transition cursor-pointer"
+            className="p-1.5 rounded-lg text-content-muted hover:text-brand-accent hover:bg-brand-subtle transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -310,7 +314,7 @@ export default function GeneratePayslipModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5 relative" ref={employeeRef}>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Select Employee
               </label>
               <button
@@ -322,12 +326,12 @@ export default function GeneratePayslipModal({
                 disabled={isLoading || (employees || []).length === 0}
                 className={`${getInputClass(!formData.employeeId && !!validationError)} pl-9 pr-3 flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-content-muted)] pointer-events-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none">
                   <User className="w-4 h-4" />
                 </span>
                 <span className="truncate pr-4">{getEmployeeDisplayLabel()}</span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${
+                  className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${
                     isEmployeeOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -360,7 +364,7 @@ export default function GeneratePayslipModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Job Title / Role
               </label>
               <input
@@ -369,16 +373,16 @@ export default function GeneratePayslipModal({
                 disabled
                 placeholder="Auto-populated"
                 value={formData.jobTitle}
-                className="w-full px-3.5 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] shadow-sm outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted shadow-sm outline-none disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Pay Period
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[var(--color-content-muted)]">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-content-muted">
                   <Calendar className="w-4 h-4" />
                 </span>
                 <input
@@ -388,7 +392,7 @@ export default function GeneratePayslipModal({
                   placeholder="e.g. June 2026"
                   value={formData.period}
                   onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2.5 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs text-[var(--color-content-main)] placeholder-[var(--color-content-muted)] transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/25 focus:border-[var(--color-brand-accent)]"
+                  className="w-full pl-9 pr-3 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-brand-accent/25 focus:border-brand-accent"
                 />
               </div>
             </div>
@@ -396,7 +400,7 @@ export default function GeneratePayslipModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5 relative" ref={paymentMethodRef}>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Payment Method
               </label>
               <button
@@ -407,12 +411,12 @@ export default function GeneratePayslipModal({
                 }}
                 className={`${getInputClass()} pl-9 pr-3 flex items-center justify-between text-left cursor-pointer z-40 relative`}
               >
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-content-muted)] pointer-events-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none">
                   <CreditCard className="w-4 h-4" />
                 </span>
                 <span>{formData.paymentMethod}</span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${
+                  className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${
                     isPaymentMethodOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -438,7 +442,7 @@ export default function GeneratePayslipModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Payment Date
               </label>
               <input
@@ -452,16 +456,16 @@ export default function GeneratePayslipModal({
             </div>
           </div>
 
-          <div className="p-4 bg-[var(--color-surface-main)] rounded-2xl border border-[var(--color-line-subtle)] space-y-3">
-            <div className="flex items-center justify-between border-b border-[var(--color-line-subtle)] pb-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-content-muted)] block">
+          <div className="p-4 bg-surface-main rounded-2xl border border-line-subtle space-y-3">
+            <div className="flex items-center justify-between border-b border-line-subtle pb-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
                 Financial Breakdown (Rs.)
               </span>
               {formData.employeeId && formData.period && (
                 <button
                   type="button"
                   onClick={handleResetToCalculated}
-                  className="text-[10px] font-bold text-[var(--color-brand-accent)] hover:underline cursor-pointer transition-all"
+                  className="text-[10px] font-bold text-brand-accent hover:underline cursor-pointer transition-all"
                 >
                   Reset to Calculated
                 </button>
@@ -470,9 +474,9 @@ export default function GeneratePayslipModal({
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-[var(--color-content-secondary)]">Basic Salary</label>
+                <label className="text-[9px] font-bold text-content-secondary">Basic Salary</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-[var(--color-content-muted)]">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-content-muted">
                     {currencyPrefix}
                   </span>
                   <input
@@ -489,9 +493,9 @@ export default function GeneratePayslipModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-[var(--color-content-secondary)]">Allowances</label>
+                <label className="text-[9px] font-bold text-content-secondary">Allowances</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-[var(--color-content-muted)]">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-content-muted">
                     {currencyPrefix}
                   </span>
                   <input
@@ -507,9 +511,9 @@ export default function GeneratePayslipModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-[var(--color-content-secondary)]">Bonus</label>
+                <label className="text-[9px] font-bold text-content-secondary">Bonus</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-[var(--color-content-muted)]">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-content-muted">
                     {currencyPrefix}
                   </span>
                   <input
@@ -525,9 +529,9 @@ export default function GeneratePayslipModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-[var(--color-content-secondary)]">Deductions</label>
+                <label className="text-[9px] font-bold text-content-secondary">Deductions</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-[var(--color-content-muted)]">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-content-muted">
                     {currencyPrefix}
                   </span>
                   <input
@@ -543,9 +547,9 @@ export default function GeneratePayslipModal({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[var(--color-line-subtle)] flex items-center justify-between text-xs">
-              <span className="font-semibold text-[var(--color-content-secondary)]">Calculated Net Pay:</span>
-              <span className="font-bold text-[var(--color-brand-accent)] bg-[var(--color-brand-subtle)] border border-[var(--color-brand-subtle)] px-2.5 py-1 rounded-lg">
+            <div className="pt-3 border-t border-line-subtle flex items-center justify-between text-xs">
+              <span className="font-semibold text-content-secondary">Calculated Net Pay:</span>
+              <span className="font-bold text-brand-accent bg-brand-subtle border border-brand-subtle px-2.5 py-1 rounded-lg">
                 Rs.
                 {netPay.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
@@ -555,17 +559,17 @@ export default function GeneratePayslipModal({
             </div>
           </div>
 
-          <div className="flex justify-end items-center gap-2 pt-4 border-t border-[var(--color-line-subtle)]">
+          <div className="flex justify-end items-center gap-2 pt-4 border-t border-line-subtle">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-[var(--color-content-secondary)] bg-[var(--color-surface-main)] hover:bg-[var(--color-brand-subtle)] hover:text-[var(--color-brand-accent)] rounded-xl border border-[var(--color-line-subtle)] transition cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-content-secondary bg-surface-main hover:bg-brand-subtle hover:text-brand-accent rounded-xl border border-line-subtle transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2.5 text-xs font-bold text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] rounded-xl shadow-xs hover:shadow-md transition cursor-pointer"
+              className="px-4 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs hover:shadow-md transition cursor-pointer"
             >
               Issue Payment Receipt
             </button>

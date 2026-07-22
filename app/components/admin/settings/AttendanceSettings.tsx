@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Clock, Edit2, X, CheckCircle2, Loader2, Eye, ShieldAlert } from "lucide-react";
 
 interface AttendanceData {
@@ -28,10 +28,15 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
   // Simulator Time state is purely local client-side state (never sent to backend)
   const [simulatedTime, setSimulatedTime] = useState(data.shiftStart || "08:45");
 
-  useEffect(() => {
+  // Sync local editing state from props during render when the data prop
+  // changes (official "adjust state when a prop changes" pattern).
+  // Sentinel `null` ensures the first render syncs, matching mount-effect semantics.
+  const [prevData, setPrevData] = useState<AttendanceData | null>(null);
+  if (data !== prevData) {
+    setPrevData(data);
     setTempData({ ...data });
     setSimulatedTime(data.shiftStart);
-  }, [data]);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,16 +88,16 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
   return (
     <div className="space-y-6">
       {/* Attendance parameters container */}
-      <div className="panel bg-white border border-[var(--color-line-subtle)] rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+      <div className="panel bg-white border border-line-subtle rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[var(--color-brand-accent)]" />
-            <h3 className="text-sm font-bold text-[var(--color-content-main)]">Attendance Rules</h3>
+            <Clock className="w-5 h-5 text-brand-accent" />
+            <h3 className="text-sm font-bold text-content-main">Attendance Rules</h3>
           </div>
 
           {!isEditing ? (
             readOnly ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-[var(--color-line-subtle)] text-[var(--color-content-secondary)] text-xs font-bold rounded-lg">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-line-subtle text-content-secondary text-xs font-bold rounded-lg">
                 <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
                 <span>Rules are read-only</span>
               </span>
@@ -100,7 +105,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-brand-subtle)] hover:bg-[var(--color-brand-accent)] hover:text-white text-[var(--color-brand-accent)] text-xs font-bold rounded-lg transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-subtle hover:bg-brand-accent hover:text-white text-brand-accent text-xs font-bold rounded-lg transition cursor-pointer"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>Edit Rules</span>
@@ -112,7 +117,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                 type="button"
                 onClick={() => setIsEditing(false)}
                 disabled={saving}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[var(--color-surface-main)] hover:bg-[var(--color-line-subtle)] text-[var(--color-content-secondary)] text-xs font-bold rounded-lg transition cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-bold rounded-lg transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Cancel</span>
@@ -121,7 +126,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                     type="button"
                     onClick={handleSubmit}
                     disabled={saving || readOnly}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
                   >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 <span>{saving ? "Saving..." : "Save Changes"}</span>
@@ -134,29 +139,29 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
           {isEditing ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[var(--color-content-secondary)]">Shift Start Time</label>
+                <label className="text-xs font-bold text-content-secondary">Shift Start Time</label>
                 <input
                   type="time"
                   required
                   value={tempData.shiftStart}
                   onChange={(e) => setTempData({ ...tempData, shiftStart: e.target.value })}
                   disabled={saving || readOnly}
-                  className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none disabled:opacity-50"
+                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none disabled:opacity-50"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[var(--color-content-secondary)]">Shift End Time</label>
+                <label className="text-xs font-bold text-content-secondary">Shift End Time</label>
                 <input
                   type="time"
                   required
                   value={tempData.shiftEnd}
                   onChange={(e) => setTempData({ ...tempData, shiftEnd: e.target.value })}
                   disabled={saving || readOnly}
-                  className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none disabled:opacity-50"
+                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none disabled:opacity-50"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[var(--color-content-secondary)]">Allowed Grace Period (Mins)</label>
+                <label className="text-xs font-bold text-content-secondary">Allowed Grace Period (Mins)</label>
                 <input
                   type="number"
                   min={0}
@@ -164,14 +169,14 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   value={tempData.gracePeriod}
                   onChange={(e) => setTempData({ ...tempData, gracePeriod: Number(e.target.value) || 0 })}
                   disabled={saving || readOnly}
-                  className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none disabled:opacity-50"
+                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none disabled:opacity-50"
                 />
               </div>
 
 
               {/* Persistable Visibility offsets */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[var(--color-content-secondary)]">
+                <label className="text-xs font-bold text-content-secondary">
                   Show Check-In Button (Minutes Before Shift)
                 </label>
                 <input
@@ -180,11 +185,11 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   required
                   value={tempData.checkInDisplayBefore}
                   onChange={(e) => setTempData({ ...tempData, checkInDisplayBefore: Number(e.target.value) || 0 })}
-                  className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none"
+                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[var(--color-content-secondary)]">
+                <label className="text-xs font-bold text-content-secondary">
                   Show Check-Out Button (Minutes After Shift End)
                 </label>
                 <input
@@ -193,33 +198,33 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   required
                   value={tempData.checkOutDisplayAfter}
                   onChange={(e) => setTempData({ ...tempData, checkOutDisplayAfter: Number(e.target.value) || 0 })}
-                  className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none"
+                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
                 />
               </div>
 
               {/* Automatic check-out settings */}
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[var(--color-line-subtle)] pt-4 mt-2">
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-line-subtle pt-4 mt-2">
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     id="autoCheckOut"
                     checked={tempData.autoCheckOut}
                     onChange={(e) => setTempData({ ...tempData, autoCheckOut: e.target.checked })}
-                    className="w-4 h-4 rounded text-[var(--color-brand-accent)] border-[var(--color-line-subtle)]"
+                    className="w-4 h-4 rounded text-brand-accent border-line-subtle"
                   />
-                  <label htmlFor="autoCheckOut" className="text-xs font-bold text-[var(--color-content-main)] cursor-pointer">
+                  <label htmlFor="autoCheckOut" className="text-xs font-bold text-content-main cursor-pointer">
                     Enable Auto Check-Out
                   </label>
                 </div>
                 {tempData.autoCheckOut && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[var(--color-content-secondary)]">Auto Check-Out Time</label>
+                    <label className="text-xs font-bold text-content-secondary">Auto Check-Out Time</label>
                     <input
                       type="time"
                       required
                       value={tempData.autoCheckOutTime}
                       onChange={(e) => setTempData({ ...tempData, autoCheckOutTime: e.target.value })}
-                      className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none"
+                      className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
                     />
                   </div>
                 )}
@@ -228,33 +233,33 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8 py-2">
               <div>
-                <span className="text-xs font-semibold text-[var(--color-content-secondary)]">Shift Window</span>
-                <span className="text-sm font-semibold text-[var(--color-content-main)] block mt-0.5">
+                <span className="text-xs font-semibold text-content-secondary">Shift Window</span>
+                <span className="text-sm font-semibold text-content-main block mt-0.5">
                   {data.shiftStart} to {data.shiftEnd}
                 </span>
               </div>
               <div>
-                <span className="text-xs font-semibold text-[var(--color-content-secondary)]">Grace Period</span>
-                <span className="text-sm font-semibold text-[var(--color-content-main)] block mt-0.5">
+                <span className="text-xs font-semibold text-content-secondary">Grace Period</span>
+                <span className="text-sm font-semibold text-content-main block mt-0.5">
                   {data.gracePeriod} minutes
                 </span>
               </div>
               <div>
-                <span className="text-xs font-semibold text-[var(--color-content-secondary)]">Check-In Active Display Window</span>
-                <span className="text-sm font-semibold text-[var(--color-content-main)] block mt-0.5">
+                <span className="text-xs font-semibold text-content-secondary">Check-In Active Display Window</span>
+                <span className="text-sm font-semibold text-content-main block mt-0.5">
                   Appears {data.checkInDisplayBefore} mins before Shift Start
                 </span>
               </div>
               <div>
-                <span className="text-xs font-semibold text-[var(--color-content-secondary)]">Check-Out Active Display Window</span>
-                <span className="text-sm font-semibold text-[var(--color-content-main)] block mt-0.5">
+                <span className="text-xs font-semibold text-content-secondary">Check-Out Active Display Window</span>
+                <span className="text-sm font-semibold text-content-main block mt-0.5">
                   Appears {data.checkOutDisplayAfter} mins after Shift End
                 </span>
               </div>
-              <div className="md:col-span-2 border-t border-[var(--color-line-subtle)] pt-4 flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-[var(--color-brand-accent)]" />
-                <span className="text-xs font-semibold text-[var(--color-content-secondary)]">
-                  Auto Check-Out is <strong className="text-[var(--color-content-main)]">{data.autoCheckOut ? "Enabled" : "Disabled"}</strong>
+              <div className="md:col-span-2 border-t border-line-subtle pt-4 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-brand-accent" />
+                <span className="text-xs font-semibold text-content-secondary">
+                  Auto Check-Out is <strong className="text-content-main">{data.autoCheckOut ? "Enabled" : "Disabled"}</strong>
                   {data.autoCheckOut && ` (Runs daily at ${data.autoCheckOutTime})`}
                 </span>
               </div>
@@ -264,25 +269,25 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
       </div>
 
       {/* Simulator (Purely Client-Side UI tool; Simulator values never touch the DB) */}
-      <div className="panel bg-[var(--color-surface-subtle)] border border-[var(--color-line-subtle)] rounded-2xl p-6">
-        <div className="flex items-center gap-2 pb-4 border-b border-[var(--color-line-subtle)]">
-          <Eye className="w-5 h-5 text-[var(--color-brand-accent)]" />
-          <h4 className="text-sm font-bold text-[var(--color-content-main)]">Employee View Simulator (Local State)</h4>
+      <div className="panel bg-surface-subtle border border-line-subtle rounded-2xl p-6">
+        <div className="flex items-center gap-2 pb-4 border-b border-line-subtle">
+          <Eye className="w-5 h-5 text-brand-accent" />
+          <h4 className="text-sm font-bold text-content-main">Employee View Simulator (Local State)</h4>
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          <div className="space-y-3 bg-white p-4 border border-[var(--color-line-subtle)] rounded-xl">
+          <div className="space-y-3 bg-white p-4 border border-line-subtle rounded-xl">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-[var(--color-content-secondary)]">Simulate Clock Time</label>
+              <label className="text-xs font-bold text-content-secondary">Simulate Clock Time</label>
               <input
                 type="time"
                 value={simulatedTime}
                 onChange={(e) => setSimulatedTime(e.target.value)}
-                className="form-input text-xs w-full p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none"
+                className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
               />
             </div>
             
-            <div className="text-xs space-y-1 text-[var(--color-content-secondary)] border-t border-[var(--color-line-subtle)] pt-2.5">
+            <div className="text-xs space-y-1 text-content-secondary border-t border-line-subtle pt-2.5">
               <div className="flex justify-between">
                 <span>Check-in active starting at:</span>
                 <span className="font-bold text-emerald-600">
@@ -298,8 +303,8 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-white border border-[var(--color-line-subtle)] rounded-xl min-h-[140px] gap-3">
-            <span className="text-xs font-bold text-[var(--color-content-secondary)] tracking-wide uppercase">
+          <div className="flex flex-col items-center justify-center p-6 bg-white border border-line-subtle rounded-xl min-h-[140px] gap-3">
+            <span className="text-xs font-bold text-content-secondary tracking-wide uppercase">
               Employee Portal Preview ({simulatedTime})
             </span>
             

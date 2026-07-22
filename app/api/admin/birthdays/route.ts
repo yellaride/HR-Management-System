@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
 import CompanyDetails from "@/modals/CompanyDetails";
+import { getAdminUser } from "@/lib/auth";
 
 // Small timezone-aware helper to get current Karachi year
 function getKarachiYear(date: Date): number {
@@ -15,6 +16,11 @@ function getKarachiYear(date: Date): number {
 
 export async function GET(request: Request) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -22,15 +28,24 @@ export async function GET(request: Request) {
     const deptParam = searchParams.get("department") || "all";
     const searchParam = searchParams.get("search") || "";
 
-    const company = (await CompanyDetails.findOne().lean()) as any;
+    const company = (await CompanyDetails.findOne().lean()) as { departments?: string[] } | null;
     const departmentsList: string[] = company?.departments || [];
 
-    const query: any = {
+    const query: {
+      status: string;
+      dateOfBirth: Record<string, unknown>;
+      $and: Record<string, unknown>[];
+      department?: string;
+    } = {
       status: "Active",
       dateOfBirth: { $ne: null },
-      $or: [
-        { birthdayVisibility: { $exists: false } },
-        { birthdayVisibility: { $ne: "hidden" } }
+      $and: [
+        {
+          $or: [
+            { birthdayVisibility: { $exists: false } },
+            { birthdayVisibility: { $ne: "hidden" } }
+          ]
+        }
       ]
     };
 
@@ -39,15 +54,33 @@ export async function GET(request: Request) {
     }
 
     if (searchParam) {
-      query.$or = [
-        { name: { $regex: searchParam, $options: "i" } },
-        { designation: { $regex: searchParam, $options: "i" } }
-      ];
+      query.$and.push({
+        $or: [
+          { name: { $regex: searchParam, $options: "i" } },
+          { designation: { $regex: searchParam, $options: "i" } }
+        ]
+      });
     }
 
+    interface BirthdayEmployee {
+      _id: { toString(): string };
+      employeeId?: string;
+      name: string;
+      department?: string;
+      designation?: string;
+      dateOfBirth: string | Date;
+      birthdayEmailStatus?: string;
+      birthdayEmailSentYear?: number;
+      userId?: { email?: string } | null;
+      profilePhotoUrl?: string;
+      profilePhotoURL?: string;
+      profilePicture?: string;
+      image?: string;
+      picture?: string;
+    }
     const rawEmployees = (await Employee.find(query)
       .populate("userId", "email")
-      .lean()) as any[];
+      .lean()) as unknown as BirthdayEmployee[];
 
     const today = new Date();
     const currentMonthIdx = today.getMonth(); 
@@ -125,9 +158,9 @@ export async function GET(request: Request) {
       employees: finalEmployees
     });
 
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

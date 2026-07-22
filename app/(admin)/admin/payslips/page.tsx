@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { Search, Filter } from "lucide-react";
 import GeneratePayslipModal, { EmployeeOption } from "@/app/components/admin/GeneratePayslipModal";
-import PayslipList from "@/app/components/payslips/PayslipList";
+import PayslipList, { CompanyDetailsData } from "@/app/components/payslips/PayslipList";
 
 // Safely extend the component's props to allow companyDetails dynamically
 const ExtendedGeneratePayslipModal = GeneratePayslipModal as React.ComponentType<
-  React.ComponentProps<typeof GeneratePayslipModal> & { companyDetails?: any }
+  React.ComponentProps<typeof GeneratePayslipModal> & { companyDetails?: CompanyDetailsData | null }
 >;
 
 interface ReferencedEmployee {
@@ -40,7 +40,7 @@ export default function AdminPayslipsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const [companyDetails, setCompanyDetails] = useState<CompanyDetailsData | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -131,9 +131,9 @@ export default function AdminPayslipsPage() {
       const savedPayslip: Payslip = await response.json();
       setPayslips((prev) => [savedPayslip, ...prev]);
       setIsModalOpen(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Submission failed:", err);
-      alert(err.message || "Failed to record payment. Please check parameters and try again.");
+      alert(err instanceof Error ? err.message : "Failed to record payment. Please check parameters and try again.");
     }
   };
 

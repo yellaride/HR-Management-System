@@ -4,6 +4,7 @@ import { Payslip } from "@/modals/Payslip";
 import { Employee } from "@/modals/Employee";
 import { Attendance } from "@/modals/Attendance";
 import CompanyDetails from "@/modals/CompanyDetails";
+import { getSessionUser } from "@/lib/auth";
 
 // TypeScript interfaces to ensure correct type resolution from lean queries
 interface IEmployee {
@@ -26,18 +27,43 @@ interface IAttendance {
   workingHours?: number;
 }
 
+// Lean payslip doc; only employeeId is inspected directly, the rest is returned as-is
+interface ILeanPayslip extends Record<string, unknown> {
+  employeeId?: { _id?: { toString(): string } } | null;
+}
+
 export async function GET(request: Request) {
   try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const isAdmin = sessionUser.role === "admin";
+
     await connectDB();
+
+    // Non-admin users may only access payslips belonging to their own employee profile
+    let ownEmployeeId: string | null = null;
+    if (!isAdmin) {
+      const ownEmployee = (await Employee.findOne({ userId: sessionUser.id })
+        .select("_id")
+        .lean()) as { _id: { toString(): string } } | null;
+      ownEmployeeId = ownEmployee?._id?.toString() || null;
+      if (!ownEmployeeId) {
+        return NextResponse.json({ error: "Employee profile not found" }, { status: 404 });
+      }
+    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const employeeId = searchParams.get("employeeId");
-    const role = searchParams.get("role"); // "employee" or "admin"
     const action = searchParams.get("action");
 
     // Case A: Fetch Auto-Calculated figures (Working hours * rate, and deductions)
     if (action === "calculate") {
+      if (!isAdmin) {
+        return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+      }
       const calcEmployeeId = searchParams.get("employeeId");
       const calcPeriod = searchParams.get("period"); // e.g. "June 2026"
 
@@ -99,12 +125,21 @@ export async function GET(request: Request) {
 
     // Case B: Fetch a single specific payslip
     if (id) {
-      const payslip = await Payslip.findById(id)
+      const payslip = (await Payslip.findById(id)
         .populate("employeeId", "name jobTitle designation profilePhotoUrl")
-        .lean();
+        .lean()) as unknown as ILeanPayslip | null;
 
       if (!payslip) {
         return NextResponse.json({ error: "Payslip record not found" }, { status: 404 });
+      }
+
+      // Ownership check: employees may only download their own payslips
+      if (!isAdmin) {
+        const payslipEmployeeId =
+          payslip.employeeId?._id?.toString() || payslip.employeeId?.toString() || "";
+        if (!payslipEmployeeId || payslipEmployeeId !== ownEmployeeId) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
       }
 
       const companyDetails = (await CompanyDetails.findOne().lean()) as ICompanyDetails | null;
@@ -114,8 +149,9 @@ export async function GET(request: Request) {
     // Case C: Fetch all payslips based on authorization roles
     let query = {};
 
-    if (role === "employee" && employeeId) {
-      query = { employeeId, status: "Active" };
+    if (!isAdmin) {
+      // Employees are always scoped to their own active payslips
+      query = { employeeId: ownEmployeeId, status: "Active" };
     } else if (employeeId) {
       query = { employeeId };
     }
@@ -142,6 +178,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser || sessionUser.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
     const body = await request.json();
     const {

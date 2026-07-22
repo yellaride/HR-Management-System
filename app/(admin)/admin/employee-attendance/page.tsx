@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Plus, RefreshCw, AlertCircle } from "lucide-react";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
@@ -46,15 +46,63 @@ function formatToLocalTimeInput(dateString: string | null | undefined, defaultTi
   return `${hh}:${mm}`;
 }
 
+type AttendanceStatus = "On Time" | "Late" | "Absent";
+
+interface EmployeeRecord {
+  id: string;
+  userId: string;
+  name: string;
+  department: string;
+  designation: string;
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePicture?: string;
+  image?: string;
+  shiftTime?: string;
+}
+
+interface AttendanceLog {
+  userId: string;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  workingHours?: number;
+  formattedDuration?: string;
+  status?: AttendanceStatus;
+}
+
+interface MonthlyRecord {
+  userId: string;
+  isLocked?: boolean;
+}
+
+interface CompanySettings {
+  shiftStart: string;
+  shiftEnd: string;
+  gracePeriod: number;
+  checkInDisplayBefore: number;
+  checkOutDisplayAfter: number;
+  autoCheckOut: boolean;
+  autoCheckOutTime: string;
+  departments?: string[];
+}
+
+interface SaveAttendancePayload {
+  userId: string;
+  date: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  status: AttendanceStatus;
+}
+
 export default function AdminAttendancePage() {
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
-  const [monthlyRecords, setMonthlyRecords] = useState<any[]>([]);
-  const [companySettings, setCompanySettings] = useState<any>(null);
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
+  const [monthlyRecords, setMonthlyRecords] = useState<MonthlyRecord[]>([]);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
 
   const [activeTab, setActiveTab] = useState<"directory" | "history-drill" | "rules">("directory");
   
-  const [filterDate, setFilterDate] = useState<string>(() => todayISO());
+  const [filterDate] = useState<string>(() => todayISO());
 
 
   // Filter criteria
@@ -90,8 +138,7 @@ export default function AdminAttendancePage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const fetchDailyLogs = async () => {
-    setIsLoading(true);
+  const fetchDailyLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/employee-attendance?date=${filterDate}`);
       if (res.ok) {
@@ -103,8 +150,8 @@ export default function AdminAttendancePage() {
           setCompanySettings(data.companySettings);
         }
 
-        if (data.employees?.length > 0 && !drillEmployeeId) {
-          setDrillEmployeeId(data.employees[0].userId);
+        if (data.employees?.length > 0) {
+          setDrillEmployeeId((prev) => prev || data.employees[0].userId);
         }
       }
     } catch (err) {
@@ -112,11 +159,14 @@ export default function AdminAttendancePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filterDate]);
 
   useEffect(() => {
-    fetchDailyLogs();
-  }, [filterDate]);
+    async function loadDailyLogs() {
+      fetchDailyLogs();
+    }
+    loadDailyLogs();
+  }, [fetchDailyLogs]);
 
   const shiftTimeLabel = useMemo(() => {
 
@@ -130,7 +180,7 @@ export default function AdminAttendancePage() {
     return employees.map((emp) => {
       const log = attendanceLogs.find((l) => l.userId === emp.userId);
       const currentMonthlyRecord = monthlyRecords.find((mr) => mr.userId === emp.userId);
-      const isLocked = currentMonthlyRecord ? currentMonthlyRecord.isLocked : false;
+      const isLocked = currentMonthlyRecord?.isLocked ?? false;
 
       return {
         userId: emp.userId,
@@ -195,13 +245,13 @@ export default function AdminAttendancePage() {
       checkOut: formatToLocalTimeInput(record?.checkOut, defaultCheckOut),
       hasCheckOut: hasCheckOut,
       enableCheckOut: hasCheckOut, 
-      status: (record?.status || "On Time") as any,
+      status: record?.status || "On Time",
       isLocked: !!targetRecord?.isLocked,
     });
     setIsEditModalOpen(true);
   };
 
-  const handleSaveAttendance = async (payload: any) => {
+  const handleSaveAttendance = async (payload: SaveAttendancePayload) => {
     const res = await fetch("/api/admin/employee-attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -211,6 +261,7 @@ export default function AdminAttendancePage() {
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
       triggerToast("Timesheet adjusted and recalculated successfully.");
+      setIsLoading(true);
       fetchDailyLogs();
     } else {
       const errData = await res.json();
@@ -223,23 +274,22 @@ export default function AdminAttendancePage() {
     setTimeout(async () => {
       setIsSyncing(false);
       triggerToast("Sync complete. Fresh checks fetched from hardware.");
+      setIsLoading(true);
       fetchDailyLogs();
     }, 1200);
   };
 
-  const handleSaveSettings = async (updatedData: any) => {
+  const handleSaveSettings = async (updatedData: Partial<CompanySettings>) => {
     try {
-      const res = await fetch("/api/admin/company-settings", {
+      const res = await fetch("/api/settings/company-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedData),
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-          setCompanySettings(data.settings);
-          triggerToast("Rules modified and applied safely.");
-        }
+        setCompanySettings(data);
+        triggerToast("Rules modified and applied safely.");
       } else {
         triggerToast("Failed updating settings parameters.");
       }
@@ -250,7 +300,7 @@ export default function AdminAttendancePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-[1500px] mx-auto pb-16 text-[var(--color-content-main)]">
+    <div className="space-y-6 max-w-375 mx-auto pb-16 text-content-main">
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 bg-slate-900 border border-slate-800 text-white text-xs font-bold rounded-2xl shadow-xl">
           <AlertCircle className="w-5 h-5 text-indigo-400 shrink-0" />
@@ -258,11 +308,11 @@ export default function AdminAttendancePage() {
         </div>
       )}
 
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6 pb-6 border-b border-[var(--color-line-subtle)]">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6 pb-6 border-b border-line-subtle">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">On-Site Attendance</h1>
-          <p className="mt-1 text-xs text-[var(--color-content-secondary)]">
-            Review today's biometric entries, log retro punch logs, and handle dynamic configurations.
+          <p className="mt-1 text-xs text-content-secondary">
+            Review today&apos;s biometric entries, log retro punch logs, and handle dynamic configurations.
           </p>
         </div>
 
@@ -270,15 +320,15 @@ export default function AdminAttendancePage() {
           <button
             onClick={handleSyncHardware}
             disabled={isSyncing}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-[var(--color-content-main)] border border-[var(--color-line-subtle)] rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-content-main border border-line-subtle rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-[var(--color-brand-accent)]" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-brand-accent" : ""}`} />
             <span>{isSyncing ? "Syncing Biometrics..." : "Sync Biometric Devices"}</span>
           </button>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-accent hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Manual Attendance</span>
@@ -286,18 +336,18 @@ export default function AdminAttendancePage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-b border-[var(--color-line-subtle)]">
+      <div className="flex items-center justify-between border-b border-line-subtle">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveTab("directory")}
             className={`px-5 py-3 text-xs font-bold border-b-2 transition -mb-px flex items-center gap-2 cursor-pointer ${
               activeTab === "directory"
-                ? "border-b-[var(--color-brand-accent)] text-[var(--color-brand-accent)]"
-                : "border-transparent text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)]"
+                ? "border-b-brand-accent text-brand-accent"
+                : "border-transparent text-content-secondary hover:text-content-main"
             }`}
           >
             <span>Daily Timesheets Directory</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-[var(--color-content-secondary)] font-extrabold">
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-content-secondary font-extrabold">
               {filteredRecords.length}
             </span>
           </button>
@@ -306,8 +356,8 @@ export default function AdminAttendancePage() {
             onClick={() => setActiveTab("history-drill")}
             className={`px-5 py-3 text-xs font-bold border-b-2 transition -mb-px flex items-center gap-2 cursor-pointer ${
               activeTab === "history-drill"
-                ? "border-b-[var(--color-brand-accent)] text-[var(--color-brand-accent)]"
-                : "border-transparent text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)]"
+                ? "border-b-brand-accent text-brand-accent"
+                : "border-transparent text-content-secondary hover:text-content-main"
             }`}
           >
             <span>Employee Historical Analytics</span>
@@ -317,8 +367,8 @@ export default function AdminAttendancePage() {
             onClick={() => setActiveTab("rules")}
             className={`px-5 py-3 text-xs font-bold border-b-2 transition -mb-px flex items-center gap-2 cursor-pointer ${
               activeTab === "rules"
-                ? "border-b-[var(--color-brand-accent)] text-[var(--color-brand-accent)]"
-                : "border-transparent text-[var(--color-content-secondary)] hover:text-[var(--color-content-main)]"
+                ? "border-b-brand-accent text-brand-accent"
+                : "border-transparent text-content-secondary hover:text-content-main"
             }`}
           >
             <span>Attendance Rules & Visibility</span>
@@ -342,8 +392,8 @@ export default function AdminAttendancePage() {
             ...Array.from(
               new Set<string>(
                 (companySettings?.departments || [])
-                  .filter((d: any) => typeof d === "string" && d.trim().length > 0)
-                  .map((d: string) => d.trim())
+                  .filter((d) => typeof d === "string" && d.trim().length > 0)
+                  .map((d) => d.trim())
               )
             ),
           ]}
@@ -356,7 +406,7 @@ export default function AdminAttendancePage() {
           />
 
           {isLoading ? (
-            <div className="py-12 text-center text-xs text-[var(--color-content-secondary)] animate-pulse">Retrieving timesheet logs...</div>
+            <div className="py-12 text-center text-xs text-content-secondary animate-pulse">Retrieving timesheet logs...</div>
           ) : (
             <AttendanceTable
               records={filteredRecords}

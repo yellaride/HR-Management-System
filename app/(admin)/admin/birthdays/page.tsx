@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Filter, Calendar, RefreshCw } from "lucide-react";
 
 import { EmployeeBirthday } from "@/lib/types";
@@ -59,15 +59,22 @@ export default function BirthdayDashboard() {
   const [activeTab, setActiveTab] = useState<"month" | "today" | "upcoming" | "calendar">("month");
   const [selectedEmp, setSelectedEmp] = useState<EmployeeBirthday | null>(null);
 
-  const [monthLabelTab, setMonthLabelTab] = useState<string>(getMonthLabel(String(currentMonthIdx)));
+  const monthLabelTab = getMonthLabel(monthFilter);
 
-  useEffect(() => {
-    setMonthLabelTab(getMonthLabel(monthFilter));
-  }, [monthFilter]);
+  // Show the loading indicator as soon as any filter changes (render-time adjustment,
+  // avoids calling setState synchronously inside the fetch effect below).
+  const [prevFilters, setPrevFilters] = useState({ monthFilter, deptFilter, search });
+  if (
+    prevFilters.monthFilter !== monthFilter ||
+    prevFilters.deptFilter !== deptFilter ||
+    prevFilters.search !== search
+  ) {
+    setPrevFilters({ monthFilter, deptFilter, search });
+    setLoading(true);
+  }
 
   // Fetch from route.ts api
-  const fetchBirthdayRecords = async () => {
-    setLoading(true);
+  const fetchBirthdayRecords = useCallback(async () => {
     try {
       const queryParams = new URLSearchParams({
         month: monthFilter,
@@ -88,11 +95,14 @@ export default function BirthdayDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [monthFilter, deptFilter, search]);
 
   useEffect(() => {
-    fetchBirthdayRecords();
-  }, [monthFilter, deptFilter, search]);
+    async function loadRecords() {
+      fetchBirthdayRecords();
+    }
+    loadRecords();
+  }, [fetchBirthdayRecords]);
 
   // Map dynamic departments from CompanyDetails schema for selection
   const deptOptions = useMemo(() => {
@@ -138,7 +148,10 @@ export default function BirthdayDashboard() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={fetchBirthdayRecords}
+              onClick={() => {
+                setLoading(true);
+                fetchBirthdayRecords();
+              }}
               className="btn-outline px-4 py-2 text-xs font-bold w-auto inline-flex items-center gap-2 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-brand-accent" : ""}`} /> 
@@ -212,7 +225,7 @@ export default function BirthdayDashboard() {
         <div className="table-card">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-line-subtle px-4 sm:px-6 py-3.5 bg-surface-main/60 gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {[
+              {([
                 { 
                   id: "month", 
                   label: monthFilter === "all" ? "Selected Month" : `Selected Month (${monthLabelTab})` 
@@ -220,12 +233,12 @@ export default function BirthdayDashboard() {
                 { id: "today", label: "Today" },
                 { id: "upcoming", label: "Upcoming" },
                 { id: "calendar", label: "Calendar View" },
-              ].map((tab) => {
+              ] as { id: "month" | "today" | "upcoming" | "calendar"; label: string }[]).map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    onClick={() => setActiveTab(tab.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                       isActive
                         ? "bg-surface-card text-brand-accent border-line-subtle shadow-2xs"

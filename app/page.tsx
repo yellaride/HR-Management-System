@@ -1,20 +1,19 @@
 import Image from "next/image";
-import Link from "next/link";
 import LoginForm from "./components/LoginForm";
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-bg-base,#fafafa)] text-[var(--color-content-main)]">
+    <div className="min-h-screen flex flex-col bg-bg-base text-content-main">
       
       {/* Header Navigation - Decreased vertical height & aligned */}
       <header className="w-full py-3 px-6 md:px-12 border-b border-slate-100 dark:border-slate-800/40 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2.5 group cursor-pointer">
-            <div className="w-9 h-9 rounded-lg bg-[var(--color-brand-accent)] text-white flex items-center justify-center font-black text-lg shadow-sm transition-transform group-hover:scale-105 duration-200">
+            <div className="w-9 h-9 rounded-lg bg-brand-accent text-white flex items-center justify-center font-black text-lg shadow-sm transition-transform group-hover:scale-105 duration-200">
               V
             </div>
-            <span className="font-bold text-lg tracking-tight text-[var(--color-content-main)]">
-              VibeFlow<span className="text-[var(--color-brand-accent)]">.</span>
+            <span className="font-bold text-lg tracking-tight text-content-main">
+              VibeFlow<span className="text-brand-accent">.</span>
             </span>
           </div>
           <div />
@@ -39,7 +38,7 @@ export default function Home() {
                 className="object-cover filter brightness-[0.7] contrast-[0.95]"
               />
               {/* Rich gradient overlay for text contrast */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-900/40 to-transparent" />
             </div>
 
             {/* Upper Badge */}
@@ -64,9 +63,9 @@ export default function Home() {
                   Security Level Verified
                 </span>
                 <div className="flex gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-accent)]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-accent)]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-accent)]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
                 </div>
               </div>
             </div>

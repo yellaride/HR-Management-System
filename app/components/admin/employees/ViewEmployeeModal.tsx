@@ -28,7 +28,7 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
   if (!isOpen || !employee) return null;
 
   // 1. Robust Join Date Parser with common fallbacks
-  const rawJoinDate = employee.joinDate || (employee as any).joiningDate || (employee as any).startDate || (employee as any).createdAt;
+  const rawJoinDate = employee.joinDate || employee.joiningDate || employee.startDate || employee.createdAt;
   let formattedJoinDate = "—";
   if (rawJoinDate) {
     const parsedDate = new Date(rawJoinDate);
@@ -40,7 +40,7 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
   // 2. Safe Salary Parser with conversion for strings (e.g., "50000") and column fallbacks
   const rawSalary = (employee.salary !== undefined && employee.salary !== null)
     ? employee.salary 
-    : ((employee as any).basicSalary || (employee as any).baseSalary);
+    : (employee.basicSalary || employee.baseSalary);
 
   let formattedSalary = "—";
   if (rawSalary !== undefined && rawSalary !== null && rawSalary !== "") {
@@ -132,12 +132,12 @@ export default function ViewEmployeeModal({ isOpen, onClose, employee, onDelete 
             <div className="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-extrabold text-sm uppercase overflow-hidden">
               {(() => {
                 const imageUrl =
-                  (employee as any).image ||
-                  (employee as any).picture ||
-                  (employee as any).profilePicture ||
-                  (employee as any).profilePhotoUrl ||
+                  employee.image ||
+                  employee.picture ||
+                  employee.profilePicture ||
+                  employee.profilePhotoUrl ||
                   // Your backend stores Cloudinary link here
-                  (employee as any).profilePhotoURL;
+                  employee.profilePhotoURL;
 
 
                 const initials = employee.name ? employee.name.split(" ").map(n => n[0]).join("") : "EE";

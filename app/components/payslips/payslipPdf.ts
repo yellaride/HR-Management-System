@@ -1,8 +1,22 @@
 
 
+// Populated employee sub-document (may carry any of several photo field names)
+export interface PayslipEmployee {
+  _id?: string;
+  name?: string;
+  jobTitle?: string;
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePhoto?: string;
+  image?: string;
+  picture?: string;
+  profilePicture?: string;
+  profilePic?: string;
+}
+
 export interface PayslipRecord {
   _id: string;
-  employeeId?: { _id?: string; name?: string; jobTitle?: string } | string | null;
+  employeeId?: PayslipEmployee | string | null;
   employeeName?: string;
   employeeRole?: string;
   period: string;
@@ -61,7 +75,8 @@ export async function downloadPayslipPdf({
     email?: string;
     phone?: string;
     brandAccent?: string; // optional brand override (hex)
-    [key: string]: any;
+    brand_accent?: string; // legacy snake_case brand override (hex)
+    [key: string]: unknown;
   } | null;
 }) {
   const { jsPDF } = await import("jspdf");
@@ -74,7 +89,7 @@ export async function downloadPayslipPdf({
 
   // Prefer DB override, else fallback to global token value.
   // Global CSS token: --color-brand-accent: #7c3aed
-  const brandAccentHex = (companyDetails as any)?.brandAccent || (companyDetails as any)?.brand_accent || "#7c3aed";
+  const brandAccentHex = companyDetails?.brandAccent || companyDetails?.brand_accent || "#7c3aed";
 
   const primaryColor = hexToRgb(brandAccentHex);
   // Keep other theme-neutral colors stable (can be extended later).

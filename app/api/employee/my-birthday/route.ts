@@ -51,9 +51,10 @@ export async function GET() {
       department: currentEmployee.department
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: error?.message || "Failed to verify birthday status" }, 
+      { error: message || "Failed to verify birthday status" }, 
       { status: 500 }
     );
   }

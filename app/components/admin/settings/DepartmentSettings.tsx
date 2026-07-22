@@ -28,10 +28,10 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
   };
 
   return (
-    <div className="panel bg-white border border-[var(--color-line-subtle)] rounded-2xl p-6 shadow-sm">
-      <div className="flex items-center gap-2 pb-4 border-b border-[var(--color-line-subtle)]">
-        <Users className="w-5 h-5 text-[var(--color-brand-accent)]" />
-        <h3 className="text-sm font-bold text-[var(--color-content-main)]">Department Management</h3>
+    <div className="panel bg-white border border-line-subtle rounded-2xl p-6 shadow-sm">
+      <div className="flex items-center gap-2 pb-4 border-b border-line-subtle">
+        <Users className="w-5 h-5 text-brand-accent" />
+        <h3 className="text-sm font-bold text-content-main">Department Management</h3>
       </div>
 
       <div className="mt-4 space-y-4">
@@ -47,13 +47,13 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
                 handleAdd();
               }
             }}
-            className="form-input text-xs flex-1 p-2 border border-[var(--color-line-subtle)] rounded-lg outline-none"
+            className="form-input text-xs flex-1 p-2 border border-line-subtle rounded-lg outline-none"
           />
           <button
             type="button"
             onClick={handleAdd}
             disabled={adding || !newDept.trim()}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer"
           >
             {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             <span>Add</span>
@@ -61,15 +61,15 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
         </div>
 
         {departments.length === 0 ? (
-          <p className="text-xs text-[var(--color-content-secondary)] italic">No departments configured.</p>
+          <p className="text-xs text-content-secondary italic">No departments configured.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
             {departments.map((dept) => (
               <div
                 key={dept}
-                className="flex items-center justify-between p-3 bg-[var(--color-surface-subtle)] border border-[var(--color-line-subtle)] rounded-xl text-xs"
+                className="flex items-center justify-between p-3 bg-surface-subtle border border-line-subtle rounded-xl text-xs"
               >
-                <span className="font-semibold text-[var(--color-content-main)] truncate mr-2">{dept}</span>
+                <span className="font-semibold text-content-main truncate mr-2">{dept}</span>
                 <button
                   type="button"
                   onClick={() => onDelete(dept)}

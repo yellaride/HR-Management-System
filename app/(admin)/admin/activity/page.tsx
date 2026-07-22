@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Filter, Calendar, RefreshCw, CheckSquare, User, ChevronDown } from "lucide-react";
 
 interface Activity {
@@ -27,7 +27,7 @@ function ActivityLogPage() {
   const typeRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -73,14 +73,14 @@ function ActivityLogPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, typeFilter, dateFilter]);
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchLogs();
     }, 300); // 300ms input debounce
     return () => clearTimeout(delayDebounce);
-  }, [search, typeFilter, dateFilter]);
+  }, [fetchLogs]);
 
   // Click Outside Handler for Custom Dropdowns
   useEffect(() => {

@@ -166,16 +166,16 @@ export default function PayslipEmployeePage() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface-main text-content-main antialiased py-8 px-4 sm:px-6 lg:px-8">
       <div className="space-y-6 ">
         
         {/* Header Block with Integrated Filters */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-line-subtle">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[var(--color-content-main)] sm:text-3xl">
+            <h1 className="text-2xl font-extrabold tracking-tight text-content-main sm:text-3xl">
               Payslips
             </h1>
-            <p className="mt-1.5 text-xs text-[var(--color-content-secondary)] font-medium">
+            <p className="mt-1.5 text-xs text-content-secondary font-medium">
               Download your official pay statements.
             </p>
           </div>
@@ -193,11 +193,11 @@ onMouseEnter={() => setIsMonthOpen(true)}
                   setIsMonthOpen(!isMonthOpen);
                   setIsYearOpen(false);
                 }}
-                className="flex items-center gap-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl px-3.5 py-2 shadow-xs cursor-pointer text-xs font-semibold hover:border-[var(--color-brand-accent)]/50 transition duration-150"
+                className="flex items-center gap-2 bg-surface-card border border-line-subtle rounded-xl px-3.5 py-2 shadow-xs cursor-pointer text-xs font-semibold hover:border-brand-accent/50 transition duration-150"
               >
-                <span className="text-[10px] font-extrabold text-[var(--color-content-muted)] uppercase tracking-wider">Month:</span>
-                <span className="text-[var(--color-content-secondary)]">{selectedMonth === "All" ? "All Months" : selectedMonth}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isMonthOpen ? "rotate-180" : ""}`} />
+                <span className="text-[10px] font-extrabold text-content-muted uppercase tracking-wider">Month:</span>
+                <span className="text-content-secondary">{selectedMonth === "All" ? "All Months" : selectedMonth}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isMonthOpen ? "rotate-180" : ""}`} />
               </button>
 
               {isMonthOpen && (
@@ -241,11 +241,11 @@ onMouseEnter={() => setIsMonthOpen(true)}
                   setIsYearOpen(!isYearOpen);
                   setIsMonthOpen(false);
                 }}
-                className="flex items-center gap-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl px-3.5 py-2 shadow-xs cursor-pointer text-xs font-semibold hover:border-[var(--color-brand-accent)]/50 transition duration-150"
+                className="flex items-center gap-2 bg-surface-card border border-line-subtle rounded-xl px-3.5 py-2 shadow-xs cursor-pointer text-xs font-semibold hover:border-brand-accent/50 transition duration-150"
               >
-                <span className="text-[10px] font-extrabold text-[var(--color-content-muted)] uppercase tracking-wider">Year:</span>
-                <span className="text-[var(--color-content-secondary)]">{selectedYear === "All" ? "All Years" : selectedYear}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-[var(--color-content-muted)] transition-transform duration-200 ${isYearOpen ? "rotate-180" : ""}`} />
+                <span className="text-[10px] font-extrabold text-content-muted uppercase tracking-wider">Year:</span>
+                <span className="text-content-secondary">{selectedYear === "All" ? "All Years" : selectedYear}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isYearOpen ? "rotate-180" : ""}`} />
               </button>
 
               {isYearOpen && (
@@ -286,8 +286,8 @@ onMouseEnter={() => setIsMonthOpen(true)}
 
         {/* Filter Details Count */}
         <div className="flex items-center justify-between px-1">
-          <div className="inline-flex items-center gap-1.5 text-[var(--color-content-secondary)] text-xs font-medium">
-            <Filter className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
+          <div className="inline-flex items-center gap-1.5 text-content-secondary text-xs font-medium">
+            <Filter className="w-3.5 h-3.5 text-content-muted" />
             <span>
               Showing {filteredPayslips.length} of {payslips.length} paid records
             </span>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { Attendance } from "@/modals/Attendance";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog"; 
@@ -11,6 +11,17 @@ import CompanyDetails from "@/modals/CompanyDetails";
 const TIMEZONE = "Asia/Karachi"; 
 
 export const dynamic = "force-dynamic";
+
+// Company settings fields consumed by the attendance logic in this route
+interface AttendanceSettings {
+  shiftStart?: string;
+  shiftEnd?: string;
+  gracePeriod?: number;
+  checkInDisplayBefore?: number;
+  checkOutDisplayAfter?: number;
+  autoCheckOut?: boolean;
+  autoCheckOutTime?: string;
+}
 
 // Timezone-safe local time helper
 function getLocalTimeComponents(date: Date) {
@@ -58,7 +69,7 @@ async function getActiveSettings() {
 }
 
 // Evaluates and processes automated check-out if threshold is met
-async function processAutoCheckOutIfEligible(userId: string, todayDateStr: string, settings: any) {
+async function processAutoCheckOutIfEligible(userId: string, todayDateStr: string, settings: AttendanceSettings) {
   if (!settings.autoCheckOut) return null;
 
   const record = await Attendance.findOne({ userId, date: todayDateStr });
@@ -202,7 +213,7 @@ export async function GET() {
       ? {
           presentDays: monthlyRecord.presentDays ?? 0,
           absentDays: monthlyRecord.absentDays ?? 0,
-          lateDays: (monthlyRecord as any).lateDays ?? 0,
+          lateDays: (monthlyRecord as unknown as { lateDays?: number }).lateDays ?? 0,
           leaveDays: monthlyRecord.leaveDays ?? 0,
           onDutyDays: monthlyRecord.onDutyDays ?? 0,
           totalWorkingHours: monthlyRecord.totalWorkingHours ?? 0,
@@ -210,9 +221,10 @@ export async function GET() {
       : null;
 
     return NextResponse.json({ todayRecord, history, monthlyRecord, monthlyStats, settings }, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: "Failed to fetch attendance metrics", details: error?.message || String(error) },
+      { error: "Failed to fetch attendance metrics", details: message || String(error) },
       { status: 500 }
     );
   }
@@ -361,7 +373,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Already checked out for today" }, { status: 400 });
       }
 
-      let finalStatus = existingRecord.status;
+      const finalStatus = existingRecord.status;
 
       // Calculate Bounded Working Hours dynamically based on active shift settings
       const checkInTime = new Date(existingRecord.checkIn);
@@ -443,9 +455,10 @@ export async function POST(request: Request) {
         { status: 200 }
       );
     }
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: "Attendance action execution failed", details: error?.message || String(error) },
+      { error: "Attendance action execution failed", details: message || String(error) },
       { status: 500 }
     );
   }

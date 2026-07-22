@@ -40,7 +40,7 @@ export default function EmployeeLeavesPage() {
           const errorData = await res.json().catch(() => ({}));
           setMessage({ type: "error", text: errorData.error || "Failed to load leave records" });
         }
-      } catch (err) {
+      } catch {
         setMessage({ type: "error", text: "Failed to load leave records" });
       } finally {
         setLoading(false);
@@ -135,7 +135,7 @@ export default function EmployeeLeavesPage() {
                 setHistory(historyData);
               }
             }
-          } catch (err) {
+          } catch {
             // Swallow refresh errors; UI shows the last known state.
           }
         };
@@ -158,13 +158,13 @@ export default function EmployeeLeavesPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-extrabold text-[var(--color-content-main)]">My Leave Dashboard</h1>
-          <p className="text-xs text-[var(--color-content-muted)]">Track and request your leaves.</p>
+          <h1 className="text-xl font-extrabold text-content-main">My Leave Dashboard</h1>
+          <p className="text-xs text-content-muted">Track and request your leaves.</p>
         </div>
         <button
           onClick={() => setIsApplyModalOpen(true)}
           disabled={submitting}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-brand-accent)] text-white rounded-lg text-xs font-bold hover:bg-[var(--color-brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-accent text-white rounded-lg text-xs font-bold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Apply for Leave
@@ -181,9 +181,9 @@ export default function EmployeeLeavesPage() {
           }`}
         >
           {message.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" />
           )}
           {message.text}
         </div>
@@ -197,22 +197,22 @@ export default function EmployeeLeavesPage() {
             return (
               <div
                 key={leaveType}
-                className="bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl p-4 shadow-sm"
+                className="bg-surface-card border border-line-subtle rounded-xl p-4 shadow-sm"
               >
-                <h3 className="text-xs font-bold text-[var(--color-content-secondary)] uppercase tracking-widest mb-3">
+                <h3 className="text-xs font-bold text-content-secondary uppercase tracking-widest mb-3">
                   {leaveType === "ANNUAL" ? "Annual Leave" : leaveType === "SICK" ? "Sick Leave" : "Casual Leave"}
                 </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-[var(--color-content-muted)]">Allocated:</span>
-                    <span className="font-bold text-[var(--color-content-main)]">{balance.allocated || 0}</span>
+                    <span className="text-content-muted">Allocated:</span>
+                    <span className="font-bold text-content-main">{balance.allocated || 0}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-[var(--color-content-muted)]">Used:</span>
+                    <span className="text-content-muted">Used:</span>
                     <span className="font-bold text-amber-600">{balance.used || 0}</span>
                   </div>
-                  <div className="flex justify-between text-xs border-t border-[var(--color-line-subtle)] pt-2">
-                    <span className="text-[var(--color-content-muted)]">Remaining:</span>
+                  <div className="flex justify-between text-xs border-t border-line-subtle pt-2">
+                    <span className="text-content-muted">Remaining:</span>
                     <span className="font-bold text-emerald-600">{balance.remaining || 0}</span>
                   </div>
                 </div>
@@ -224,9 +224,9 @@ export default function EmployeeLeavesPage() {
 
       {/* Leave History Section */}
       {loading ? (
-        <div className="text-center py-12 text-[var(--color-content-muted)]">
+        <div className="text-center py-12 text-content-muted">
           <div className="flex justify-center items-center gap-2">
-            <div className="w-4 h-4 border-2 border-[var(--color-brand-accent)] border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
             <span>Loading details...</span>
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function EmployeeLeavesPage() {
           {history && history.length > 0 ? (
             <LeaveHistoryTable history={history} />
           ) : (
-            <div className="text-center py-12 text-[var(--color-content-muted)] bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl">
+            <div className="text-center py-12 text-content-muted bg-surface-card border border-line-subtle rounded-xl">
               <p className="text-xs">No leave records found.</p>
             </div>
           )}

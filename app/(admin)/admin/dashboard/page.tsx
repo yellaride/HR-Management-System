@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import {
   Users,
   Layers,
@@ -39,10 +39,28 @@ function getFriendlyErrorMessage(error: string | null): string | null {
   return "Something went wrong while processing this action. Please try again shortly.";
 }
 
+interface TodayBirthday {
+  name: string;
+  designation?: string;
+  department?: string;
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePicture?: string;
+  image?: string;
+  picture?: string;
+}
+
+// Client-only current date (empty string on the server keeps hydration safe,
+// exactly like the previous set-state-on-mount effect).
+const subscribeToNothing = () => () => {};
+const getClientDate = () =>
+  new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+const getServerDate = () => "";
+
 export default function AdminDashboardPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
-  const [currentDate, setCurrentDate] = useState("");
+  const currentDate = useSyncExternalStore(subscribeToNothing, getClientDate, getServerDate);
 
   const [dashboardStats, setDashboardStats] = useState<{
     totalEmployees: number;
@@ -52,20 +70,12 @@ export default function AdminDashboardPage() {
     presentToday: number;
   } | null>(null);
   
-  const [todayBirthdays, setTodayBirthdays] = useState<any[]>([]);
+  const [todayBirthdays, setTodayBirthdays] = useState<TodayBirthday[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
-    setCurrentDate(new Date().toLocaleDateString("en-US", options));
-  }, []);
-
   const loadStats = useCallback(async () => {
     try {
-      setStatsLoading(true);
-      setStatsError(null);
-
       const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load dashboard stats");
       const data = await res.json();
@@ -80,8 +90,8 @@ export default function AdminDashboardPage() {
 
       setTodayBirthdays(Array.isArray(data.todayBirthdays) ? data.todayBirthdays : []);
 
-    } catch (e: any) {
-      setStatsError(e?.message || "Failed to load dashboard stats");
+    } catch (e) {
+      setStatsError(e instanceof Error ? e.message : "Failed to load dashboard stats");
       setDashboardStats({
         totalEmployees: 0,
         totalDepartments: 0,
@@ -96,7 +106,10 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
-    loadStats();
+    async function loadInitialStats() {
+      loadStats();
+    }
+    loadInitialStats();
   }, [loadStats]);
 
   const handleCreateEmployee = async (data: {
@@ -132,17 +145,19 @@ export default function AdminDashboardPage() {
             const text = await res.text();
             serverErrorMsg = text || serverErrorMsg;
           }
-        } catch (_) {}
+        } catch {}
         throw new Error(serverErrorMsg);
       }
 
       const result = await res.json();
       if (result?.employee) {
         setIsAddModalOpen(false);
+        setStatsLoading(true);
+        setStatsError(null);
         await loadStats();
       }
-    } catch (err: any) {
-      setAddEmployeeError(err?.message || "An error occurred during registration.");
+    } catch (err) {
+      setAddEmployeeError(err instanceof Error ? err.message : "An error occurred during registration.");
     }
   };
 
@@ -154,7 +169,7 @@ export default function AdminDashboardPage() {
       isPositive: true,
       changeText: "vs last month",
       icon: Users,
-      colorClass: "bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border-[var(--color-line-subtle)]",
+      colorClass: "bg-brand-subtle text-brand-accent border-line-subtle",
     },
     {
       label: "Total Departments",
@@ -163,7 +178,7 @@ export default function AdminDashboardPage() {
       isPositive: true,
       changeText: "In administration",
       icon: Layers,
-      colorClass: "bg-[var(--color-brand-subtle)]/40 text-[var(--color-brand-hover)] border-[var(--color-line-subtle)]/60",
+      colorClass: "bg-brand-subtle/40 text-brand-hover border-line-subtle/60",
     },
     {
       label: "Today's Attendance",
@@ -186,22 +201,22 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface-main)] pb-16">
+    <div className="min-h-screen bg-surface-main pb-16">
       <div className="px-2 py-6 space-y-6 w-full">
         
         {/* Dashboard Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-[var(--color-line-subtle)]">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-line-subtle">
           <div>
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[var(--color-brand-accent)] animate-pulse" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-accent)]">
+              <span className="h-2 w-2 rounded-full bg-brand-accent animate-pulse" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-brand-accent">
                 HR Operations Portal
               </span>
             </div>
-            <h1 className="text-3xl font-extrabold text-[var(--color-content-main)] tracking-tight mt-1">
+            <h1 className="text-3xl font-extrabold text-content-main tracking-tight mt-1">
               Admin Dashboard
             </h1>
-            <p className="mt-1 text-sm text-[var(--color-content-secondary)]">
+            <p className="mt-1 text-sm text-content-secondary">
               Overview and quick actions for real-time employee directory operations.
               {statsError && (
                 <span className="block mt-2 text-xs text-amber-600 font-medium">
@@ -212,8 +227,8 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-xl text-xs font-bold text-[var(--color-brand-accent)] shadow-sm">
-              <Calendar className="w-4 h-4 text-[var(--color-brand-accent)]" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs font-bold text-brand-accent shadow-sm">
+              <Calendar className="w-4 h-4 text-brand-accent" />
               <span>{currentDate || "Loading Date..."}</span>
             </div>
           </div>
@@ -244,12 +259,12 @@ export default function AdminDashboardPage() {
           {/* Recent Activities */}
           <div className="lg:col-span-2 panel p-6 flex flex-col justify-between gap-6 min-w-0">
             <div className="min-w-0">
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--color-line-subtle)]">
+              <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
                 <div>
-                  <h2 className="text-base font-semibold text-[var(--color-content-main)]">Recent System Activity</h2>
-                  <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Real-time log of administrative events.</p>
+                  <h2 className="text-base font-semibold text-content-main">Recent System Activity</h2>
+                  <p className="text-xs text-content-secondary mt-0.5">Real-time log of administrative events.</p>
                 </div>
-                <Link href="/admin/activity" className="text-xs font-semibold text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] transition cursor-pointer">
+                <Link href="/admin/activity" className="text-xs font-semibold text-brand-accent hover:text-brand-hover transition cursor-pointer">
                   View All Activity
                 </Link>
               </div>
@@ -264,8 +279,8 @@ export default function AdminDashboardPage() {
           <div className="lg:col-span-1 panel p-6 space-y-5 flex flex-col justify-between">
             <div className="space-y-4">
               <div>
-                <h2 className="text-base font-semibold text-[var(--color-content-main)]">Quick Actions</h2>
-                <p className="text-xs text-[var(--color-content-secondary)] mt-0.5">Direct shortcuts to common HR tasks.</p>
+                <h2 className="text-base font-semibold text-content-main">Quick Actions</h2>
+                <p className="text-xs text-content-secondary mt-0.5">Direct shortcuts to common HR tasks.</p>
               </div>
 
               <div className="space-y-3">
@@ -276,57 +291,57 @@ export default function AdminDashboardPage() {
                     setIsAddModalOpen(true);
                   }}
                   aria-label="Add New Employee"
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group cursor-pointer"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-surface-main/60 hover:bg-surface-main border border-line-subtle hover:border-brand-subtle transition-all duration-200 text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] rounded-lg border border-[var(--color-brand-subtle)] group-hover:bg-[var(--color-brand-accent)] group-hover:text-white transition-all duration-200">
+                    <div className="p-2.5 bg-brand-subtle text-brand-accent rounded-lg border border-brand-subtle group-hover:bg-brand-accent group-hover:text-white transition-all duration-200">
                       <UserPlus className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-xs text-[var(--color-content-main)] block">Add New Employee</span>
-                      <span className="text-[11px] text-[var(--color-content-secondary)]">Register new directory profiles</span>
+                      <span className="font-semibold text-xs text-content-main block">Add New Employee</span>
+                      <span className="text-[11px] text-content-secondary">Register new directory profiles</span>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-4 h-4 text-content-muted group-hover:text-content-secondary group-hover:translate-x-0.5 transition" />
                 </button>
 
                 <Link
                   href="/admin/leaves"
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-surface-main/60 hover:bg-surface-main border border-line-subtle hover:border-brand-subtle transition-all duration-200 text-left group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-100 group-hover:bg-amber-500 group-hover:text-white transition-all duration-200">
                       <Clock className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-xs text-[var(--color-content-main)] block">Manage Leave Requests</span>
-                      <span className="text-[11px] text-[var(--color-content-secondary)]">Approve or deny applications</span>
+                      <span className="font-semibold text-xs text-content-main block">Manage Leave Requests</span>
+                      <span className="text-[11px] text-content-secondary">Approve or deny applications</span>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-4 h-4 text-content-muted group-hover:text-content-secondary group-hover:translate-x-0.5 transition" />
                 </Link>
 
                 <Link
                   href="/admin/payslips"
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--color-surface-main)]/60 hover:bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] hover:border-[var(--color-brand-subtle)] transition-all duration-200 text-left group"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl bg-surface-main/60 hover:bg-surface-main border border-line-subtle hover:border-brand-subtle transition-all duration-200 text-left group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-200">
                       <FileSpreadsheet className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="font-semibold text-xs text-[var(--color-content-main)] block">Review Salary Payslips</span>
-                      <span className="text-[11px] text-[var(--color-content-secondary)]">Dispatch salary and tax records</span>
+                      <span className="font-semibold text-xs text-content-main block">Review Salary Payslips</span>
+                      <span className="text-[11px] text-content-secondary">Dispatch salary and tax records</span>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[var(--color-content-muted)] group-hover:text-[var(--color-content-secondary)] group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-4 h-4 text-content-muted group-hover:text-content-secondary group-hover:translate-x-0.5 transition" />
                 </Link>
               </div>
 
-              <div className="pt-4 border-t border-[var(--color-line-subtle)] text-center">
-                <span className="text-xs text-[var(--color-content-muted)]">
+              <div className="pt-4 border-t border-line-subtle text-center">
+                <span className="text-xs text-content-muted">
                   Need help? Read the{" "}
-                  <a href="#" className="text-[var(--color-brand-accent)] hover:text-[var(--color-brand-hover)] hover:underline transition">
+                  <a href="#" className="text-brand-accent hover:text-brand-hover hover:underline transition">
                     HR Playbook
                   </a>
                 </span>

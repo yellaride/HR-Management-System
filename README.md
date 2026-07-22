@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HR Management System
 
-## Getting Started
+Production HR portal built with Next.js (App Router), MongoDB (Mongoose) and NextAuth.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Admin portal**: employee directory, attendance timesheets (shift rules, grace period, auto check-out, monthly locking), leave approvals with balance tracking, leave policies (global + per-employee), payslip generation with versioning and PDF download, birthday tracker with automated emails, activity log, company settings.
+- **Employee portal**: check-in/check-out, attendance history, leave requests with live balances, payslip downloads, profile management (Cloudinary photos), birthday greeting.
+- **Auth**: NextAuth (JWT credentials), role-based access (`admin` / `employee`), tokenVersion-based global session invalidation, password reset via Resend email.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Next.js 16 (App Router) + React 19 + TypeScript (strict)
+- MongoDB Atlas via Mongoose
+- NextAuth v4 (credentials + JWT)
+- Tailwind CSS v4
+- Cloudinary (profile photos), Resend (transactional email)
+- Vercel cron (`vercel.json`) for daily birthday emails
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup
 
-## Learn More
+1. `npm install`
+2. Copy `.env.example` to `.env` and fill in all values.
+3. `npm run dev`
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `npm run dev` — development server
+- `npm run build` — production build
+- `npm start` — run production build
+- `npm run lint` — ESLint
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment (Vercel)
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push to GitHub and import the repo in Vercel.
+2. Set all environment variables from `.env.example` in Vercel Project Settings (set `NEXTAUTH_URL` to your production domain).
+3. The birthday cron (`/api/admin/birthdays/cron`, daily 04:00 UTC = 09:00 PKT) registers automatically; Vercel sends `Authorization: Bearer $CRON_SECRET` with each invocation.
+4. In MongoDB Atlas allow network access for Vercel (0.0.0.0/0) and enable backups.

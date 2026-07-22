@@ -23,10 +23,10 @@ export default function StandardWorkingHoursSettings({
       <span className="field-label block">Standard Working Hours</span>
 
       {!isEditing ? (
-        <div className="text-sm font-semibold text-[var(--color-content-main)] flex items-center gap-2 mt-0.5">
-          <Clock className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
+        <div className="text-sm font-semibold text-content-main flex items-center gap-2 mt-0.5">
+          <Clock className="w-3.5 h-3.5 text-content-muted" />
           {typeof value === "number" ? value : 0}
-          <span className="text-xs font-medium text-[var(--color-content-secondary)]">hours / year</span>
+          <span className="text-xs font-medium text-content-secondary">hours / year</span>
         </div>
       ) : (
         <div className="flex items-center gap-2 mt-0.5">
@@ -52,7 +52,7 @@ export default function StandardWorkingHoursSettings({
 
             className="form-input text-xs"
           />
-          <span className="text-xs font-medium text-[var(--color-content-secondary)]">hours / year</span>
+          <span className="text-xs font-medium text-content-secondary">hours / year</span>
         </div>
       )}
     </div>

@@ -81,10 +81,10 @@ export default function BirthdayCelebrationsCard({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="font-bold text-xs text-[var(--color-content-main)] block truncate">
+                <span className="font-bold text-xs text-content-main block truncate">
                   {emp.name}
                 </span>
-                <span className="text-[10px] text-[var(--color-content-secondary)] block truncate">
+                <span className="text-[10px] text-content-secondary block truncate">
                   {emp.designation || "Team Member"} •
                   <span className="font-semibold text-brand-accent">{emp.department || "General"}</span>
                 </span>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { CheckSquare, Calendar, FileText, Heart, User, Clock } from "lucide-react";
+import { CheckSquare, Calendar, FileText, Heart, User } from "lucide-react";
 
 interface Activity {
   _id: string;

@@ -3,12 +3,18 @@ import connectDB from "@/lib/mongodb";
 import User from "@/modals/User";
 import { Employee } from "@/modals/Employee";
 import CompanyDetails from "@/modals/CompanyDetails"; 
+import { getAdminUser } from "@/lib/auth";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
     const { id } = await params;
     const body = await request.json();
@@ -105,9 +111,10 @@ export async function PUT(
       employee: updatedEmployee,
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Profile update error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "";
+    return NextResponse.json({ error: message || "Internal Server Error" }, { status: 500 });
   }
 }
 export async function DELETE(
@@ -115,6 +122,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> } // Typed as Promise in Next.js 15
 ) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
     const { id } = await params; // Awaited in Next.js 15
 
@@ -136,8 +148,9 @@ export async function DELETE(
       message: "Employee profile and system credentials deleted successfully" 
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Profile deletion error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "";
+    return NextResponse.json({ error: message || "Internal Server Error" }, { status: 500 });
   }
 }

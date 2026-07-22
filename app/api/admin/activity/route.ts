@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
+import { getAdminUser } from "@/lib/auth";
 
 // Helper to translate database activityType values into frontend category types
 const mapActivityTypeToFrontendType = (activityType: string): string => {
@@ -24,6 +25,11 @@ const mapActivityTypeToFrontendType = (activityType: string): string => {
 
 export async function GET(request: Request) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await connectDB();
     const { searchParams } = new URL(request.url);
     const typeFilter = searchParams.get("type") || "all";
@@ -32,14 +38,14 @@ export async function GET(request: Request) {
     // 1. Resolve user ID mappings if searching by name
     let matchingUserIds: string[] = [];
     if (searchQuery) {
-      const matchingEmployees = await Employee.find({
+      const matchingEmployees = (await Employee.find({
         name: { $regex: searchQuery, $options: "i" }
-      }).select("_id").lean();
-      matchingUserIds = matchingEmployees.map((emp: any) => emp._id.toString());
+      }).select("_id").lean()) as unknown as Array<{ _id: { toString(): string } }>;
+      matchingUserIds = matchingEmployees.map((emp) => emp._id.toString());
     }
 
     // 2. Build Database Query mapping actual database attributes
-    const dbQuery: Record<string, any> = {};
+    const dbQuery: Record<string, unknown> = {};
 
     if (typeFilter !== "all") {
       if (typeFilter === "attendance") {
@@ -54,13 +60,14 @@ export async function GET(request: Request) {
     }
 
     if (searchQuery) {
-      dbQuery.$or = [
+      const orConditions: Record<string, unknown>[] = [
         { description: { $regex: searchQuery, $options: "i" } },
         { activityType: { $regex: searchQuery, $options: "i" } }
       ];
       if (matchingUserIds.length > 0) {
-        dbQuery.$or.push({ userId: { $in: matchingUserIds } });
+        orConditions.push({ userId: { $in: matchingUserIds } });
       }
+      dbQuery.$or = orConditions;
     }
 
     const dbLogs = await ActivityLog.find(dbQuery)
@@ -69,14 +76,20 @@ export async function GET(request: Request) {
       .lean();
 
     // 3. Retrieve all employees to map activityLog.userId to employee name + designation
-    const employees = await Employee.find({}).lean();
+    interface LeanEmployee {
+      _id?: { toString(): string };
+      userId?: { toString(): string };
+      name: string;
+      designation: string;
+    }
+    const employees = (await Employee.find({}).lean()) as unknown as LeanEmployee[];
 
     const employeeIdToName = new Map<string, string>();
     const employeeIdToDesignation = new Map<string, string>();
     const authUserIdToName = new Map<string, string>();
     const authUserIdToDesignation = new Map<string, string>();
 
-    employees.forEach((emp: any) => {
+    employees.forEach((emp) => {
       const empId = emp._id?.toString();
       const authUserId = emp.userId?.toString();
       if (empId) {
@@ -90,7 +103,14 @@ export async function GET(request: Request) {
     });
 
     // 4. Normalize logs so they have the proper structure the React frontend expects
-    const logsToRender = (dbLogs || []).map((log: any) => {
+    interface LeanActivityLog {
+      _id: { toString(): string };
+      userId?: string | { toString(): string };
+      description?: string;
+      activityType: string;
+      createdAt?: string | Date;
+    }
+    const logsToRender = ((dbLogs || []) as unknown as LeanActivityLog[]).map((log) => {
       const rawUserId = log.userId;
       const userIdStr = rawUserId?.toString();
 
@@ -118,10 +138,11 @@ export async function GET(request: Request) {
     logsToRender.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json({ logs: logsToRender }, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to fetch activity logs:", error);
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: message || "Internal Server Error" },
       { status: 500 }
     );
   }

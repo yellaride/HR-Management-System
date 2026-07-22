@@ -27,11 +27,11 @@ interface CompanySettingsState {
 }
 
 const swalCustomClass = {
-  popup: "bg-white rounded-2xl border border-[var(--color-line-subtle)] shadow-xl font-sans",
-  title: "text-sm font-bold text-[var(--color-content-main)]",
-  htmlContainer: "text-xs text-[var(--color-content-secondary)]",
+  popup: "bg-white rounded-2xl border border-line-subtle shadow-xl font-sans",
+  title: "text-sm font-bold text-content-main",
+  htmlContainer: "text-xs text-content-secondary",
   confirmButton:
-    "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
+    "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
 };
 
 const Toast = Swal.mixin({
@@ -66,7 +66,6 @@ export default function AdminSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      setLoading(true);
       const res = await fetch("/api/settings/company-settings");
       if (!res.ok) throw new Error("Could not load configurations.");
       const data = await res.json();
@@ -86,12 +85,12 @@ export default function AdminSettingsPage() {
         autoCheckOut: typeof data.autoCheckOut === "boolean" ? data.autoCheckOut : false,
         autoCheckOutTime: data.autoCheckOutTime || "18:00",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       Swal.fire({
         icon: "error",
         title: "Retrieval Failed",
-        text: error?.message || "Could not retrieve system configurations.",
+        text: error instanceof Error ? error.message : "Could not retrieve system configurations.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass,
       });
@@ -101,7 +100,10 @@ export default function AdminSettingsPage() {
   };
 
   useEffect(() => {
-    fetchSettings();
+    async function loadSettings() {
+      fetchSettings();
+    }
+    loadSettings();
   }, []);
 
   const handleUpdateSettings = async (updatedFields: Partial<CompanySettingsState>) => {
@@ -123,12 +125,12 @@ export default function AdminSettingsPage() {
         icon: "success",
         title: "Configuration updated",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       Swal.fire({
         icon: "error",
         title: "Save Failed",
-        text: error?.message || "Verify your connection parameters and try again.",
+        text: error instanceof Error ? error.message : "Verify your connection parameters and try again.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass,
       });
@@ -163,9 +165,9 @@ export default function AdminSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 bg-[var(--color-surface-main)]">
-        <Loader2 className="w-8 h-8 text-[var(--color-brand-accent)] animate-spin" />
-        <span className="text-sm font-semibold text-[var(--color-content-secondary)]">
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 bg-surface-main">
+        <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
+        <span className="text-sm font-semibold text-content-secondary">
           Retrieving configuration parameters...
         </span>
       </div>
@@ -173,11 +175,11 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface-main)] text-[var(--color-content-main)] antialiased ">
+    <div className="min-h-screen bg-surface-main text-content-main antialiased ">
       <div className=" w-full space-y-6 ">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-[var(--color-content-main)]">System Settings</h1>
-          <p className="mt-1 text-xs text-[var(--color-content-secondary)]">
+          <h1 className="text-2xl font-black tracking-tight text-content-main">System Settings</h1>
+          <p className="mt-1 text-xs text-content-secondary">
             Configure company attributes, structural departments, work timing constraints, and account security.
           </p>
         </div>

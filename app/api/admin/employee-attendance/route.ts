@@ -4,8 +4,18 @@ import { Attendance } from "@/modals/Attendance";
 import { Employee } from "@/modals/Employee";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import CompanyDetails from "@/modals/CompanyDetails";
+import { getAdminUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+
+// Company settings fields consumed by the attendance calculations in this route
+interface AttendanceSettings {
+  shiftStart?: string;
+  shiftEnd?: string;
+  gracePeriod?: number;
+  autoCheckOut?: boolean;
+  autoCheckOutTime?: string;
+}
 
 function timeToMinutes(timeStr: string): number {
   if (!timeStr) return 0;
@@ -129,7 +139,7 @@ async function syncMonthlyAttendanceAggregates(userId: string, year: number, mon
  * Automatically checks out employees who have check-ins but are missing check-outs,
  * given that the autoCheckOut setting is enabled and the appropriate threshold has passed.
  */
-async function runAutoCheckOutIfNeeded(date: string, settings: any) {
+async function runAutoCheckOutIfNeeded(date: string, settings: AttendanceSettings) {
   if (!settings?.autoCheckOut) return;
 
   const serverTime = new Date();
@@ -201,6 +211,11 @@ async function runAutoCheckOutIfNeeded(date: string, settings: any) {
 
 export async function GET(request: Request) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await dbConnect();
     const { searchParams } = new URL(request.url);
 
@@ -216,9 +231,10 @@ export async function GET(request: Request) {
     // CASE A: Fetch History & Monthly aggregations for drilldown
     if (userId) {
       // Evaluate past logs and ensure historical runs are up to date before fetching
-      const settings = await getActiveSettings();
-      
-      let query: any = { userId };
+      // (getActiveSettings creates the CompanyDetails doc if missing, so the call must stay)
+      await getActiveSettings();
+
+      const query: Record<string, unknown> = { userId };
 
       if (period === "this-month") {
         const monthStr = String(currentMonth).padStart(2, "0");
@@ -292,7 +308,8 @@ export async function GET(request: Request) {
     const shiftEnd = settings?.shiftEnd || "20:00";
     const shiftTimeLabel = `${shiftStart}-${shiftEnd}`;
 
-    const enrichedEmployees = (employees || []).map((e: any) => ({
+    type LeanEmployeeDoc = Record<string, unknown> & { shiftTime?: string };
+    const enrichedEmployees = ((employees || []) as LeanEmployeeDoc[]).map((e) => ({
       ...e,
       shiftTime: e?.shiftTime || shiftTimeLabel,
     }));
@@ -305,7 +322,7 @@ export async function GET(request: Request) {
       companySettings: settings
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Attendance API GET Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
@@ -313,6 +330,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const admin = await getAdminUser();
+    if (!admin) {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
     await dbConnect();
     const body = await request.json();
 
@@ -348,13 +370,13 @@ export async function POST(request: Request) {
     const calculations = computeDailyShiftsAndHours(checkInDate, checkOutDate, settings);
     const finalStatus = status ? status : calculations.status;
 
-    const updatePayload: any = {
+    const updatePayload: Record<string, unknown> = {
       userId,
       date,
       status: finalStatus,
     };
 
-    const updateQuery: any = {};
+    const updateQuery: Record<string, unknown> = {};
 
     if (finalStatus === "Absent") {
       updatePayload.workingHours = 0;
@@ -386,7 +408,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, record: updatedRecord }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Attendance API POST Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

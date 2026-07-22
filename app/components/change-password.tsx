@@ -100,20 +100,20 @@ export default function ChangePasswordSettings({
   };
 
   return (
-    <div className="bg-[var(--color-surface-card)] border border-[var(--color-line-subtle)] rounded-2xl shadow-sm overflow-hidden max-w-xl w-full">
+    <div className="bg-surface-card border border-line-subtle rounded-2xl shadow-sm overflow-hidden max-w-xl w-full">
       {/* Header Container */}
-      <div className="px-6 py-5 border-b border-[var(--color-line-subtle)] bg-slate-50/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="px-6 py-5 border-b border-line-subtle bg-slate-50/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-sm font-bold text-[var(--color-content-main)] flex items-center gap-2">
-            <Lock className="w-4 h-4 text-[var(--color-brand-accent)]" />
+          <h2 className="text-sm font-bold text-content-main flex items-center gap-2">
+            <Lock className="w-4 h-4 text-brand-accent" />
             <span>Update Security Password</span>
           </h2>
-          <p className="text-xs text-[var(--color-content-secondary)]">
+          <p className="text-xs text-content-secondary">
             Keep your account secure by modifying your login credentials periodically.
           </p>
         </div>
 
-        <span className="inline-flex self-start text-[10px] font-extrabold px-3 py-1 rounded-2xl border tracking-wide uppercase bg-[var(--color-brand-subtle)]/70 border-[var(--color-brand-accent)]/20 text-[var(--color-brand-accent)]">
+        <span className="inline-flex self-start text-[10px] font-extrabold px-3 py-1 rounded-2xl border tracking-wide uppercase bg-brand-subtle/70 border-brand-accent/20 text-brand-accent">
           {roleLabel}
         </span>
       </div>
@@ -130,9 +130,9 @@ export default function ChangePasswordSettings({
             }`}
           >
             {statusMessage.type === "success" ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-500 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
             )}
             <span className="leading-relaxed">{statusMessage.text}</span>
           </div>
@@ -152,7 +152,7 @@ export default function ChangePasswordSettings({
             inputClassName="form-input"
           />
 
-          <hr className="border-[var(--color-line-subtle)] my-2" />
+          <hr className="border-line-subtle my-2" />
 
           {/* New Password Field */}
           <PasswordInputWithToggle
@@ -167,8 +167,8 @@ export default function ChangePasswordSettings({
 
           {/* Live Requirements Helper Panel */}
           {passwordForm.newPassword && (
-            <div className="p-3 bg-[var(--color-surface-main)] border border-[var(--color-line-subtle)] rounded-xl space-y-1.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--color-content-muted)]">
+            <div className="p-3 bg-surface-main border border-line-subtle rounded-xl space-y-1.5">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-content-muted">
                 Security Criteria
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px]">
@@ -178,7 +178,7 @@ export default function ChangePasswordSettings({
                   ) : (
                     <X className="w-3.5 h-3.5 text-slate-400" />
                   )}
-                  <span className={checks.length ? "text-[var(--color-content-secondary)]" : "text-[var(--color-content-muted)]"}>
+                  <span className={checks.length ? "text-content-secondary" : "text-content-muted"}>
                     Min 8 characters
                   </span>
                 </div>
@@ -189,7 +189,7 @@ export default function ChangePasswordSettings({
                   ) : (
                     <X className="w-3.5 h-3.5 text-slate-400" />
                   )}
-                  <span className={checks.number ? "text-[var(--color-content-secondary)]" : "text-[var(--color-content-muted)]"}>
+                  <span className={checks.number ? "text-content-secondary" : "text-content-muted"}>
                     At least 1 number
                   </span>
                 </div>
@@ -200,7 +200,7 @@ export default function ChangePasswordSettings({
                   ) : (
                     <X className="w-3.5 h-3.5 text-slate-400" />
                   )}
-                  <span className={checks.specialChar ? "text-[var(--color-content-secondary)]" : "text-[var(--color-content-muted)]"}>
+                  <span className={checks.specialChar ? "text-content-secondary" : "text-content-muted"}>
                     1 special char
                   </span>
                 </div>
@@ -221,11 +221,11 @@ export default function ChangePasswordSettings({
         </div>
 
         {/* Submit Actions Button */}
-        <div className="pt-4 border-t border-[var(--color-line-subtle)] flex justify-end">
+        <div className="pt-4 border-t border-line-subtle flex justify-end">
           <button
             type="submit"
             disabled={loading || !isFormValid}
-            className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-main)]"
+            className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none bg-brand-accent hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 focus:ring-offset-surface-main"
           >
             {loading ? (
               <>

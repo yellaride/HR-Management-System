@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { Employee } from "@/modals/Employee"; // Preserving exact model path
 import { v2 as cloudinary } from "cloudinary";
 
@@ -49,7 +49,20 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const employee = (await Employee.findOne({ userId }).lean()) as any;
+    interface LeanEmployeeProfile {
+      fullName?: string;
+      name?: string;
+      profilePhotoUrl?: string;
+      phoneNumber?: string;
+      address?: string;
+      dateOfBirth?: Date | null;
+      gender?: string;
+      maritalStatus?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
+      updatedAt?: Date;
+    }
+    const employee = (await Employee.findOne({ userId }).lean()) as LeanEmployeeProfile | null;
 
     if (!employee) {
       return NextResponse.json({ error: "Employee profile not found" }, { status: 404 });
@@ -74,9 +87,10 @@ export async function GET() {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: "Internal Server Error", details: error?.message || String(error) },
+      { error: "Internal Server Error", details: message || String(error) },
       { status: 500 }
     );
   }
@@ -177,9 +191,10 @@ export async function PUT(request: Request) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: "Internal Server Error", details: error?.message || String(error) },
+      { error: "Internal Server Error", details: message || String(error) },
       { status: 500 }
     );
   }

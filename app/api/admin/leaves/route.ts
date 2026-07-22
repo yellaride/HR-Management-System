@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import mongoose from "mongoose";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import Leave from "@/modals/LeaveRequest";
 import LeaveBalance from "@/modals/LeaveBalance";
 import { Employee } from "@/modals/Employee";
@@ -10,10 +10,38 @@ import { ActivityLog } from "@/modals/ActivityLog";
 
 type TrackedLeaveType = "ANNUAL" | "SICK" | "CASUAL";
 
-function formatDateString(value: any): string {
+type LeaveBalanceEntry = { allocated?: number; used?: number; remaining?: number };
+type LeanLeaveBalance = Partial<Record<TrackedLeaveType, LeaveBalanceEntry>>;
+
+// Shape of the lean Leave docs read by this route
+interface LeanLeave {
+  _id: unknown;
+  userId?: string | mongoose.Types.ObjectId;
+  type?: string;
+  status?: string;
+  startDate?: unknown;
+  endDate?: unknown;
+  days?: number;
+  reason?: string;
+  employeeName?: string;
+  designation?: string;
+}
+
+// Shape of the lean Employee doc fields read by this route
+interface LeanEmployeeInfo {
+  name?: string;
+  designation?: string;
+  profilePhotoUrl?: string;
+  profilePhotoURL?: string;
+  profilePicture?: string;
+  image?: string;
+  picture?: string;
+}
+
+function formatDateString(value: unknown): string {
   if (!value) return "";
   try {
-    const d = new Date(value);
+    const d = new Date(value as string | number | Date);
     if (isNaN(d.getTime())) {
       return String(value).split("T")[0] || "";
     }
@@ -28,7 +56,7 @@ export async function GET() {
   try {
     await connectDB();
     const session = await getServerSession(authOptions);
-    const currentUser = session?.user as any;
+    const currentUser = session?.user;
 
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
@@ -53,17 +81,17 @@ export async function GET() {
       .lean();
 
     const formatted = await Promise.all(
-      leaves.map(async (leave: any) => {
+      (leaves as unknown as LeanLeave[]).map(async (leave) => {
         // Safe ObjectId resolution to prevent casting crashes
-        let employeeDoc = null;
+        let employeeDoc: LeanEmployeeInfo | null = null;
         if (leave.userId && mongoose.Types.ObjectId.isValid(leave.userId)) {
-          employeeDoc = await Employee.findOne({ userId: new mongoose.Types.ObjectId(leave.userId) }).lean() as any;
+          employeeDoc = await Employee.findOne({ userId: new mongoose.Types.ObjectId(leave.userId) }).lean() as LeanEmployeeInfo | null;
         } else {
-          employeeDoc = await Employee.findOne({ userId: leave.userId }).lean() as any;
+          employeeDoc = await Employee.findOne({ userId: leave.userId }).lean() as LeanEmployeeInfo | null;
         }
 
         const balanceDoc = await LeaveBalance.findOne({ userId: leave.userId }).lean();
-        const balance = balanceDoc as any; 
+        const balance = balanceDoc as LeanLeaveBalance | null; 
 
         const rawType = String(leave.type || "").toUpperCase();
         const rawStatus = String(leave.status || "PENDING").toUpperCase();
@@ -83,9 +111,10 @@ export async function GET() {
         else if (isCasual) matchedKey = "CASUAL";
 
         // Query balances only if the leave is of a tracked paid type
-        if (matchedKey && balance && balance[matchedKey]) {
-          totalLeaves = Number(balance[matchedKey].allocated ?? 15);
-          usedLeaves = Number(balance[matchedKey].used ?? 0);
+        const trackedBalance = matchedKey && balance ? balance[matchedKey] : undefined;
+        if (trackedBalance) {
+          totalLeaves = Number(trackedBalance.allocated ?? 15);
+          usedLeaves = Number(trackedBalance.used ?? 0);
           remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
         }
 
@@ -140,7 +169,7 @@ export async function PUT(req: Request) {
   try {
     await connectDB();
     const session = await getServerSession(authOptions);
-    const currentUser = session?.user as any;
+    const currentUser = session?.user;
 
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
@@ -182,17 +211,18 @@ export async function PUT(req: Request) {
       // Prevents "UNPAID" leaves (or variations like "UNPAID LEAVE") from corrupting and refunding casual leaves
       if (currentStatus !== "REJECTED" && !leaveType.includes("UNPAID")) {
         const balanceDoc = await LeaveBalance.findOne({ userId: leaveRequest.userId });
-        const balance = balanceDoc as any; 
+        const balance = balanceDoc as LeanLeaveBalance | null; 
         
         const matchedKey = leaveType.includes("ANNUAL") ? "ANNUAL" : 
                            leaveType.includes("SICK") ? "SICK" : "CASUAL";
 
-        if (balance && balance[matchedKey]) {
-          const currentUsed = Number(balance[matchedKey].used || 0);
-          balance[matchedKey].used = Math.max(0, currentUsed - Number(leaveRequest.days || 0));
+        const balanceEntry = balance ? balance[matchedKey] : undefined;
+        if (balanceEntry) {
+          const currentUsed = Number(balanceEntry.used || 0);
+          balanceEntry.used = Math.max(0, currentUsed - Number(leaveRequest.days || 0));
           
-          const allocated = Number(balance[matchedKey].allocated ?? 0);
-          balance[matchedKey].remaining = Math.max(0, allocated - balance[matchedKey].used);
+          const allocated = Number(balanceEntry.allocated ?? 0);
+          balanceEntry.remaining = Math.max(0, allocated - balanceEntry.used);
 
           balanceDoc.markModified(matchedKey);
           await balanceDoc.save();

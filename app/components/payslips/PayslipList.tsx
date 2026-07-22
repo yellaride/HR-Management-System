@@ -8,6 +8,7 @@ import { downloadPayslipPdf, PayslipRecord } from "./payslipPdf";
 export interface ExtendedPayslipRecord extends PayslipRecord {
   status?: string;
   version?: string;
+  Version?: string; // legacy capitalized variant from older records
 }
 
 export interface CompanyDetailsData {
@@ -16,7 +17,11 @@ export interface CompanyDetailsData {
   email?: string;
   phone?: string;
   logo?: string;
-  [key: string]: any;
+  companyName?: string;
+  location?: string;
+  brandAccent?: string;
+  brand_accent?: string;
+  [key: string]: unknown;
 }
 
 interface PayslipListProps {
@@ -36,10 +41,10 @@ interface PayslipListProps {
 }
 
 const swalCustomClass = {
-  popup: "bg-white rounded-2xl border border-[var(--color-line-subtle)] shadow-xl font-sans",
-  title: "text-sm font-bold text-[var(--color-content-main)]",
-  htmlContainer: "text-xs text-[var(--color-content-secondary)]",
-  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-[var(--color-brand-accent)] hover:bg-[var(--color-brand-hover)] border-none outline-none cursor-pointer transition",
+  popup: "bg-white rounded-2xl border border-line-subtle shadow-xl font-sans",
+  title: "text-sm font-bold text-content-main",
+  htmlContainer: "text-xs text-content-secondary",
+  confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
 };
 
 // Declaring ": React.JSX.Element" tells TypeScript this function must return JSX
@@ -109,13 +114,13 @@ export default function PayslipList({
   return (
     <div className="table-card">
       {/* Header Panel */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-line-subtle)] bg-[var(--color-surface-main)]/60">
-        <div className="text-xs font-bold text-[var(--color-content-main)] tracking-wide uppercase">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-line-subtle bg-surface-main/60">
+        <div className="text-xs font-bold text-content-main tracking-wide uppercase">
           {title}
         </div>
 
         {!showAdminControls && (
-          <div className="inline-flex items-center gap-1.5 text-[var(--color-content-secondary)] text-[11px] font-semibold">
+          <div className="inline-flex items-center gap-1.5 text-content-secondary text-[11px] font-semibold">
             <span>{payslips.length} records</span>
           </div>
         )}
@@ -132,7 +137,7 @@ export default function PayslipList({
               {showDetailedBreakdown && (
                 <>
                   <th className="px-6 py-4 text-right text-emerald-600">Allowances</th>
-                  <th className="px-6 py-4 text-right text-[var(--color-brand-accent)]">Bonus</th>
+                  <th className="px-6 py-4 text-right text-brand-accent">Bonus</th>
                   <th className="px-6 py-4 text-right text-rose-600">Deductions</th>
                 </>
               )}
@@ -145,21 +150,21 @@ export default function PayslipList({
               <th className="px-6 py-4 text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--color-line-subtle)] text-[var(--color-content-secondary)] text-xs">
+          <tbody className="divide-y divide-line-subtle text-content-secondary text-xs">
             {isLoading ? (
               <tr>
-                <td colSpan={totalColumns} className="px-6 py-12 text-center text-[var(--color-content-muted)]">
+                <td colSpan={totalColumns} className="px-6 py-12 text-center text-content-muted">
                   <div className="flex flex-col items-center justify-center gap-3">
-                    <div className="w-6 h-6 border-2 border-[var(--color-brand-accent)] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
                     <span className="font-medium">Loading payroll records...</span>
                   </div>
                 </td>
               </tr>
             ) : payslips.length === 0 ? (
               <tr>
-                <td colSpan={totalColumns} className="px-6 py-12 text-center text-[var(--color-content-muted)]">
+                <td colSpan={totalColumns} className="px-6 py-12 text-center text-content-muted">
                   <div className="flex flex-col items-center justify-center gap-2">
-                    <AlertCircle className="w-6 h-6 text-[var(--color-content-muted)]/60" />
+                    <AlertCircle className="w-6 h-6 text-content-muted/60" />
                     <span className="font-medium">{emptyMessage}</span>
                   </div>
                 </td>
@@ -185,17 +190,17 @@ export default function PayslipList({
                         <div className="flex items-center gap-3">
                           {(() => {
                             const imageUrl =
-                              (employeeObj as any)?.profilePhotoUrl ||
-                              (employeeObj as any)?.profilePhotoURL ||
-                              (employeeObj as any)?.profilePhoto ||
-                              (employeeObj as any)?.image ||
-                              (employeeObj as any)?.picture ||
-                              (employeeObj as any)?.profilePicture ||
-                              (employeeObj as any)?.profilePic;
+                              employeeObj?.profilePhotoUrl ||
+                              employeeObj?.profilePhotoURL ||
+                              employeeObj?.profilePhoto ||
+                              employeeObj?.image ||
+                              employeeObj?.picture ||
+                              employeeObj?.profilePicture ||
+                              employeeObj?.profilePic;
 
                             if (typeof imageUrl === "string" && imageUrl.trim()) {
                               return (
-                                <div className="w-9 h-9 rounded-xl bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border border-[var(--color-line-subtle)] overflow-hidden">
+                                <div className="w-9 h-9 rounded-xl bg-brand-subtle text-brand-accent border border-line-subtle overflow-hidden">
                                   <img
                                     src={imageUrl}
                                     alt={employeeName}
@@ -211,27 +216,27 @@ export default function PayslipList({
                             }
 
                             return (
-                              <div className="w-9 h-9 rounded-xl bg-[var(--color-brand-subtle)] text-[var(--color-brand-accent)] border border-[var(--color-line-subtle)] flex items-center justify-center font-bold text-[11px]">
+                              <div className="w-9 h-9 rounded-xl bg-brand-subtle text-brand-accent border border-line-subtle flex items-center justify-center font-bold text-[11px]">
                                 {initials}
                               </div>
                             );
                           })()}
                           <div>
-                            <span className="font-bold text-[var(--color-content-main)] block leading-tight">{employeeName}</span>
-                            <span className="text-[10px] text-[var(--color-content-muted)] font-medium mt-0.5 block">{employeeRole}</span>
+                            <span className="font-bold text-content-main block leading-tight">{employeeName}</span>
+                            <span className="text-[10px] text-content-muted font-medium mt-0.5 block">{employeeRole}</span>
                           </div>
                         </div>
                       </td>
                     )}
 
                     <td className="px-6 py-4">
-                      <span className="font-semibold text-[var(--color-content-main)] flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-[var(--color-content-muted)]" />
+                      <span className="font-semibold text-content-main flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-content-muted" />
                         {slip.period}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 text-right font-semibold text-[var(--color-content-secondary)]">
+                    <td className="px-6 py-4 text-right font-semibold text-content-secondary">
                       {formatCurrency ? formatCurrency(slip.basicSalary) : slip.basicSalary}
                     </td>
 
@@ -240,7 +245,7 @@ export default function PayslipList({
                         <td className="px-6 py-4 text-right font-semibold text-emerald-600">
                           {formatCurrency ? formatCurrency(slip.allowances || 0) : (slip.allowances || 0)}
                         </td>
-                        <td className="px-6 py-4 text-right font-semibold text-[var(--color-brand-accent)]">
+                        <td className="px-6 py-4 text-right font-semibold text-brand-accent">
                           {formatCurrency ? formatCurrency(slip.bonus || 0) : (slip.bonus || 0)}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold text-rose-600">
@@ -249,20 +254,20 @@ export default function PayslipList({
                       </>
                     )}
 
-                    <td className="px-6 py-4 text-right font-extrabold text-[var(--color-content-main)]">
-                      <span className="text-[var(--color-brand-accent)]">
+                    <td className="px-6 py-4 text-right font-extrabold text-content-main">
+                      <span className="text-brand-accent">
                         {formatCurrency ? formatCurrency(slip.netPay) : slip.netPay}
                       </span>
                     </td>
 
                     {showVersion && (
                       <td className="px-6 py-4 text-center">
-                        {String((slip as any).version ?? (slip as any).Version ?? "").trim() ? (
-                          <span className="font-bold text-[var(--color-content-secondary)]">
-                            {String((slip as any).version ?? (slip as any).Version)}
+                        {String(slip.version ?? slip.Version ?? "").trim() ? (
+                          <span className="font-bold text-content-secondary">
+                            {String(slip.version ?? slip.Version)}
                           </span>
                         ) : (
-                          <span className="text-[var(--color-content-muted)]">-</span>
+                          <span className="text-content-muted">-</span>
                         )}
                       </td>
                     )}
@@ -294,13 +299,13 @@ export default function PayslipList({
                         disabled={isCurrentlyDownloading}
                         className={`btn-table-download ${
                           isCurrentlyDownloading
-                            ? "bg-[var(--color-surface-main)] text-[var(--color-content-muted)] border-[var(--color-line-subtle)] cursor-not-allowed"
-                            : "bg-[var(--color-brand-subtle)] hover:bg-[var(--color-brand-accent)] hover:text-white text-[var(--color-brand-accent)] border-[var(--color-brand-subtle)] cursor-pointer"
+                            ? "bg-surface-main text-content-muted border-line-subtle cursor-not-allowed"
+                            : "bg-brand-subtle hover:bg-brand-accent hover:text-white text-brand-accent border-brand-subtle cursor-pointer"
                         }`}
                       >
                         {isCurrentlyDownloading ? (
                           <>
-                            <div className="w-3.5 h-3.5 border-2 border-[var(--color-content-muted)] border-t-transparent rounded-full animate-spin" />
+                            <div className="w-3.5 h-3.5 border-2 border-content-muted border-t-transparent rounded-full animate-spin" />
                             <span>Compiling...</span>
                           </>
                         ) : (
