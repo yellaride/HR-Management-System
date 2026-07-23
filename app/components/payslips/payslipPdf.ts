@@ -1,5 +1,3 @@
-
-
 // Populated employee sub-document (may carry any of several photo field names)
 export interface PayslipEmployee {
   _id?: string;
@@ -55,7 +53,7 @@ function hexToRgb(hex: string): [number, number, number] {
     const b = parseInt(cleaned.slice(4, 6), 16);
     return [r, g, b];
   }
-  return [124, 58, 237]; // default: #7c3aed
+  return [37, 99, 235]; // default: #2563eb (var(--color-brand-accent))
 }
 
 export async function downloadPayslipPdf({
@@ -63,7 +61,7 @@ export async function downloadPayslipPdf({
   employeeName,
   employeeRole,
   formatCurrency = defaultFormatCurrency,
-  companyDetails, // <-- Pass database retrieved data down
+  companyDetails, // Pass database retrieved data down
 }: {
   slip: PayslipRecord;
   employeeName: string;
@@ -88,32 +86,25 @@ export async function downloadPayslipPdf({
   });
 
   // Prefer DB override, else fallback to global token value.
-  // Global CSS token: --color-brand-accent: #7c3aed
-  const brandAccentHex = companyDetails?.brandAccent || companyDetails?.brand_accent || "#7c3aed";
+  // Global CSS token: --color-brand-accent: #2563eb
+  const brandAccentHex =
+    companyDetails?.brandAccent ||
+    companyDetails?.brand_accent ||
+    "#2563eb";
 
   const primaryColor = hexToRgb(brandAccentHex);
-  // Keep other theme-neutral colors stable (can be extended later).
   const darkColor = [15, 23, 42];
   const lightColor = [248, 250, 252];
   const grayColor = [100, 116, 139];
   const borderColor = [226, 232, 240];
 
-
-  // Map database details with fallbacks in case DB properties are blank
+  // Map database details with fallbacks
   const companyNameRaw = companyDetails?.companyName || "Corporate Hub";
-  // Preserve casing from DB (the PDF should not force lowercase/uppercase).
-  // If you store "syncup" in DB and want "Syncup" display, fix the value in DB
-  // or implement a smarter casing rule here.
   const companyName = companyNameRaw;
 
   const companyAddress = companyDetails?.location || "Office Headquarters, Pakistan";
   const companyEmail = companyDetails?.email || "hr@company.com";
   const companyPhone = companyDetails?.phone || "N/A";
-
-
-
-
-
 
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(20);
@@ -126,9 +117,7 @@ export async function downloadPayslipPdf({
   doc.text(companyAddress, 20, 31);
   doc.text(`${companyEmail} | ${companyPhone}`, 20, 36);
 
-
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-
   doc.setLineWidth(0.5);
   doc.line(20, 42, 190, 42);
 

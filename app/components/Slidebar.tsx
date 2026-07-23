@@ -1,18 +1,54 @@
 "use client";
 
-import { useEffect } from "react";
-
+import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
-// Define TypeScript interfaces for structural safety
+/* ── 1. Sidebar Context & Provider ── */
+type SidebarContextValue = {
+  state: "expanded" | "collapsed";
+  toggleSidebar: () => void;
+};
+
+const SidebarContext = createContext<SidebarContextValue | null>(null);
+
+export function useSidebar() {
+  const ctx = useContext(SidebarContext);
+  if (!ctx) throw new Error("useSidebar must be used inside SidebarProvider");
+  return ctx;
+}
+
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+
+  const toggleSidebar = useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (typeof document !== "undefined") {
+        document.cookie = `sidebar_state=${next}; path=/; max-age=${60 * 60 * 24 * 7};`;
+      }
+      return next;
+    });
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      state: open ? ("expanded" as const) : ("collapsed" as const),
+      toggleSidebar,
+    }),
+    [open, toggleSidebar]
+  );
+
+  return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
+}
+
+/* ── 2. Navigation Items Configuration ── */
 interface SidebarProps {
   role?: "admin" | "employee";
 }
 
-// Navigation items with visual SVG icons for both Admin and Employee roles
 const navItems = {
   admin: [
     {
@@ -20,7 +56,7 @@ const navItems = {
       label: "Dashboard",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
         </svg>
       ),
     },
@@ -29,7 +65,7 @@ const navItems = {
       label: "Employees",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
     },
@@ -38,7 +74,7 @@ const navItems = {
       label: "Payslips",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
     },
@@ -47,7 +83,7 @@ const navItems = {
       label: "Leave Manager",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
     },
@@ -56,7 +92,7 @@ const navItems = {
       label: "Leaves Policy",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
     },
@@ -65,8 +101,8 @@ const navItems = {
       label: "Activity",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v8z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 8h10M7 12h6" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v8z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h6" />
         </svg>
       ),
     },
@@ -75,8 +111,8 @@ const navItems = {
       label: "Attendance Record",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 11l3 3L22 4" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 11l3 3L22 4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
         </svg>
       ),
     },
@@ -85,8 +121,8 @@ const navItems = {
       label: "Birthdays",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 22s8-4 8-10V6l-8-4-8 4v6c0 6 8 10 8 10z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 10h.01M15 10h.01" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 22s8-4 8-10V6l-8-4-8 4v6c0 6 8 10 8 10z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10h.01M15 10h.01" />
         </svg>
       ),
     },
@@ -95,12 +131,11 @@ const navItems = {
       label: "Settings",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
     },
-   
   ],
   employee: [
     {
@@ -108,25 +143,17 @@ const navItems = {
       label: "Dashboard",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
         </svg>
       ),
     },
-    {
-      href: "/employee/profile",
-      label: "Profile",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-    },
+    
     {
       href: "/employee/attendance",
       label: "Attendance",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
     },
@@ -135,7 +162,7 @@ const navItems = {
       label: "Leave",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
     },
@@ -144,37 +171,149 @@ const navItems = {
       label: "Payslips",
       icon: (
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+    },
+    {
+      href: "/employee/profile",
+      label: "Profile Settings",
+      icon: (
+        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ),
     },
   ],
 };
 
+/* ── 3. Single Consolidated Brand & User Header Div ── */
+function UnifiedHeaderCard({
+  displayRole,
+  userEmail,
+  onCloseMobile,
+}: {
+  displayRole: string;
+  userEmail: string;
+  onCloseMobile: () => void;
+}) {
+  const { state, toggleSidebar } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  return (
+    <div className="flex items-center justify-between pb-3 border-b border-line-subtle min-h-[48px]">
+      {/* Brand + Email Combined Container */}
+      <div
+        className={
+          isCollapsed
+            ? "group/logo relative size-9 shrink-0 cursor-pointer rounded-xl"
+            : "flex items-center gap-2.5 min-w-0"
+        }
+        {...(isCollapsed
+          ? {
+              role: "button",
+              tabIndex: 0,
+              "aria-label": "Expand sidebar",
+              onClick: toggleSidebar,
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleSidebar();
+                }
+              },
+            }
+          : {})}
+      >
+        {isCollapsed ? (
+          <>
+            {/* Collapsed State: Logo badge swaps to PanelLeftOpen icon on hover */}
+            <div className="size-9 rounded-xl bg-brand-accent flex items-center justify-center font-bold text-white text-xs shadow-xs transition-opacity duration-200 group-hover/logo:opacity-0">
+              S
+            </div>
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover/logo:opacity-100">
+              <PanelLeftOpen className="h-5 w-5 text-brand-accent" strokeWidth={1.75} />
+            </span>
+          </>
+        ) : (
+          /* Expanded State: Clean Logo, Role Badge & Email in One Integrated Section */
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-9 rounded-xl bg-brand-accent flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-xs">
+              S
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-sm text-content-main tracking-tight leading-tight">
+                  SyncUp
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-subtle text-brand-accent uppercase shrink-0">
+                  {displayRole}
+                </span>
+              </div>
+              <span className="text-[11px] text-content-muted font-medium truncate mt-0.5 leading-tight">
+                {userEmail}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Toggle Button */}
+      {!isCollapsed && (
+        <button
+          type="button"
+          aria-label="Collapse sidebar"
+          onClick={toggleSidebar}
+          className="hidden lg:flex p-1.5 rounded-lg border border-line-subtle bg-surface-main text-content-secondary hover:text-content-main hover:bg-surface-card transition-colors cursor-pointer shrink-0"
+        >
+          <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
+        </button>
+      )}
+
+      {/* Mobile Drawer Close Button */}
+      <button
+        type="button"
+        onClick={onCloseMobile}
+        className="lg:hidden p-1.5 rounded-lg border border-line-subtle text-content-secondary hover:text-content-main hover:bg-surface-main cursor-pointer"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/* ── 4. Main Sidebar Component ── */
 export default function Sidebar({ role }: SidebarProps) {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   const pathname = usePathname() || "";
   const router = useRouter();
   const { data: session } = useSession();
 
-  // Watch for session errors (such as Token/Session expiration from global logout)
+  useEffect(() => {
+    setIsNavOpen(false);
+    setIsProfileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (session?.error === "SessionExpired") {
-      // Clear local session storage and redirect to the home page securely
       signOut({ callbackUrl: "/" });
     }
   }, [session]);
 
-  // 1. Safe role detection from session
   const sessionRole = session?.user?.role?.trim().toLowerCase();
   const isAdminFromSession = sessionRole === "admin";
   const isEmployeeFromSession = sessionRole === "employee";
 
-  // 2. Fallback path-based role
-  const fallbackPathRole: "admin" | "employee" = 
-    pathname.startsWith("/admin") ? "admin" : "employee";
+  const fallbackPathRole: "admin" | "employee" = pathname.startsWith("/admin")
+    ? "admin"
+    : "employee";
 
-  // 3. Determine final display role with the prop 'role' prioritized first
   const displayRole: "admin" | "employee" =
     role ||
     (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
@@ -182,13 +321,11 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const activeNavItems = navItems[displayRole];
 
-  // 4. Default mock data matching the display context
   const defaultProfile =
     displayRole === "admin"
       ? { name: "Admin User", email: "admin@vibeflow.com", avatarLabel: "AD" }
       : { name: "Employee User", email: "employee@vibeflow.com", avatarLabel: "EM" };
 
-  // 5. Ensure profile name, email, and role match the context of the sidebar layout being viewed
   const matchesActiveContext = sessionRole === displayRole;
   const currentProfile = {
     role: displayRole,
@@ -198,80 +335,157 @@ export default function Sidebar({ role }: SidebarProps) {
   };
 
   return (
-<aside className="w-full min-w-0 lg:w-[220px] h-auto lg:h-screen lg:max-h-screen flex flex-col justify-between bg-slate-900 border-r border-slate-800 text-slate-100 p-5 shadow-xl select-none overflow-hidden">
-      {/* Upper Section: Profile Header & Navigation */}
-      <div className="flex flex-col gap-8">
-        
-        {/* Dynamic Profile Section */}
-        <div className="flex items-center gap-3.5 p-2 rounded-xl bg-slate-800/50 border border-slate-800/40">
-          <div className="relative">
-            {/* Unified Gradient on Profile Avatar matches Website Primary Purple Accent */}
-            <div className="w-11 h-11 rounded-xl bg-linear-to-tr from-brand-accent to-purple-600 flex items-center justify-center font-bold text-white shadow-md text-sm border border-white/10">
-              {currentProfile.avatarLabel}
-            </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 shadow-sm" />
-          </div>
+    <>
+      {/* Mobile Top Header */}
+      <header className="lg:hidden w-full bg-surface-card border-b border-line-subtle px-4 py-3 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setIsNavOpen(true)}
+            aria-label="Open Navigation"
+            className="p-2 rounded-xl border border-line-subtle bg-surface-main text-content-secondary hover:text-content-main hover:bg-surface-card transition-all cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
 
-          <div className="flex flex-col overflow-hidden min-w-0">
-            <span className="font-bold text-sm tracking-tight text-white leading-tight truncate">
-              {displayRole === "admin" ? "Admin User" : "Employee User"}
-            </span>
-            <span className="text-[11px] text-slate-400 font-medium truncate leading-tight mt-0.5">
-              {currentProfile.email}
-            </span>
-          </div>
+          <span className="font-extrabold text-sm text-content-main tracking-tight">SyncUp</span>
         </div>
 
-        {/* Dynamic Category Section */}
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 mb-3">
-            {displayRole === "admin" ? "Core Management" : "Employee Portal"}
-          </div>
+        {/* Mobile Profile Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(!isProfileOpen)}
+            aria-label="User menu"
+            className="w-9 h-9 rounded-xl bg-brand-accent flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ring-brand-accent/20 cursor-pointer"
+          >
+            {currentProfile.avatarLabel}
+          </button>
+
+          {isProfileOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
+              <div className="absolute right-0 mt-2.5 w-56 rounded-2xl bg-surface-card border border-line-subtle shadow-lg z-50 p-2 space-y-1">
+                <div className="px-3 py-2 border-b border-line-subtle">
+                  <p className="text-xs font-bold text-content-main truncate">{currentProfile.name}</p>
+                  <p className="text-[11px] text-content-muted truncate mt-0.5">{currentProfile.email}</p>
+                </div>
+
+                <Link
+                  href={displayRole === "admin" ? "/admin/settings" : "/employee/profile"}
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-content-secondary hover:text-content-main hover:bg-surface-main rounded-xl transition-colors"
+                >
+                  <svg className="w-4 h-4 text-content-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>{displayRole === "admin" ? "Settings" : "Profile"}</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsProfileOpen(false);
+                    await signOut({ redirect: false });
+                    router.push("/");
+                    router.refresh();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Mobile Backdrop Overlay */}
+      {isNavOpen && (
+        <div
+          onClick={() => setIsNavOpen(false)}
+          className="fixed inset-0 bg-content-main/40 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        />
+      )}
+
+      {/* Main Sidebar */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-surface-card border-r border-line-subtle p-3.5 sm:p-4 shadow-lg select-none flex flex-col justify-between transition-all duration-300 ease-in-out lg:static lg:h-screen lg:max-h-screen lg:translate-x-0 ${
+          isNavOpen ? "translate-x-0 w-72" : "-translate-x-full"
+        } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[240px]"}`}
+      >
+        <div className="flex flex-col gap-5 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {/* Unified Brand + Role + Email Header Div */}
+          <UnifiedHeaderCard
+            displayRole={displayRole}
+            userEmail={currentProfile.email}
+            onCloseMobile={() => setIsNavOpen(false)}
+          />
 
           {/* Navigation Items */}
-          <nav className="space-y-1">
-            <ul className="space-y-1">
-              {activeNavItems.map((item) => {
-                const isActive = pathname === item.href;
+          <div>
+            {!isCollapsed && (
+              <div className="text-[10px] font-bold uppercase tracking-widest text-content-muted px-2 mb-2">
+                Navigation
+              </div>
+            )}
 
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={`flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-150 ${
-                        isActive
-                          ? "bg-brand-accent text-white shadow-sm shadow-brand-accent/20"
-                          : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                      }`}
-                    >
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
+            <nav>
+              <ul className="space-y-1.5">
+                {activeNavItems.map((item) => {
+                  const isActive = pathname === item.href;
+
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        title={isCollapsed ? item.label : undefined}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-150 ${
+                          isCollapsed ? "justify-center" : ""
+                        } ${
+                          isActive
+                            ? "bg-brand-accent text-white shadow-xs font-bold"
+                            : "text-content-secondary hover:text-content-main hover:bg-surface-main"
+                        }`}
+                      >
+                        <div className="shrink-0">{item.icon}</div>
+                        {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
         </div>
-      </div>
 
-      {/* Bottom Section: Logout Action */}
-      <div className="pt-4 border-t border-slate-800">
-        <button
-          type="button"
-          onClick={async () => {
-            await signOut({ redirect: false });
-            router.push("/");
-            router.refresh();
-          }}
-          className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-150"
-        >
-          <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span>Log out</span>
-        </button>
-      </div>
-    </aside>
+        {/* Footer Logout Action */}
+        <div className="pt-3 border-t border-line-subtle mt-3">
+          <button
+            type="button"
+            title={isCollapsed ? "Log out" : undefined}
+            onClick={async () => {
+              await signOut({ redirect: false });
+              router.push("/");
+              router.refresh();
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-all duration-150 cursor-pointer overflow-hidden ${
+              isCollapsed ? "justify-center" : ""
+            }`}
+          >
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            {!isCollapsed && <span className="truncate">Log out</span>}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

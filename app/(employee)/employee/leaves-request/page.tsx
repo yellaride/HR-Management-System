@@ -15,7 +15,6 @@ export default function EmployeeLeavesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
-  // Selected leave for viewing detail modal
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
 
   useEffect(() => {
@@ -23,11 +22,9 @@ export default function EmployeeLeavesPage() {
       try {
         setLoading(true);
         setMessage(null);
-        // GET retrieves this employee's leaves and balances
         const res = await fetch("/api/employee/leaves-request");
         if (res.ok) {
           const data = await res.json();
-          // Expected response: { leaves: [...], balances: {...} }
           if (data.leaves && data.balances) {
             setHistory(data.leaves);
             setBalances(data.balances);
@@ -50,7 +47,6 @@ export default function EmployeeLeavesPage() {
   }, []);
 
   const handleRowClick = (record: LeaveRecord) => {
-    // Map LeaveRecord to LeaveRequest structure required by LeaveDetailsModal
     const mappedType: LeaveRequest["type"] =
       record.type === "ANNUAL"
         ? "Annual Leave"
@@ -60,7 +56,6 @@ export default function EmployeeLeavesPage() {
             ? "Casual Leave"
             : "Other Leave";
 
-    // Map the uppercase status to title-case status
     const mappedStatus: LeaveRequest["status"] =
       record.status === "APPROVED"
         ? "Approved"
@@ -71,7 +66,6 @@ export default function EmployeeLeavesPage() {
     const mapped: LeaveRequest = {
       id: record.id,
       employeeName: "Your Request",
-      // Restored both fields to ensure the mapped object satisfies type definitions
       designation: "Employee",
       department: "Internal",
       type: mappedType,
@@ -81,7 +75,6 @@ export default function EmployeeLeavesPage() {
       reason: record.reason,
       status: mappedStatus,
       
-      // Cast the index key to prevent indexing errors
       totalLeaves: balances?.[record.type as keyof LeaveBalances]?.allocated || 0,
       usedLeaves: balances?.[record.type as keyof LeaveBalances]?.used || 0,
       remainingLeaves: balances?.[record.type as keyof LeaveBalances]?.remaining || 0
@@ -111,7 +104,6 @@ export default function EmployeeLeavesPage() {
         throw new Error(data.error || "Failed to submit leave request");
       }
 
-      // Update balances after successful submission
       if (data.updatedBalances) {
         setBalances(data.updatedBalances);
       }
@@ -121,7 +113,6 @@ export default function EmployeeLeavesPage() {
         text: `Leave request submitted successfully! ${data.newRequest?.days || ""} days requested.`,
       });
 
-      // Refresh history
       setTimeout(() => {
         const fetchUpdated = async () => {
           try {
@@ -136,7 +127,7 @@ export default function EmployeeLeavesPage() {
               }
             }
           } catch {
-            // Swallow refresh errors; UI shows the last known state.
+            // Retain last known state on refresh error
           }
         };
         fetchUpdated();
@@ -154,65 +145,69 @@ export default function EmployeeLeavesPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6  w-full">
+    <div className="space-y-6 pb-12">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-line-subtle">
         <div>
-          <h1 className="text-xl font-extrabold text-content-main">My Leave Dashboard</h1>
-          <p className="text-xs text-content-muted">Track and request your leaves.</p>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-content-main tracking-tight">
+            My Leave Dashboard
+          </h1>
+          <p className="mt-1 text-xs text-content-secondary leading-relaxed">
+            Track allocated balances and request new leaves.
+          </p>
         </div>
         <button
           onClick={() => setIsApplyModalOpen(true)}
           disabled={submitting}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-accent text-white rounded-lg text-xs font-bold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-accent text-white rounded-xl text-xs font-bold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 cursor-pointer shadow-xs"
         >
           <Plus className="w-4 h-4" />
           Apply for Leave
         </button>
       </div>
 
-      {/* Success/Error Messages */}
+      {/* Success/Error Alerts */}
       {message && (
         <div
-          className={`p-4 rounded-lg text-xs font-medium flex items-center gap-2 ${
+          className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2.5 ${
             message.type === "success"
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-              : "bg-rose-50 text-rose-700 border border-rose-100"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+              : "bg-rose-50 text-rose-800 border border-rose-200"
           }`}
         >
           {message.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           )}
-          {message.text}
+          <span>{message.text}</span>
         </div>
       )}
 
       {/* Leave Balance Cards */}
-       {balances && (
+      {balances && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {(["ANNUAL", "SICK", "CASUAL"] as const).map((leaveType) => {
             const balance = balances[leaveType];
             return (
               <div
                 key={leaveType}
-                className="bg-surface-card border border-line-subtle rounded-xl p-4 shadow-sm"
+                className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs flex flex-col justify-between"
               >
                 <h3 className="text-xs font-bold text-content-secondary uppercase tracking-widest mb-3">
                   {leaveType === "ANNUAL" ? "Annual Leave" : leaveType === "SICK" ? "Sick Leave" : "Casual Leave"}
                 </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-content-muted">Allocated:</span>
+                    <span className="text-content-muted font-medium">Allocated:</span>
                     <span className="font-bold text-content-main">{balance.allocated || 0}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-content-muted">Used:</span>
+                    <span className="text-content-muted font-medium">Used:</span>
                     <span className="font-bold text-amber-600">{balance.used || 0}</span>
                   </div>
-                  <div className="flex justify-between text-xs border-t border-line-subtle pt-2">
-                    <span className="text-content-muted">Remaining:</span>
+                  <div className="flex justify-between text-xs border-t border-line-subtle pt-2 mt-1">
+                    <span className="text-content-muted font-medium">Remaining:</span>
                     <span className="font-bold text-emerald-600">{balance.remaining || 0}</span>
                   </div>
                 </div>
@@ -224,16 +219,15 @@ export default function EmployeeLeavesPage() {
 
       {/* Leave History Section */}
       {loading ? (
-        <div className="text-center py-12 text-content-muted">
+        <div className="text-center py-16 text-content-muted text-xs font-medium">
           <div className="flex justify-center items-center gap-2">
             <div className="w-4 h-4 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
-            <span>Loading details...</span>
+            <span>Loading leave records...</span>
           </div>
         </div>
       ) : (
         <div
           onClick={(e) => {
-            // Find row within target tbody only to prevent capturing the header rows
             const row = (e.target as HTMLElement).closest("tbody tr") as HTMLTableRowElement | null;
             if (row) {
               const index = row.sectionRowIndex;
@@ -242,13 +236,13 @@ export default function EmployeeLeavesPage() {
               }
             }
           }}
-          className="overflow-x-auto vertical-slider-reset"
+          className="overflow-x-auto rounded-2xl bg-surface-card border border-line-subtle shadow-xs"
         >
           {history && history.length > 0 ? (
             <LeaveHistoryTable history={history} />
           ) : (
-            <div className="text-center py-12 text-content-muted bg-surface-card border border-line-subtle rounded-xl">
-              <p className="text-xs">No leave records found.</p>
+            <div className="text-center py-12 text-content-muted">
+              <p className="text-xs font-medium">No leave records found.</p>
             </div>
           )}
         </div>
@@ -261,7 +255,7 @@ export default function EmployeeLeavesPage() {
         onSubmit={handleApplyLeave}
       />
 
-      {/* Render the details modal as READ-ONLY */}
+      {/* Read-Only Leave Details Modal */}
       {selectedLeave && (
         <LeaveDetailsModal
           leave={selectedLeave}

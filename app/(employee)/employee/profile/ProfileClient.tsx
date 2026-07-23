@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import Swal from "sweetalert2";
 import {
   User,
-  Trash2,
   ShieldAlert,
   Loader2,
   Edit2,
@@ -12,9 +11,9 @@ import {
   X,
   MapPin,
   HeartHandshake,
-  Camera,
   ChevronDown
 } from "lucide-react";
+import ProfilePhotoUploader from "./ProfilePhotoUploader";
 
 type ProfileState = {
   fullName: string;
@@ -22,16 +21,15 @@ type ProfileState = {
   profilePhotoUrl: string;
   phoneNumber: string;
   address: string;
-  dateOfBirth: string; // yyyy-mm-dd
+  dateOfBirth: string;
   gender: string;
   maritalStatus: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
 };
 
-// Obsidian-Amethyst SweetAlert configurations matching custom design tokens
 const swalCustomClass = {
-  popup: "bg-white rounded-2xl border border-line-subtle shadow-xl font-sans",
+  popup: "bg-surface-card rounded-2xl border border-line-subtle shadow-xl font-sans",
   title: "text-sm font-bold text-content-main",
   htmlContainer: "text-xs text-content-secondary",
   confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
@@ -71,7 +69,6 @@ async function uploadToCloudinary(file: File): Promise<string> {
 }
 
 export default function ProfileClient() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const genderRef = useRef<HTMLDivElement>(null);
   const maritalRef = useRef<HTMLDivElement>(null);
 
@@ -91,15 +88,12 @@ export default function ProfileClient() {
     emergencyContactPhone: "",
   });
 
-  // Temporary state for editing session
   const [tempProfile, setTempProfile] = useState<ProfileState>({ ...profile });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Dropdown States
   const [isGenderOpen, setIsGenderOpen] = useState(false);
   const [isMaritalOpen, setIsMaritalOpen] = useState(false);
 
-  // Password Modification States
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -107,7 +101,6 @@ export default function ProfileClient() {
   });
   const [passwordSaving, setPasswordSaving] = useState(false);
 
-  // Close dropdown overlay menus on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
@@ -127,12 +120,10 @@ export default function ProfileClient() {
     };
   }, [isGenderOpen, isMaritalOpen]);
 
-  // Strip non-numerical entries
   const sanitizeNumbersOnly = (value: string) => {
     return value.replace(/\D/g, "");
   };
 
-  // Calculates completion rate based on key profile details
   const completionPercentage = useMemo(() => {
     const keysToTrack: (keyof ProfileState)[] = [
       "profilePhotoUrl",
@@ -182,7 +173,7 @@ export default function ProfileClient() {
           icon: "error",
           title: "Profile Data Retrieval Failed",
           text: e instanceof Error && e.message ? e.message : "Verify your connection or attempt again later.",
-          confirmButtonColor: "#7c3aed",
+          confirmButtonColor: "#2563eb",
           customClass: swalCustomClass
         });
       } finally {
@@ -240,7 +231,7 @@ export default function ProfileClient() {
         icon: "success",
         title: "Profile details updated",
         customClass: {
-          popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          popup: "bg-surface-card border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
           title: "text-xs font-bold text-content-main",
         }
       });
@@ -250,7 +241,7 @@ export default function ProfileClient() {
         icon: "error",
         title: "Save Failed",
         text: e instanceof Error && e.message ? e.message : "Please check your inputs and try again.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
         customClass: swalCustomClass
       });
     } finally {
@@ -258,8 +249,7 @@ export default function ProfileClient() {
     }
   };
 
-  const onPhotoSelected = async (file: File | null) => {
-    if (!file) return;
+  const onPhotoSelected = async (file: File) => {
     try {
       setUploadingPhoto(true);
       Toast.fire({ icon: "info", title: "Uploading photo..." });
@@ -284,7 +274,7 @@ export default function ProfileClient() {
         icon: "success",
         title: "Photo saved successfully",
         customClass: {
-          popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          popup: "bg-surface-card border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
           title: "text-xs font-bold text-content-main",
         }
       });
@@ -294,7 +284,7 @@ export default function ProfileClient() {
         icon: "error",
         title: "Upload Failed",
         text: e instanceof Error && e.message ? e.message : "Photo update failed. Please try again.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
         customClass: swalCustomClass
       });
     } finally {
@@ -302,51 +292,44 @@ export default function ProfileClient() {
     }
   };
 
-  const handleAvatarAction = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleRemovePhoto = async () => {
     if (uploadingPhoto) return;
 
-    if (tempProfile.profilePhotoUrl) {
-      try {
-        setUploadingPhoto(true);
+    try {
+      setUploadingPhoto(true);
 
-        const saveRes = await fetch("/api/employee/profile", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profilePhotoUrl: "" }),
-        });
+      const saveRes = await fetch("/api/employee/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profilePhotoUrl: "" }),
+      });
 
-        if (!saveRes.ok) {
-          const data = await saveRes.json().catch(() => ({}));
-          throw new Error(data?.error || "Failed to remove photo");
+      if (!saveRes.ok) {
+        const data = await saveRes.json().catch(() => ({}));
+        throw new Error(data?.error || "Failed to remove photo");
+      }
+
+      setTempProfile((p) => ({ ...p, profilePhotoUrl: "" }));
+      setProfile((p) => ({ ...p, profilePhotoUrl: "" }));
+      Toast.fire({
+        icon: "success",
+        title: "Photo removed",
+        customClass: {
+          popup: "bg-surface-card border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          title: "text-xs font-bold text-content-main",
         }
-
-        setTempProfile((p) => ({ ...p, profilePhotoUrl: "" }));
-        setProfile((p) => ({ ...p, profilePhotoUrl: "" }));
-        Toast.fire({
-          icon: "success",
-          title: "Photo removed",
-          customClass: {
-            popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
-            title: "text-xs font-bold text-content-main",
-          }
-        });
-      } catch (e) {
-        console.error(e);
-        Swal.fire({
-          icon: "error",
-          title: "Failed to remove photo",
-          text: e instanceof Error && e.message ? e.message : "Please try again.",
-          confirmButtonColor: "#7c3aed",
-          customClass: swalCustomClass
-        });
-      } finally {
-        setUploadingPhoto(false);
-      }
-    } else {
-      if (fileInputRef.current) {
-        fileInputRef.current.click();
-      }
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({
+        icon: "error",
+        title: "Failed to remove photo",
+        text: e instanceof Error && e.message ? e.message : "Please try again.",
+        confirmButtonColor: "#2563eb",
+        customClass: swalCustomClass
+      });
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -362,7 +345,7 @@ export default function ProfileClient() {
         icon: "error",
         title: "Validation Error",
         text: "New passwords do not match.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
         customClass: swalCustomClass
       });
       return;
@@ -373,7 +356,7 @@ export default function ProfileClient() {
         icon: "error",
         title: "Invalid Structure",
         text: "Password must be at least 8 characters in length.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
         customClass: swalCustomClass
       });
       return;
@@ -400,7 +383,7 @@ export default function ProfileClient() {
         icon: "success",
         title: "Password changed successfully",
         customClass: {
-          popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
+          popup: "bg-surface-card border border-line-subtle rounded-2xl shadow-xl p-4 font-sans text-xs",
           title: "text-xs font-bold text-content-main",
         }
       });
@@ -410,7 +393,7 @@ export default function ProfileClient() {
         icon: "error",
         title: "Password Change Failed",
         text: e instanceof Error && e.message ? e.message : "Verify your current credentials and try again.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
         customClass: swalCustomClass
       });
     } finally {
@@ -422,7 +405,7 @@ export default function ProfileClient() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
         <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
-        <span className="text-sm font-semibold text-content-secondary">Retrieving your profile files...</span>
+        <span className="text-sm font-semibold text-content-secondary">Retrieving profile data...</span>
       </div>
     );
   }
@@ -432,26 +415,25 @@ export default function ProfileClient() {
     : "EE";
 
   return (
-    <div className={`space-y-6  pb-12 px-4 transition-all ${uploadingPhoto ? "cursor-wait select-none" : ""}`}>
-      
-      {/* Header Panel */}
+    <div className={`space-y-6 pb-12 transition-all ${uploadingPhoto ? "cursor-wait select-none" : ""}`}>
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-line-subtle gap-4">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-content-main">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-content-main">
             Profile Settings
           </h1>
-          <p className="mt-0.5 text-xs text-content-secondary">
-            Keep your background details up to date.
+          <p className="mt-1 text-xs text-content-secondary">
+            Keep your account and personal details updated.
           </p>
         </div>
         
-        {/* Toggle Controls */}
+        {/* Toggle Actions */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
           {!isEditing ? (
             <button
               type="button"
               onClick={handleStartEditing}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] cursor-pointer"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>Edit Profile</span>
@@ -461,7 +443,7 @@ export default function ProfileClient() {
               <button
                 type="button"
                 onClick={handleCancelEditing}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-subtle hover:bg-line-subtle text-brand-accent text-xs font-bold rounded-lg transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-subtle hover:bg-line-subtle text-brand-accent text-xs font-bold rounded-xl transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Cancel</span>
@@ -470,7 +452,7 @@ export default function ProfileClient() {
                 type="button"
                 onClick={handleSave}
                 disabled={!canSave}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
               >
                 {saving ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -484,60 +466,20 @@ export default function ProfileClient() {
         </div>
       </div>
 
-      {/* Main Grid Layout */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         
-        {/* Left Hand Card (Visual Overview & Progress Tracker) */}
+        {/* Left Side: Avatar & Completion Status */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="panel panel-section flex flex-col items-center text-center">
+          <div className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs flex flex-col items-center text-center">
             
-            {/* Avatar Container with Conditional Deletion / Upload logic */}
-            <div 
-              className="relative group rounded-full cursor-pointer"
-              onClick={handleAvatarAction}
-            >
-              <div className="h-28 w-28 rounded-full border-2 border-line-subtle bg-surface-main flex items-center justify-center overflow-hidden shadow-inner relative transition duration-150 group-hover:ring-2 group-hover:ring-brand-accent/20">
-                {tempProfile.profilePhotoUrl ? (
-                  <img 
-                    src={tempProfile.profilePhotoUrl} 
-                    alt="Profile" 
-                    className="h-full w-full object-cover" 
-                  />
-                ) : (
-                  <span className="text-brand-accent font-extrabold text-xl tracking-wider">
-                    {initials}
-                  </span>
-                )}
-
-                {/* Overlays */}
-                {tempProfile.profilePhotoUrl ? (
-                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded-full">
-                    <Trash2 className="w-5 h-5 mb-0.5 text-red-400" />
-                    <span className="text-[9px] font-bold tracking-wide uppercase text-red-300">Remove Photo</span>
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded-full">
-                    <Camera className="w-5 h-5 mb-0.5" />
-                    <span className="text-[9px] font-bold tracking-wide uppercase">Upload Photo</span>
-                  </div>
-                )}
-
-                {/* Loading State Spinner */}
-                {uploadingPhoto && (
-                  <div className="absolute inset-0 bg-content-main/80 flex items-center justify-center text-white">
-                    <Loader2 className="w-5 h-5 animate-spin text-brand-accent" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              onChange={(e) => onPhotoSelected(e.target.files?.[0] || null)}
-              className="hidden"
-              disabled={uploadingPhoto || !!tempProfile.profilePhotoUrl}
+            {/* Separated Profile Photo Component */}
+            <ProfilePhotoUploader
+              photoUrl={tempProfile.profilePhotoUrl}
+              initials={initials}
+              uploading={uploadingPhoto}
+              onPhotoSelected={onPhotoSelected}
+              onRemovePhoto={handleRemovePhoto}
             />
 
             <h2 className="mt-3 text-base font-bold text-content-main leading-tight">
@@ -547,7 +489,7 @@ export default function ProfileClient() {
               {profile.email}
             </span>
 
-            {/* Profile Progress Completion Bar */}
+            {/* Completion Progress Bar */}
             <div className="w-full mt-4 pt-4 border-t border-line-subtle text-left">
               <div className="flex items-center justify-between text-[11px] font-bold text-content-secondary mb-1.5">
                 <span>Profile Completion</span>
@@ -561,50 +503,48 @@ export default function ProfileClient() {
               </div>
             </div>
 
-            {/* Warn Panel */}
-            <div className="mt-4 alert-warn">
+            {/* Note Panel */}
+            <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-left flex gap-2">
               <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
               <div className="text-[10px] text-amber-800 leading-relaxed font-medium">
-                Full Name and Email are structurally locked. Access HR options to request alterations.
+                Full Name and Email are structurally locked. Contact HR to request alterations.
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Hand Forms */}
+        {/* Right Side: Identity, Contact & Password Forms */}
         <div className="lg:col-span-8 space-y-4">
           <form onSubmit={handleSave} className="space-y-4">
             
-            {/* Section 1: Basic Information */}
-            <div className="panel panel-section space-y-3">
-              <div className="panel-header">
+            {/* General Identity */}
+            <div className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-line-subtle">
                 <User className="w-4 h-4 text-brand-accent" />
-                <h3 className="panel-header-title">General Identity</h3>
+                <h3 className="text-xs font-bold text-content-main tracking-wide uppercase">General Identity</h3>
               </div>
 
               {!isEditing ? (
-                // VIEW MODE
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-1">
                   <div>
-                    <span className="field-label block">Date of Birth</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Date of Birth</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block">
                       {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString("en-US", { dateStyle: "medium" }) : "Not provided"}
                     </span>
                   </div>
                   <div>
-                    <span className="field-label block">Gender</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Gender</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.gender || "Not provided"}</span>
                   </div>
                   <div>
-                    <span className="field-label block">Marital Status</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Marital Status</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.maritalStatus || "Not provided"}</span>
                   </div>
                 </div>
               ) : (
-                // EDIT MODE WITH CUSTOM DROPDOWNS
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="field-label block">Date of Birth</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Date of Birth</label>
                     <input
                       type="date"
                       value={tempProfile.dateOfBirth}
@@ -613,23 +553,23 @@ export default function ProfileClient() {
                     />
                   </div>
 
-                  {/* Custom Gender Dropdown */}
+                  {/* Gender Dropdown */}
                   <div className="space-y-1 relative" ref={genderRef}>
-                    <label className="field-label block">Gender</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Gender</label>
                     <button
                       type="button"
                       onClick={() => {
                         setIsGenderOpen(!isGenderOpen);
                         setIsMaritalOpen(false);
                       }}
-                      className="dropdown-trigger flex items-center justify-between text-left cursor-pointer z-40 relative"
+                      className="w-full px-3 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main flex items-center justify-between text-left cursor-pointer"
                     >
                       <span>{tempProfile.gender || "Select Gender"}</span>
                       <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isGenderOpen ? "rotate-180" : ""}`} />
                     </button>
 
                     {isGenderOpen && (
-                      <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150 z-50">
+                      <div className="dropdown-panel absolute left-0 right-0 mt-1.5 shadow-lg z-50">
                         {["Male", "Female", "Other"].map((gender) => (
                           <button
                             key={gender}
@@ -649,23 +589,23 @@ export default function ProfileClient() {
                     )}
                   </div>
 
-                  {/* Custom Marital Status Dropdown */}
+                  {/* Marital Status Dropdown */}
                   <div className="space-y-1 relative" ref={maritalRef}>
-                    <label className="field-label block">Marital Status</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Marital Status</label>
                     <button
                       type="button"
                       onClick={() => {
                         setIsMaritalOpen(!isMaritalOpen);
                         setIsGenderOpen(false);
                       }}
-                      className="dropdown-trigger flex items-center justify-between text-left cursor-pointer z-40 relative"
+                      className="w-full px-3 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main flex items-center justify-between text-left cursor-pointer"
                     >
                       <span>{tempProfile.maritalStatus || "Select Status"}</span>
                       <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isMaritalOpen ? "rotate-180" : ""}`} />
                     </button>
 
                     {isMaritalOpen && (
-                      <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150 z-50">
+                      <div className="dropdown-panel absolute left-0 right-0 mt-1.5 shadow-lg z-50">
                         {["Single", "Married", "Divorced", "Widowed"].map((status) => (
                           <button
                             key={status}
@@ -688,30 +628,28 @@ export default function ProfileClient() {
               )}
             </div>
 
-            {/* Section 2: Contact Information */}
-            <div className="panel panel-section space-y-3">
-              <div className="panel-header">
+            {/* Contact Information */}
+            <div className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-line-subtle">
                 <MapPin className="w-4 h-4 text-brand-accent" />
-                <h3 className="panel-header-title">Contact Coordinates</h3>
+                <h3 className="text-xs font-bold text-content-main tracking-wide uppercase">Contact Coordinates</h3>
               </div>
 
               {!isEditing ? (
-                // VIEW MODE
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-1">
                   <div className="md:col-span-1">
-                    <span className="field-label block">Phone Number</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Phone Number</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.phoneNumber || "Not provided"}</span>
                   </div>
                   <div className="md:col-span-2">
-                    <span className="field-label block">Physical Address</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Physical Address</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block leading-relaxed">{profile.address || "Not provided"}</span>
                   </div>
                 </div>
               ) : (
-                // EDIT MODE
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1 md:col-span-1">
-                    <label className="field-label block">Phone Number</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Phone Number</label>
                     <input
                       type="tel"
                       placeholder="Numbers only"
@@ -722,7 +660,7 @@ export default function ProfileClient() {
                   </div>
 
                   <div className="space-y-1 md:col-span-2">
-                    <label className="field-label block">Physical Address</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Physical Address</label>
                     <input
                       type="text"
                       placeholder="Resident coordinates..."
@@ -735,30 +673,28 @@ export default function ProfileClient() {
               )}
             </div>
 
-            {/* Section 3: Emergency Contacts */}
-            <div className="panel panel-section space-y-3">
-              <div className="panel-header">
+            {/* Emergency Contacts */}
+            <div className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-line-subtle">
                 <HeartHandshake className="w-4 h-4 text-brand-accent" />
-                <h3 className="panel-header-title">Emergency Contact</h3>
+                <h3 className="text-xs font-bold text-content-main tracking-wide uppercase">Emergency Contact</h3>
               </div>
 
               {!isEditing ? (
-                // VIEW MODE
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-1">
                   <div>
-                    <span className="field-label block">Contact Person</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Contact Person</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.emergencyContactName || "Not provided"}</span>
                   </div>
                   <div>
-                    <span className="field-label block">Contact Number</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Contact Number</span>
                     <span className="text-xs font-semibold text-content-main mt-0.5 block">{profile.emergencyContactPhone || "Not provided"}</span>
                   </div>
                 </div>
               ) : (
-                // EDIT MODE
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="field-label block">Contact Person Name</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Contact Person Name</label>
                     <input
                       type="text"
                       placeholder="Kin name..."
@@ -769,7 +705,7 @@ export default function ProfileClient() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="field-label block">Contact Phone Number</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Contact Phone Number</label>
                     <input
                       type="tel"
                       placeholder="Numbers only"
@@ -783,18 +719,17 @@ export default function ProfileClient() {
             </div>
           </form>
 
-          {/* Section 4: Security (Password Modification Panel) */}
-          <div className="panel">
-            <div className="panel-section space-y-4">
-              <div className="panel-header">
-                <ShieldAlert className="w-4 h-4 text-brand-accent" />
-                <h3 className="panel-header-title">Security & Credentials</h3>
-              </div>
+          {/* Password Modification Panel */}
+          <div className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-line-subtle">
+              <ShieldAlert className="w-4 h-4 text-brand-accent" />
+              <h3 className="text-xs font-bold text-content-main tracking-wide uppercase">Security & Credentials</h3>
+            </div>
 
-              <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="field-label block">Current Password</label>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Current Password</label>
                     <input
                       type="password"
                       placeholder="Enter current password"
@@ -805,8 +740,8 @@ export default function ProfileClient() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="field-label block">New Password</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">New Password</label>
                     <input
                       type="password"
                       placeholder="Min. 8 characters"
@@ -817,8 +752,8 @@ export default function ProfileClient() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="field-label block">Confirm Password</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Confirm Password</label>
                     <input
                       type="password"
                       placeholder="Re-enter password"
@@ -827,25 +762,24 @@ export default function ProfileClient() {
                       className="form-input text-xs"
                       required
                     />
-                  </div>
                 </div>
+              </div>
 
-                <div className="flex justify-end pt-2 border-t border-line-subtle">
-                  <button
-                    type="submit"
-                    disabled={passwordSaving}
-                    className="inline-flex items-center gap-1.5 px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                  >
-                    {passwordSaving ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                    )}
-                    <span>{passwordSaving ? "Updating..." : "Update Password"}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="flex justify-end pt-2 border-t border-line-subtle">
+                <button
+                  type="submit"
+                  disabled={passwordSaving}
+                  className="inline-flex items-center gap-1.5 px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                >
+                  {passwordSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                  )}
+                  <span>{passwordSaving ? "Updating..." : "Update Password"}</span>
+                </button>
+              </div>
+            </form>
           </div>
 
         </div>

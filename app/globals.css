@@ -1,31 +1,30 @@
 @import "tailwindcss";
 
-/* 1. Modern Purple Design Token Schema */
+/* 1. Theme Design Tokens Schema */
 @theme {
-  /* Canvas & Surface Layers (With a subtle violet undertone) */
-  --color-surface-main: #f9f8fc;          /* Soft violet-tinted off-white canvas */
+  /* Canvas & Surface Layers */
+  --color-surface-main: #f8fafc;          /* Soft blue-tinted off-white canvas (Slate 50) */
   --color-surface-card: #ffffff;          /* Pure white card/panel background */
   
   /* Boundaries and Lines */
-  --color-line-subtle: #e2e0e8;           /* Neutral-grey line with subtle lavender tint */
+  --color-line-subtle: #e2e8f0;           /* Neutral-slate line (Slate 200) */
   
-  /* Modern Royal Purple / Violet Accents */
-  --color-brand-accent: #7c3aed;          /* Active state / Violet 600 */
-  --color-brand-hover: #6d28d9;           /* Darkened hover state / Violet 700 */
-  --color-brand-subtle: #ede9fe;          /* Soft, cohesive purple background / Violet 100 */
+  /* Modern Blue Accents */
+  --color-brand-accent: #2563eb;          /* Active state / Blue 600 */
+  --color-brand-hover: #1d4ed8;           /* Darkened hover state / Blue 700 */
+  --color-brand-subtle: #dbeafe;          /* Soft background / Blue 100 */
   
-  /* Typography Roles (Designed with rich obsidian-plum/amethyst deep tones) */
-  --color-content-main: #181124;          /* Deep obsidian-plum heading/body text */
-  --color-content-secondary: #534a60;     /* Muted amethyst-grey for secondary details */
-  --color-content-muted: #8e859c;         /* Light slate-lavender for auxiliary text */
+  /* Typography Roles */
+  --color-content-main: #0f172a;          /* Deep slate heading/body text (Slate 900) */
+  --color-content-secondary: #475569;     /* Muted slate-grey (Slate 600) */
+  --color-content-muted: #94a3b8;         /* Light slate (Slate 400) */
 }
 
 /* 2. Base Element Resets */
 body {
   color: var(--color-content-main);
   background: var(--color-surface-main);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
-    "Segoe UI Emoji";
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   font-weight: 400;
   overflow-x: hidden;
 }
@@ -37,9 +36,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1,
-h2,
-h3 {
+h1, h2, h3 {
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -48,14 +45,14 @@ p {
   font-weight: 400;
 }
 
-/* 3. Semantic Landing Layout & Page Utilities */
+/* 3. Landing Layout & Page Utilities */
 
 @utility landing-container {
   @apply min-h-screen flex flex-col justify-between selection:bg-brand-subtle selection:text-brand-accent bg-surface-main;
 }
 
 @utility header-nav {
-  @apply w-full py-5 px-6 md:px-12 border-b border-line-subtle bg-surface-card/80 backdrop-blur-md sticky top-0 z-50;
+  @apply w-full py-4 px-4 sm:px-6 lg:px-8 border-b border-line-subtle bg-surface-card/80 backdrop-blur-md sticky top-0 z-50;
 }
 
 @utility brand-logo-box {
@@ -71,7 +68,7 @@ p {
 }
 
 @utility hero-overlay {
-  @apply absolute inset-0 z-0 bg-linear-to-tr from-[#181124]/95 via-[#534a60]/85 to-[#7c3aed]/40 mix-blend-multiply;
+  @apply absolute inset-0 z-0 bg-linear-to-tr from-[#0f172a]/95 via-[#475569]/85 to-[#2563eb]/40 mix-blend-multiply;
 }
 
 @utility hero-badge {
@@ -94,11 +91,9 @@ p {
   @apply absolute top-1 bottom-1 rounded-lg bg-surface-card shadow-xs border border-line-subtle/40 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)];
 }
 
-/* Remove any unintended vertical slider/track UI artifacts (used by segmented control styles) */
 @utility vertical-slider-reset {
   @apply [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none];
 }
-
 
 @utility segmented-btn {
   @apply relative z-10 flex-1 py-2.5 text-xs font-semibold rounded-lg transition-colors duration-200 text-content-secondary hover:text-content-main;
@@ -109,10 +104,10 @@ p {
 }
 
 @utility footer-container {
-  @apply w-full py-6 px-6 md:px-12 border-t border-line-subtle bg-surface-card/50;
+  @apply w-full py-6 px-4 sm:px-6 lg:px-8 border-t border-line-subtle bg-surface-card/50;
 }
 
-/* 4. Interactive Component Utilities (Button Schema) */
+/* 4. Interactive Component Utilities */
 
 @utility panel {
   @apply bg-surface-card border border-line-subtle rounded-xl shadow-sm;
@@ -207,10 +202,10 @@ p {
 }
 
 @utility form-input {
-  @apply w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-sm text-content-main placeholder-content-muted transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-accent/25 focus:border-brand-accent;
+  @apply w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-sm text-content-main placeholder-content-muted transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:border-brand-accent/40 focus:outline-none focus:ring-2 focus:ring-brand-accent/25 focus:border-brand-accent;
 }
 
-/* 7. Global Purple Dropdown Schema (reusable across admin modals) */
+/* 5. Dropdown Schema */
 
 @utility dropdown-trigger {
   @apply w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main transition-all duration-200 shadow-sm outline-none cursor-pointer;
@@ -220,9 +215,6 @@ p {
   @apply bg-surface-card border border-line-subtle rounded-xl shadow-lg py-1 z-50;
 }
 
-
-
-
 @utility dropdown-option {
   @apply w-full px-4 py-2 text-xs text-left font-semibold transition-colors cursor-pointer block text-content-secondary hover:bg-brand-subtle hover:text-brand-accent;
 }
@@ -230,7 +222,6 @@ p {
 @utility dropdown-option-active {
   @apply bg-brand-subtle text-brand-accent;
 }
-
 
 @utility auth-input-focus {
   @apply focus:outline-none focus:ring-4 focus:ring-brand-accent/15 focus:border-brand-accent/90;
@@ -240,7 +231,7 @@ p {
   @apply form-input pl-10;
 }
 
-/* 9. Birthday UI Utilities (shared across admin + employee dashboards) */
+/* 6. Birthday UI Utilities */
 
 @keyframes birthdaySlideIn {
   from {
@@ -255,7 +246,7 @@ p {
 
 @utility birthday-banner {
   @apply relative overflow-hidden p-6 rounded-2xl text-white shadow-md
-         bg-linear-to-r from-pink-500 via-purple-500 to-indigo-600;
+         bg-linear-to-r from-blue-500 via-cyan-500 to-indigo-600;
   animation: birthdaySlideIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -280,7 +271,7 @@ p {
 }
 
 @utility birthday-card-overlay {
-  @apply absolute top-0 right-0 w-24 h-24 bg-linear-to-br from-pink-500/10 to-indigo-500/10 rounded-full blur-lg pointer-events-none;
+  @apply absolute top-0 right-0 w-24 h-24 bg-linear-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-lg pointer-events-none;
 }
 
 @utility birthday-card-header {
@@ -296,11 +287,11 @@ p {
 }
 
 @utility birthday-card-celebrants-chip {
-  @apply text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 border border-pink-100 shrink-0;
+  @apply text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 shrink-0;
 }
 
 @utility birthday-card-bday-icon {
-  @apply p-2 bg-linear-to-tr from-pink-500 to-indigo-500 text-white rounded-xl shadow-xs;
+  @apply p-2 bg-linear-to-tr from-blue-500 to-indigo-600 text-white rounded-xl shadow-xs;
 }
 
 @utility birthday-celebrants-list {
@@ -309,12 +300,12 @@ p {
 
 @utility birthday-celebrant-tile {
   @apply flex items-center gap-3 p-3 rounded-xl bg-surface-main/70 border border-line-subtle
-         hover:border-pink-200 transition-colors duration-150;
+         hover:border-blue-200 transition-colors duration-150;
 }
 
 @utility birthday-celebrant-avatar {
-  @apply h-9 w-9 rounded-full bg-linear-to-tr from-pink-100 to-indigo-100 flex items-center justify-center
-         border border-line-subtle font-bold text-xs text-indigo-700 uppercase shrink-0;
+  @apply h-9 w-9 rounded-full bg-linear-to-tr from-blue-100 to-indigo-100 flex items-center justify-center
+         border border-line-subtle font-bold text-xs text-blue-700 uppercase shrink-0;
 }
 
 @utility birthday-celebrant-emoji {

@@ -5,7 +5,6 @@ import { Search, Filter } from "lucide-react";
 import GeneratePayslipModal, { EmployeeOption } from "@/app/components/admin/GeneratePayslipModal";
 import PayslipList, { CompanyDetailsData } from "@/app/components/payslips/PayslipList";
 
-// Safely extend the component's props to allow companyDetails dynamically
 const ExtendedGeneratePayslipModal = GeneratePayslipModal as React.ComponentType<
   React.ComponentProps<typeof GeneratePayslipModal> & { companyDetails?: CompanyDetailsData | null }
 >;
@@ -30,7 +29,7 @@ interface Payslip {
   paymentMethod?: string;
   paymentDate?: string;
   status?: string;
-  version?: string; // Mapped here
+  version?: string;
 }
 
 export default function AdminPayslipsPage() {
@@ -155,47 +154,53 @@ export default function AdminPayslipsPage() {
   });
 
   return (
-    <div className="space-y-6  pb-12">
-      
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200">
+    <div className="space-y-6 pb-12">
+      {/* Page Header Area */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-line-subtle">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Paid Payslips Ledger</h1>
-          <p className="mt-1 text-xs text-slate-500">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-content-main tracking-tight">
+            Paid Payslips Ledger
+          </h1>
+          <p className="mt-1 text-xs text-content-secondary leading-relaxed">
             Monitor compensations and download generated PDF receipt summaries for completed payments.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative w-full sm:w-64">
+        {/* Action Controls Area */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64 md:w-72">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-400" />
+              <Search className="h-4 w-4 text-content-muted" />
             </div>
             <input
               type="text"
               placeholder="Search paid payroll history..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition duration-150"
+              className="block w-full pl-9 pr-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent transition duration-150 shadow-xs"
             />
           </div>
 
+          {/* Record Payment Button */}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-xs transition-all duration-150 active:scale-[0.98] cursor-pointer"
           >
             <span>Record Payment</span>
           </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-1 py-2">
-        <div className="inline-flex items-center gap-1.5 text-slate-500 text-[11px] font-semibold">
-          <Filter className="w-3.5 h-3.5" />
+      {/* Counter Row */}
+      <div className="flex items-center justify-between px-1">
+        <div className="inline-flex items-center gap-1.5 text-content-secondary text-[11px] font-semibold">
+          <Filter className="w-3.5 h-3.5 text-content-muted" />
           <span>Showing {filteredPayslips.length} paid entries</span>
         </div>
       </div>
 
+      {/* Payslips Table List */}
       <PayslipList
         payslips={filteredPayslips}
         isLoading={isLoading}
@@ -209,13 +214,14 @@ export default function AdminPayslipsPage() {
         companyDetails={companyDetails}
       />
 
+      {/* Generate Payslip Modal */}
       <ExtendedGeneratePayslipModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         employees={employees}
         isLoading={isLoading} 
         onSave={handleSavePayslip}
-        companyDetails={companyDetails} // Passed company details safely
+        companyDetails={companyDetails}
       />
     </div>
   );
