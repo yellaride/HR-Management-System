@@ -9,7 +9,6 @@ import CompanyInfoSettings from "@/app/components/admin/settings/CompanyInfoSett
 import DepartmentSettings from "@/app/components/admin/settings/DepartmentSettings";
 import AttendanceSettings from "@/app/components/admin/settings/AttendanceSettings";
 
-
 interface CompanySettingsState {
   companyName: string;
   location: string;
@@ -23,7 +22,7 @@ interface CompanySettingsState {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutTime: string;
+  autoCheckOutBuffer: number;
 }
 
 const swalCustomClass = {
@@ -61,7 +60,7 @@ export default function AdminSettingsPage() {
     checkInDisplayBefore: 30,
     checkOutDisplayAfter: 0,
     autoCheckOut: false,
-    autoCheckOutTime: "18:00",
+    autoCheckOutBuffer: 30,
   });
 
   const fetchSettings = async () => {
@@ -83,7 +82,7 @@ export default function AdminSettingsPage() {
         checkInDisplayBefore: typeof data.checkInDisplayBefore === "number" ? data.checkInDisplayBefore : 30,
         checkOutDisplayAfter: typeof data.checkOutDisplayAfter === "number" ? data.checkOutDisplayAfter : 0,
         autoCheckOut: typeof data.autoCheckOut === "boolean" ? data.autoCheckOut : false,
-        autoCheckOutTime: data.autoCheckOutTime || "18:00",
+        autoCheckOutBuffer: typeof data.autoCheckOutBuffer === "number" ? Math.min(30, Math.max(0, data.autoCheckOutBuffer)) : 30,
       });
     } catch (error) {
       console.error(error);
@@ -100,10 +99,7 @@ export default function AdminSettingsPage() {
   };
 
   useEffect(() => {
-    async function loadSettings() {
-      fetchSettings();
-    }
-    loadSettings();
+    fetchSettings();
   }, []);
 
   const handleUpdateSettings = async (updatedFields: Partial<CompanySettingsState>) => {
@@ -120,7 +116,9 @@ export default function AdminSettingsPage() {
         throw new Error(errData?.error || "Failed to update details.");
       }
 
-      setSettings(payload);
+      const updatedData = await res.json();
+      setSettings(updatedData);
+
       Toast.fire({
         icon: "success",
         title: "Configuration updated",
@@ -198,8 +196,6 @@ export default function AdminSettingsPage() {
           onAdd={handleAddDepartment} 
           onDelete={handleDeleteDepartment} 
         />
-
-        
 
         <div className="flex justify-start">
           <ChangePasswordSettings role="admin" />

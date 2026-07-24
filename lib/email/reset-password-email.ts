@@ -12,25 +12,25 @@ function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Reset Your Password</title>
     </head>
-    <body style="margin: 0; padding: 0; background-color: #f9f8fc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f9f8fc; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="100%" max-width="600px" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e0e8; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+            <table width="100%" max-width="600px" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
               
               <!-- Branding Header Banner -->
               <tr>
-                <td style="background-color: #7c3aed; padding: 40px 30px; text-align: center;">
+                <td style="background-color: #2563eb; padding: 40px 30px; text-align: center;">
                   <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.025em;">Password Reset Link</h1>
-                  <p style="color: #ede9fe; margin: 8px 0 0 0; font-size: 14px;">Secure workspace recovery connection</p>
+                  <p style="color: #dbeafe; margin: 8px 0 0 0; font-size: 14px;">Secure workspace recovery connection</p>
                 </td>
               </tr>
 
               <!-- Body Message -->
               <tr>
                 <td style="padding: 40px 30px;">
-                  <p style="color: #181124; font-size: 16px; line-height: 24px; margin: 0 0 16px 0;">Hello <strong>${name}</strong>,</p>
-                  <p style="color: #534a60; font-size: 14px; line-height: 22px; margin: 0 0 24px 0;">
+                  <p style="color: #0f172a; font-size: 16px; line-height: 24px; margin: 0 0 16px 0;">Hello <strong>${name}</strong>,</p>
+                  <p style="color: #475569; font-size: 14px; line-height: 22px; margin: 0 0 24px 0;">
                     We received a request to reset the password for your VibeFlow workspace account. To establish your new security credentials, click the button below:
                   </p>
 
@@ -38,7 +38,7 @@ function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 28px; text-align: center;">
                     <tr>
                       <td align="center">
-                        <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #7c3aed; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; padding: 12px 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.25);">
+                        <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; padding: 12px 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25);">
                           Reset Workspace Password
                         </a>
                       </td>
@@ -46,11 +46,11 @@ function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
                   </table>
 
                   <!-- Security Protocol Alert -->
-                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #e2e0e8; padding-top: 24px;">
+                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #e2e8f0; padding-top: 24px;">
                     <tr>
                       <td>
-                        <p style="color: #7c3aed; font-size: 13px; line-height: 20px; font-weight: 600; margin: 0 0 6px 0;">🔑 Password Security Info:</p>
-                        <p style="color: #534a60; font-size: 13px; line-height: 20px; margin: 0;">
+                        <p style="color: #2563eb; font-size: 13px; line-height: 20px; font-weight: 600; margin: 0 0 6px 0;">🔑 Password Security Info:</p>
+                        <p style="color: #475569; font-size: 13px; line-height: 20px; margin: 0;">
                           This security link is active for 60 minutes and can only be used once. If you did not authorize this request, you can safely ignore this email and your password will remain unchanged.
                         </p>
                       </td>
@@ -62,9 +62,9 @@ function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
 
               <!-- Footer -->
               <tr>
-                <td style="background-color: #f9f8fc; padding: 24px 30px; border-top: 1px solid #e2e0e8; text-align: center;">
-                  <p style="color: #8e859c; font-size: 11px; line-height: 18px; margin: 0 0 4px 0;">This email is auto-generated by your internal HR platform. Please do not reply directly to this message.</p>
-                  <p style="color: #8e859c; font-size: 11px; line-height: 18px; margin: 0;">&copy; ${currentYear} Internal Corporate Directory.</p>
+                <td style="background-color: #f8fafc; padding: 24px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+                  <p style="color: #94a3b8; font-size: 11px; line-height: 18px; margin: 0 0 4px 0;">This email is auto-generated by your internal HR platform. Please do not reply directly to this message.</p>
+                  <p style="color: #94a3b8; font-size: 11px; line-height: 18px; margin: 0;">&copy; ${currentYear} Internal Corporate Directory.</p>
                 </td>
               </tr>
 

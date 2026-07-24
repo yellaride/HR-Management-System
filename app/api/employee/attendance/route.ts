@@ -7,159 +7,234 @@ import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog"; 
 import CompanyDetails from "@/modals/CompanyDetails";
 
-// Set your regional timezone
 const TIMEZONE = "Asia/Karachi"; 
 
 export const dynamic = "force-dynamic";
 
-// Company settings fields consumed by the attendance logic in this route
 interface AttendanceSettings {
-  shiftStart?: string;
-  shiftEnd?: string;
-  gracePeriod?: number;
-  checkInDisplayBefore?: number;
-  checkOutDisplayAfter?: number;
-  autoCheckOut?: boolean;
-  autoCheckOutTime?: string;
+  shiftStart: string;
+  shiftEnd: string;
+  gracePeriod: number;
+  checkInDisplayBefore: number;
+  checkOutDisplayAfter: number;
+  autoCheckOut: boolean;
+  autoCheckOutTime: string;
 }
 
-// Timezone-safe local time helper
-function getLocalTimeComponents(date: Date) {
-  const tzString = date.toLocaleString("en-US", { timeZone: TIMEZONE });
-  const localDateObj = new Date(tzString);
+// Extract exact local date/time parts without server timezone pollution
+function getZonedParts(date: Date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const p of parts) {
+    if (p.type !== "literal") {
+      map[p.type] = p.value;
+    }
+  }
+  let hour = parseInt(map.hour, 10);
+  if (hour === 24) hour = 0;
+
   return {
-    hours: localDateObj.getHours(),
-    minutes: localDateObj.getMinutes(),
-    day: localDateObj.getDay(), // 0 = Sunday, 1 = Monday...
-    localDateObj
+    year: parseInt(map.year, 10),
+    month: parseInt(map.month, 10), // 1 - 12
+    day: parseInt(map.day, 10),
+    hour,
+    minute: parseInt(map.minute, 10),
+    second: parseInt(map.second, 10),
+    dateStr: `${map.year}-${map.month.toString().padStart(2, "0")}-${map.day.toString().padStart(2, "0")}`,
   };
+}
+
+// Safe string formatted date (YYYY-MM-DD)
+function getLocalDateString(date: Date = new Date()): string {
+  return getZonedParts(date).dateStr;
+}
+
+// Day of week in Asia/Karachi (0 = Sunday, 1 = Monday, ...)
+function getZonedDayOfWeek(date: Date = new Date()): number {
+  const formatter = new Intl.DateTimeFormat("en-US", { timeZone: TIMEZONE, weekday: "short" });
+  const dayStr = formatter.format(date);
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return days.indexOf(dayStr);
 }
 
 // Convert "HH:mm" time format to total minutes from midnight
 function timeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
   const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
+  return (h || 0) * 60 + (m || 0);
 }
 
-// Get local date string in YYYY-MM-DD format
-function getLocalDateString(date: Date = new Date()): string {
-  const tzString = date.toLocaleString("en-US", { timeZone: TIMEZONE });
-  const localDate = new Date(tzString);
-  const year = localDate.getFullYear();
-  const month = String(localDate.getMonth() + 1).padStart(2, "0");
-  const day = String(localDate.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+// Convert local date string ("YYYY-MM-DD") and time string ("HH:mm") to UTC Date object (PKT is UTC+5)
+function zonedTimeToUtcDate(dateStr: string, timeStr: string): Date {
+  return new Date(`${dateStr}T${timeStr}:00+05:00`);
 }
 
-// Fetch DB Configurations with Fallbacks
-async function getActiveSettings() {
-  let settings = await CompanyDetails.findOne();
-  if (!settings) {
-    settings = {
-      shiftStart: "09:00",
-      shiftEnd: "17:00",
-      gracePeriod: 15,
-      checkInDisplayBefore: 30,
-      checkOutDisplayAfter: 0,
-      autoCheckOut: false,
-      autoCheckOutTime: "18:00",
-    };
-  }
-  return settings;
+// Fetch DB Configurations safely with complete type casting and fallbacks
+async function getActiveSettings(): Promise<AttendanceSettings> {
+  const settings = (await CompanyDetails.findOne().lean()) as Record<string, any> | null;
+
+  return {
+    shiftStart: settings?.shiftStart ?? "09:00",
+    shiftEnd: settings?.shiftEnd ?? "17:00",
+    gracePeriod: settings?.gracePeriod ?? 15,
+    checkInDisplayBefore: settings?.checkInDisplayBefore ?? 30,
+    checkOutDisplayAfter: settings?.checkOutDisplayAfter ?? 0,
+    autoCheckOut: settings?.autoCheckOut ?? false,
+    autoCheckOutTime: settings?.autoCheckOutTime ?? "18:00",
+  };
 }
 
-// Evaluates and processes automated check-out if threshold is met
-async function processAutoCheckOutIfEligible(userId: string, todayDateStr: string, settings: AttendanceSettings) {
-  if (!settings.autoCheckOut) return null;
+// Calculates working hours bounded strictly by configured shift bounds
+function calculateBoundedWorkingHours(
+  checkIn: Date,
+  checkOut: Date,
+  recordDateStr: string,
+  shiftStartStr: string = "09:00",
+  shiftEndStr: string = "17:00"
+) {
+  const shiftStartUtc = zonedTimeToUtcDate(recordDateStr, shiftStartStr);
+  const shiftEndUtc = zonedTimeToUtcDate(recordDateStr, shiftEndStr);
 
-  const record = await Attendance.findOne({ userId, date: todayDateStr });
-  if (!record || record.checkOut) return record; // No record or already checked out
+  const effectiveCheckIn = Math.max(checkIn.getTime(), shiftStartUtc.getTime());
+  const effectiveCheckOut = Math.min(checkOut.getTime(), shiftEndUtc.getTime());
 
+  let diffMs = effectiveCheckOut - effectiveCheckIn;
+  if (diffMs < 0) diffMs = 0;
+
+  let diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours > 8) diffHours = 8; // Daily max cap
+
+  const decimalHours = Math.round(diffHours * 100) / 100;
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  const formattedDuration = `${hours} hrs ${mins} mins`;
+
+  return { decimalHours, formattedDuration };
+}
+
+// Resolves unclosed records (past days & today if past cutoff time)
+async function processUnclosedAttendance(userId: string, settings: AttendanceSettings) {
   const now = new Date();
-  const localNow = getLocalTimeComponents(now);
-  const currentMins = localNow.hours * 60 + localNow.minutes;
-  const autoCheckOutMins = timeToMinutes(settings.autoCheckOutTime || "18:00");
+  const zonedNow = getZonedParts(now);
+  const todayDateStr = zonedNow.dateStr;
+  const currentMins = zonedNow.hour * 60 + zonedNow.minute;
 
-  // If local time is equal to or past the auto checkout time, execute check-out
-  if (currentMins >= autoCheckOutMins) {
-    const autoCheckOutDate = new Date();
-    const [autoH, autoM] = (settings.autoCheckOutTime || "18:00").split(":").map(Number);
-    autoCheckOutDate.setHours(autoH, autoM, 0, 0);
+  const autoCheckOutMins = timeToMinutes(settings.autoCheckOutTime);
+  const shiftEndMins = timeToMinutes(settings.shiftEnd);
+  const checkOutDisplayOffset = settings.checkOutDisplayAfter;
+  const unclosedThresholdMins = Math.max(autoCheckOutMins, shiftEndMins + checkOutDisplayOffset);
 
-    const checkInTime = new Date(record.checkIn);
-    const localCheckIn = getLocalTimeComponents(checkInTime);
+  // Find all open/unclosed attendance records for this user
+  const unclosedRecords = await Attendance.find({
+    userId,
+    $or: [{ checkOut: { $exists: false } }, { checkOut: null }],
+  });
 
-    // Calculate dynamic shift bounds
-    const checkInBoundStart = new Date(localCheckIn.localDateObj);
-    const [sH, sM] = (settings.shiftStart || "09:00").split(":").map(Number);
-    checkInBoundStart.setHours(sH, sM, 0, 0);
+  for (const record of unclosedRecords) {
+    const isPastDate = record.date < todayDateStr;
+    const isToday = record.date === todayDateStr;
 
-    const checkOutBoundEnd = new Date(autoCheckOutDate);
-    const [eH, eM] = (settings.shiftEnd || "17:00").split(":").map(Number);
-    checkOutBoundEnd.setHours(eH, eM, 0, 0);
-
-    const checkInLocalTime = localCheckIn.localDateObj.getTime();
-    const checkOutLocalTime = autoCheckOutDate.getTime();
-
-    // Lock boundaries to ensure hours outside configuration parameters are excluded
-    const effectiveCheckInTime = Math.max(checkInLocalTime, checkInBoundStart.getTime());
-    const effectiveCheckOutTime = Math.min(checkOutLocalTime, checkOutBoundEnd.getTime());
-
-    let diffMs = effectiveCheckOutTime - effectiveCheckInTime;
-    if (diffMs < 0) diffMs = 0;
-
-    let diffHours = diffMs / (1000 * 60 * 60);
-    if (diffHours > 8) diffHours = 8; // Cap daily working hours
-
-    const decimalHours = Math.round(diffHours * 100) / 100;
-    const totalMinutes = Math.floor(diffMs / (1000 * 60));
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    const formattedDuration = `${hours} hrs ${mins} mins`;
-
-    record.checkOut = autoCheckOutDate;
-    record.workingHours = decimalHours;
-    record.formattedDuration = formattedDuration;
-    record.status = "Absent"; // Auto check-out defaults status to Absent if shift end parameter was missed
-
-    await record.save();
-
-    const currentYear = localNow.localDateObj.getFullYear();
-    const currentMonth = localNow.localDateObj.getMonth() + 1;
-
-    // Increment total working hours progressively in the monthly record
-    const updatedMonthlyRecord = await MonthlyAttendance.findOneAndUpdate(
-      { userId, year: currentYear, month: currentMonth, isLocked: false },
-      { 
-        $inc: { totalWorkingHours: decimalHours }
-      },
-      { new: true }
-    );
-
-    if (updatedMonthlyRecord) {
-      updatedMonthlyRecord.totalWorkingHours = Math.round(updatedMonthlyRecord.totalWorkingHours * 100) / 100;
-      await updatedMonthlyRecord.save();
+    let shouldProcess = false;
+    if (isPastDate) {
+      shouldProcess = true;
+    } else if (isToday && currentMins >= unclosedThresholdMins) {
+      shouldProcess = true;
     }
 
-    // Write system activity log entry
-    await ActivityLog.create({
-      userId,
-      activityType: "CHECK_OUT",
-      date: todayDateStr,
-      timestamp: autoCheckOutDate,
-      description: `System auto-resolved check-out at configured time: ${settings.autoCheckOutTime} (Duration: ${formattedDuration})`,
-      metadata: {
-        attendanceId: record._id,
-        workingHours: decimalHours,
-        status: "Absent",
-        isAutoCheckedOut: true,
-      },
-    });
+    if (!shouldProcess) continue;
 
-    return record;
+    const [rYear, rMonth] = record.date.split("-").map(Number);
+
+    if (settings.autoCheckOut) {
+      // AUTO CHECK-OUT IS ENABLED
+      const autoCheckOutDate = zonedTimeToUtcDate(record.date, settings.autoCheckOutTime);
+      const checkInDate = new Date(record.checkIn);
+
+      const { decimalHours, formattedDuration } = calculateBoundedWorkingHours(
+        checkInDate,
+        autoCheckOutDate,
+        record.date,
+        settings.shiftStart,
+        settings.shiftEnd
+      );
+
+      record.checkOut = autoCheckOutDate;
+      record.workingHours = decimalHours;
+      record.formattedDuration = formattedDuration;
+      record.status = "Absent";
+      await record.save();
+
+      // Adjust monthly attendance
+      await MonthlyAttendance.findOneAndUpdate(
+        { userId, year: rYear, month: rMonth, isLocked: false },
+        {
+          $inc: {
+            presentDays: -1,
+            absentDays: 1,
+            totalWorkingHours: decimalHours,
+          },
+        }
+      );
+
+      await ActivityLog.create({
+        userId,
+        activityType: "CHECK_OUT",
+        date: record.date,
+        timestamp: autoCheckOutDate,
+        description: `System auto-checkout applied: Status marked Absent, Duration: ${formattedDuration}`,
+        metadata: {
+          attendanceId: record._id,
+          workingHours: decimalHours,
+          status: "Absent",
+          isAutoCheckedOut: true,
+        },
+      });
+    } else {
+      // AUTO CHECK-OUT IS DISABLED & USER FORGOT TO CHECK OUT
+      // Status becomes "Absent" and working hours are NOT calculated (0 hrs).
+      record.workingHours = 0;
+      record.formattedDuration = "0 hrs 0 mins";
+      record.status = "Absent";
+      await record.save();
+
+      // Adjust monthly attendance
+      await MonthlyAttendance.findOneAndUpdate(
+        { userId, year: rYear, month: rMonth, isLocked: false },
+        {
+          $inc: {
+            presentDays: -1,
+            absentDays: 1,
+          },
+        }
+      );
+
+      await ActivityLog.create({
+        userId,
+        activityType: "CHECK_OUT",
+        date: record.date,
+        timestamp: now,
+        description: `Employee forgot to check out (Auto-checkout disabled). Status set to Absent, Working hours set to 0.`,
+        metadata: {
+          attendanceId: record._id,
+          workingHours: 0,
+          status: "Absent",
+          isAutoCheckedOut: false,
+          forgotCheckOut: true,
+        },
+      });
+    }
   }
-
-  return record;
 }
 
 export async function GET() {
@@ -175,11 +250,11 @@ export async function GET() {
     const settings = await getActiveSettings();
     const todayDateStr = getLocalDateString();
     const now = new Date();
-    const local = getLocalTimeComponents(now);
-    const currentYear = local.localDateObj.getFullYear();
-    const currentMonth = local.localDateObj.getMonth() + 1;
+    const zonedNow = getZonedParts(now);
+    const currentYear = zonedNow.year;
+    const currentMonth = zonedNow.month;
 
-    // Auto-lock older months when querying logs
+    // Lock past months
     await MonthlyAttendance.updateMany(
       {
         userId,
@@ -192,31 +267,30 @@ export async function GET() {
       { $set: { isLocked: true } }
     );
 
-    // Apply auto-checkout verification before fetching record
-    let todayRecord = await processAutoCheckOutIfEligible(userId, todayDateStr, settings);
-    if (!todayRecord) {
-      todayRecord = await Attendance.findOne({ userId, date: todayDateStr });
-    }
+    // Process open/unclosed attendance records
+    await processUnclosedAttendance(userId, settings);
+
+    const todayRecord = await Attendance.findOne({ userId, date: todayDateStr }).lean();
 
     const history = await Attendance.find({ userId })
       .sort({ createdAt: -1 })
       .limit(30)
       .lean();
 
-    const monthlyRecord = await MonthlyAttendance.findOne({
+    const monthlyRecord = (await MonthlyAttendance.findOne({
       userId,
       year: currentYear,
       month: currentMonth
-    }).lean();
+    }).lean()) as Record<string, any> | null;
 
     const monthlyStats = monthlyRecord
       ? {
-          presentDays: monthlyRecord.presentDays ?? 0,
-          absentDays: monthlyRecord.absentDays ?? 0,
-          lateDays: (monthlyRecord as unknown as { lateDays?: number }).lateDays ?? 0,
-          leaveDays: monthlyRecord.leaveDays ?? 0,
-          onDutyDays: monthlyRecord.onDutyDays ?? 0,
-          totalWorkingHours: monthlyRecord.totalWorkingHours ?? 0,
+          presentDays: Math.max(0, monthlyRecord.presentDays ?? 0),
+          absentDays: Math.max(0, monthlyRecord.absentDays ?? 0),
+          lateDays: Math.max(0, monthlyRecord.lateDays ?? 0),
+          leaveDays: Math.max(0, monthlyRecord.leaveDays ?? 0),
+          onDutyDays: Math.max(0, monthlyRecord.onDutyDays ?? 0),
+          totalWorkingHours: Math.round((monthlyRecord.totalWorkingHours ?? 0) * 100) / 100,
         }
       : null;
 
@@ -249,41 +323,24 @@ export async function POST(request: Request) {
 
     const settings = await getActiveSettings();
     const now = new Date();
-    const local = getLocalTimeComponents(now);
-    const currentYear = local.localDateObj.getFullYear();
-    const currentMonth = local.localDateObj.getMonth() + 1;
+    const zonedNow = getZonedParts(now);
+    const currentYear = zonedNow.year;
+    const currentMonth = zonedNow.month;
 
     // 1. Weekly Off Constraint
-    if (local.day === 0) {
+    if (getZonedDayOfWeek(now) === 0) {
       return NextResponse.json(
         { error: "Weekly Off: Attendance actions are disabled on Sundays." },
         { status: 400 }
       );
     }
 
-    const todayDateStr = getLocalDateString(now);
+    const todayDateStr = zonedNow.dateStr;
 
-    // Apply auto-checkout checks before executing any action
-    await processAutoCheckOutIfEligible(userId, todayDateStr, settings);
+    // Process any open/unclosed records first
+    await processUnclosedAttendance(userId, settings);
 
-    // 2. Active Operational Window Check (Parsed dynamically from Mongoose Company Settings)
-    const currentTimeMinutes = local.hours * 60 + local.minutes;
-    const shiftStartMin = timeToMinutes(settings.shiftStart || "09:00");
-    const shiftEndMin = timeToMinutes(settings.shiftEnd || "17:00");
-    const checkInDisplayOffset = settings.checkInDisplayBefore || 30;
-    const checkOutDisplayOffset = settings.checkOutDisplayAfter || 0;
-
-    const minAllowedTime = shiftStartMin - checkInDisplayOffset; 
-    const maxAllowedTime = shiftEndMin + checkOutDisplayOffset;
-
-    if (currentTimeMinutes < minAllowedTime || currentTimeMinutes > maxAllowedTime) {
-      return NextResponse.json(
-        { error: `Attendance actions are restricted to your active shift parameters (${settings.shiftStart} to ${settings.shiftEnd}).` },
-        { status: 400 }
-      );
-    }
-
-    // 3. Lock System - Automatically lock historical records belonging to past months
+    // 2. Lock System - Automatically lock historical records
     await MonthlyAttendance.updateMany(
       {
         userId,
@@ -296,7 +353,7 @@ export async function POST(request: Request) {
       { $set: { isLocked: true } }
     );
 
-    // 4. Lock Check - Prevent operations if the current month is locked
+    // Lock Check
     const currentMonthlyRecord = await MonthlyAttendance.findOne({
       userId,
       year: currentYear,
@@ -310,15 +367,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const currentTimeMinutes = zonedNow.hour * 60 + zonedNow.minute;
+    const shiftStartMin = timeToMinutes(settings.shiftStart);
+    const checkInDisplayOffset = settings.checkInDisplayBefore;
+
     if (action === "check-in") {
+      // Validate Check-in Window
+      const minAllowedCheckIn = shiftStartMin - checkInDisplayOffset;
+      if (currentTimeMinutes < minAllowedCheckIn) {
+        return NextResponse.json(
+          { error: `Check-in is not allowed before ${settings.shiftStart} (Allowed from ${settings.checkInDisplayBefore} mins prior).` },
+          { status: 400 }
+        );
+      }
+
       const existingRecord = await Attendance.findOne({ userId, date: todayDateStr });
       if (existingRecord) {
         return NextResponse.json({ error: "Already checked in for today" }, { status: 400 });
       }
 
-      // Late check-in condition: Current time is past (shiftStart + gracePeriod)
       let status: "On Time" | "Late" | "Absent" = "On Time";
-      const graceThresholdMinutes = shiftStartMin + (settings.gracePeriod || 15);
+      const graceThresholdMinutes = shiftStartMin + settings.gracePeriod;
 
       if (currentTimeMinutes > graceThresholdMinutes) {
         status = "Late";
@@ -331,17 +400,21 @@ export async function POST(request: Request) {
         status,
       });
 
-      // Update monthly record (add present days)
+      // Update monthly record
+      const incPayload: Record<string, number> = { presentDays: 1 };
+      if (status === "Late") {
+        incPayload.lateDays = 1;
+      }
+
       await MonthlyAttendance.findOneAndUpdate(
         { userId, year: currentYear, month: currentMonth },
         { 
-          $inc: { presentDays: 1 },
+          $inc: incPayload,
           $setOnInsert: { totalWorkingHours: 0, absentDays: 0, leaveDays: 0, onDutyDays: 0, isLocked: false }
         },
         { upsert: true, new: true }
       );
 
-      // Log activity to unified log
       await ActivityLog.create({
         userId,
         activityType: "CHECK_IN",
@@ -373,70 +446,29 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Already checked out for today" }, { status: 400 });
       }
 
-      const finalStatus = existingRecord.status;
-
-      // Calculate Bounded Working Hours dynamically based on active shift settings
       const checkInTime = new Date(existingRecord.checkIn);
-      const checkOutTime = now;
-
-      const localCheckIn = getLocalTimeComponents(checkInTime);
-      const localCheckOut = getLocalTimeComponents(checkOutTime);
-
-      const checkInBoundStart = new Date(localCheckIn.localDateObj);
-      const [sH, sM] = (settings.shiftStart || "09:00").split(":").map(Number);
-      checkInBoundStart.setHours(sH, sM, 0, 0);
-
-      const checkOutBoundEnd = new Date(localCheckOut.localDateObj);
-      const [eH, eM] = (settings.shiftEnd || "17:00").split(":").map(Number);
-      checkOutBoundEnd.setHours(eH, eM, 0, 0);
-
-      const checkInLocalTime = localCheckIn.localDateObj.getTime();
-      const checkOutLocalTime = localCheckOut.localDateObj.getTime();
-
-      const effectiveCheckInTime = Math.max(checkInLocalTime, checkInBoundStart.getTime());
-      const effectiveCheckOutTime = Math.min(checkOutLocalTime, checkOutBoundEnd.getTime());
-
-      let diffMs = effectiveCheckOutTime - effectiveCheckInTime;
-      if (diffMs < 0) diffMs = 0;
-
-      let diffHours = diffMs / (1000 * 60 * 60);
-      
-      // Cap at 8 hours maximum on a daily basis
-      if (diffHours > 8) {
-        diffHours = 8;
-        diffMs = 8 * 1000 * 60 * 60;
-      }
-
-      const decimalHours = Math.round(diffHours * 100) / 100;
-
-      const totalMinutes = Math.floor(diffMs / (1000 * 60));
-      const hours = Math.floor(totalMinutes / 60);
-      const mins = totalMinutes % 60;
-      const formattedDuration = `${hours} hrs ${mins} mins`;
+      const { decimalHours, formattedDuration } = calculateBoundedWorkingHours(
+        checkInTime,
+        now,
+        todayDateStr,
+        settings.shiftStart,
+        settings.shiftEnd
+      );
 
       existingRecord.checkOut = now;
-      existingRecord.status = finalStatus;
       existingRecord.workingHours = decimalHours;
       existingRecord.formattedDuration = formattedDuration;
 
       await existingRecord.save();
 
-      // Increment total working hours progressively in the monthly record
-      const updatedMonthlyRecord = await MonthlyAttendance.findOneAndUpdate(
+      // Increment total working hours progressively in monthly record
+      await MonthlyAttendance.findOneAndUpdate(
         { userId, year: currentYear, month: currentMonth, isLocked: false },
         { 
           $inc: { totalWorkingHours: decimalHours }
-        },
-        { new: true }
+        }
       );
 
-      // Round working hours in database to avoid floating point precision issues
-      if (updatedMonthlyRecord) {
-        updatedMonthlyRecord.totalWorkingHours = Math.round(updatedMonthlyRecord.totalWorkingHours * 100) / 100;
-        await updatedMonthlyRecord.save();
-      }
-
-      // Log activity to unified log
       await ActivityLog.create({
         userId,
         activityType: "CHECK_OUT",
@@ -446,7 +478,7 @@ export async function POST(request: Request) {
         metadata: {
           attendanceId: existingRecord._id,
           workingHours: decimalHours,
-          status: finalStatus,
+          status: existingRecord.status,
         },
       });
 

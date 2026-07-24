@@ -32,7 +32,7 @@ export async function GET() {
         checkInDisplayBefore: 30,
         checkOutDisplayAfter: 0,
         autoCheckOut: false,
-        autoCheckOutTime: "18:00",
+        autoCheckOutBuffer: 30,
       };
     }
 
@@ -57,7 +57,7 @@ async function handleUpdate(request: Request) {
 
     await dbConnect();
 
-    // 2. Safely parse request body to avoid crashing on empty payloads
+    // 2. Safely parse request body
     let body;
     try {
       body = await request.json();
@@ -81,8 +81,13 @@ async function handleUpdate(request: Request) {
       checkInDisplayBefore,
       checkOutDisplayAfter,
       autoCheckOut,
-      autoCheckOutTime
+      autoCheckOutBuffer
     } = body;
+
+    // Ensure autoCheckOutBuffer is a number between 0 and 30 minutes
+    let bufferInMinutes = typeof autoCheckOutBuffer === "number" ? autoCheckOutBuffer : 30;
+    if (bufferInMinutes > 30) bufferInMinutes = 30;
+    if (bufferInMinutes < 0) bufferInMinutes = 0;
 
     // Find the singular active settings document
     const existing = await CompanyDetails.findOne();
@@ -100,8 +105,8 @@ async function handleUpdate(request: Request) {
       gracePeriod: typeof gracePeriod === "number" ? gracePeriod : 15,
       checkInDisplayBefore: typeof checkInDisplayBefore === "number" ? checkInDisplayBefore : 30,
       checkOutDisplayAfter: typeof checkOutDisplayAfter === "number" ? checkOutDisplayAfter : 0,
-      autoCheckOut: typeof autoCheckOut === "boolean" ? autoCheckOut : false,
-      autoCheckOutTime: autoCheckOutTime || "18:00",
+      autoCheckOut: Boolean(autoCheckOut),
+      autoCheckOutBuffer: bufferInMinutes,
     };
 
     let result;
@@ -128,7 +133,6 @@ async function handleUpdate(request: Request) {
   }
 }
 
-// 3. Support both HTTP PUT and POST methods to bypass client configuration errors
 export async function PUT(request: Request) {
   return handleUpdate(request);
 }

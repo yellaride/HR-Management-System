@@ -12,11 +12,11 @@ const CompanyDetailsSchema = new Schema(
     shiftStart: { type: String, default: "09:00" },
     shiftEnd: { type: String, default: "17:00" },
     gracePeriod: { type: Number, default: 15 },
-    // New persistent visibility and automation parameters
+    // persistent visibility and automation parameters
     checkInDisplayBefore: { type: Number, default: 30 }, // Minutes before shiftStart to show button
     checkOutDisplayAfter: { type: Number, default: 0 },  // Minutes after shiftEnd to show button
-    autoCheckOut: { type: Boolean, default: false },    // Is Auto Check-out active
-    autoCheckOutTime: { type: String, default: "18:00" }, // Time of day to run auto check-out
+    autoCheckOut: { type: Boolean, default: false },    // Is Auto Check-out active (checkbox)
+    autoCheckOutBuffer: { type: Number, default: 30, min: 0, max: 30 }, // Buffer in minutes (max 30)
   },
   {
     timestamps: true,

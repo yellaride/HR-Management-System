@@ -39,6 +39,16 @@ interface HistoryProps {
   onPeriodChange: (p: "this-month" | "last-month" | "all") => void;
 }
 
+/** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
+function formatTo12Hour(timeStr: string): string {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 function formatToLocalTimeInput(dateString: string | null | undefined, defaultTime: string): string {
   if (!dateString) return defaultTime;
   const date = new Date(dateString);
@@ -395,10 +405,10 @@ export default function HistoryAnalytics({
                       <tr key={log._id} className="hover:bg-slate-50/50 transition">
                         <td className="px-6 py-4 font-black text-content-main">{log.date}</td>
                         <td className="px-6 py-4 font-mono font-semibold">
-                          {log.checkIn ? new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" }) : "--"}
+                          {log.checkIn ? formatTo12Hour(new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" })) : "--"}
                         </td>
                         <td className="px-6 py-4 font-mono font-semibold">
-                          {log.checkOut ? new Date(log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" }) : "--"}
+                          {log.checkOut ? formatTo12Hour(new Date(log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" })) : "--"}
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-slate-500">{log.workingHours || "0"} hrs</td>
                         <td className="px-6 py-4 font-mono font-extrabold text-content-main">{log.formattedDuration || "--"}</td>

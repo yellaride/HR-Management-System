@@ -8,63 +8,83 @@ import { getAdminUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// Company settings fields consumed by the attendance calculations in this route
+const TIMEZONE = "Asia/Karachi";
+
 interface AttendanceSettings {
   shiftStart?: string;
   shiftEnd?: string;
   gracePeriod?: number;
   autoCheckOut?: boolean;
-  autoCheckOutTime?: string;
+  autoCheckOutBuffer?: number;
 }
 
+/** Returns date formatted as "YYYY-MM-DD" in Asia/Karachi time */
+function getKarachiDateString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/** Returns total minutes from midnight in Asia/Karachi time */
+function getKarachiMinutes(date: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(date);
+
+  let hours = 0;
+  let minutes = 0;
+  for (const part of parts) {
+    if (part.type === "hour") hours = parseInt(part.value, 10) % 24;
+    if (part.type === "minute") minutes = parseInt(part.value, 10);
+  }
+  return hours * 60 + minutes;
+}
+
+/** Converts "HH:MM" string to minutes from midnight */
 function timeToMinutes(timeStr: string): number {
   if (!timeStr) return 0;
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
+  const [h, m] = timeStr.split(":").map((num) => parseInt(num, 10));
+  return (h || 0) * 60 + (m || 0);
 }
 
+/** Fetches active settings or defaults */
 async function getActiveSettings() {
   let settings = await CompanyDetails.findOne();
   if (!settings) {
     settings = await CompanyDetails.create({
-      shiftStart: "12:00",
-      shiftEnd: "20:00",
+      shiftStart: "09:00",
+      shiftEnd: "17:00",
       gracePeriod: 15,
       checkInDisplayBefore: 30,
       checkOutDisplayAfter: 0,
       autoCheckOut: false,
-      autoCheckOutTime: "18:00"
+      autoCheckOutBuffer: 30,
     });
   }
   return settings;
 }
 
+/** Computes daily shift status and working hours (capped at 8h max) */
 function computeDailyShiftsAndHours(
-  checkInDate: Date | null, 
-  checkOutDate: Date | null, 
+  checkInDate: Date | null,
+  checkOutDate: Date | null,
   settings: { shiftStart?: string; shiftEnd?: string; gracePeriod?: number }
 ) {
   if (!checkInDate) {
     return { status: "Absent" as const, workingHours: 0, formattedDuration: "" };
   }
 
-  const timeZone = "Asia/Karachi";
   const gracePeriod = typeof settings.gracePeriod === "number" ? settings.gracePeriod : 15;
   const shiftStart = settings.shiftStart || "09:00";
   const shiftEnd = settings.shiftEnd || "17:00";
 
-  const getMinutesInTimezone = (date: Date, tz: string) => {
-    const tzString = date.toLocaleTimeString("en-US", {
-      timeZone: tz,
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const [hours, minutes] = tzString.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const checkInMinutes = getMinutesInTimezone(checkInDate, timeZone);
+  const checkInMinutes = getKarachiMinutes(checkInDate);
   const shiftStartMin = timeToMinutes(shiftStart);
   const graceThresholdMinutes = shiftStartMin + gracePeriod;
 
@@ -77,16 +97,22 @@ function computeDailyShiftsAndHours(
     return { status, workingHours: 0, formattedDuration: "" };
   }
 
-  const checkOutMinutes = getMinutesInTimezone(checkOutDate, timeZone);
-  const shiftEndMinutes = timeToMinutes(shiftEnd);
+  const shiftEndMin = timeToMinutes(shiftEnd);
+  const checkOutMinutes = getKarachiMinutes(checkOutDate);
 
-  const effectiveStartMinutes = Math.max(checkInMinutes, shiftStartMin);
-  const effectiveEndMinutes = Math.min(checkOutMinutes, shiftEndMinutes);
+  let diffMinutes = 0;
+  const isNightShift = shiftEndMin < shiftStartMin;
 
-  let diffMinutes = effectiveEndMinutes - effectiveStartMinutes;
-  if (diffMinutes < 0) diffMinutes = 0;
+  if (!isNightShift) {
+    const effectiveStartMinutes = Math.max(checkInMinutes, shiftStartMin);
+    const effectiveEndMinutes = Math.min(checkOutMinutes, shiftEndMin);
+    diffMinutes = Math.max(0, effectiveEndMinutes - effectiveStartMinutes);
+  } else {
+    const diffMs = checkOutDate.getTime() - checkInDate.getTime();
+    diffMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)));
+  }
 
-  // Limit daily working hours to 8 hours max
+  // Cap working hours to 8 hours maximum per day
   if (diffMinutes > 8 * 60) {
     diffMinutes = 8 * 60;
   }
@@ -99,13 +125,15 @@ function computeDailyShiftsAndHours(
   return { status, workingHours: decimalHours, formattedDuration };
 }
 
+/** Recalculates monthly aggregate metrics */
 async function syncMonthlyAttendanceAggregates(userId: string, year: number, month: number) {
   const monthStr = String(month).padStart(2, "0");
-  const datePattern = `^${year}-${monthStr}`;
+  const startDate = `${year}-${monthStr}-01`;
+  const endDate = `${year}-${monthStr}-31`;
 
   const allMonthlyLogs = await Attendance.find({
     userId,
-    date: { $regex: datePattern }
+    date: { $gte: startDate, $lte: endDate },
   }).lean();
 
   let totalWorkingHours = 0;
@@ -129,64 +157,50 @@ async function syncMonthlyAttendanceAggregates(userId: string, year: number, mon
       totalWorkingHours,
       presentDays,
       absentDays,
-      isLocked: false 
+      isLocked: false,
     },
     { upsert: true, new: true }
   );
 }
 
-/**
- * Automatically checks out employees who have check-ins but are missing check-outs,
- * given that the autoCheckOut setting is enabled and the appropriate threshold has passed.
- */
+/** On-demand trigger when page loads */
 async function runAutoCheckOutIfNeeded(date: string, settings: AttendanceSettings) {
   if (!settings?.autoCheckOut) return;
 
-  const serverTime = new Date();
-  const localNow = new Date(serverTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
-  
-  const currentYear = localNow.getFullYear();
-  const currentMonth = localNow.getMonth() + 1;
-  const currentDay = localNow.getDate();
-  const todayStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(currentDay).padStart(2, "0")}`;
-
-  // Do not run operations on future days
+  const todayStr = getKarachiDateString();
   if (date > todayStr) return;
 
-  // If checking today, verify whether Pakistan local time has reached the trigger threshold
   if (date === todayStr) {
-    const currentLocalMinutes = localNow.getHours() * 60 + localNow.getMinutes();
-    const autoCheckOutMinutes = timeToMinutes(settings.autoCheckOutTime || "18:00");
-    if (currentLocalMinutes < autoCheckOutMinutes) {
-      return; 
+    const currentLocalMinutes = getKarachiMinutes();
+    const shiftEndMin = timeToMinutes(settings.shiftEnd || "17:00");
+    const bufferMin = typeof settings.autoCheckOutBuffer === "number" 
+      ? Math.min(30, Math.max(0, settings.autoCheckOutBuffer)) 
+      : 30;
+    
+    if (currentLocalMinutes < (shiftEndMin + bufferMin)) {
+      return;
     }
   }
 
-  // Find daily logs having a check-in but missing a check-out
   const pendingLogs = await Attendance.find({
     date,
     checkIn: { $exists: true, $ne: null },
-    checkOut: { $exists: false }
+    $or: [{ checkOut: { $exists: false } }, { checkOut: null }],
   }).lean();
 
   if (pendingLogs.length === 0) return;
 
   const [yearStr, monthStr] = date.split("-");
-  const year = parseInt(yearStr);
-  const month = parseInt(monthStr);
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
 
   for (const log of pendingLogs) {
-    // Skip operation if the month is finalized/locked
     const monthlyLockCheck = await MonthlyAttendance.findOne({ userId: log.userId, year, month }).lean();
-    if (monthlyLockCheck?.isLocked) {
-      continue;
-    }
+    if (monthlyLockCheck?.isLocked) continue;
 
-    // Safely resolve check-out timestamp matching shiftEnd in local PKT (+05:00)
     const checkoutISO = `${date}T${settings.shiftEnd || "17:00"}:00+05:00`;
     let checkOutDate = new Date(checkoutISO);
 
-    // Guard against negative boundaries (in case checkout is chronologically before check-in)
     if (log.checkIn && checkOutDate.getTime() < new Date(log.checkIn).getTime()) {
       checkOutDate = new Date(log.checkIn);
     }
@@ -200,8 +214,8 @@ async function runAutoCheckOutIfNeeded(date: string, settings: AttendanceSetting
           checkOut: checkOutDate,
           workingHours: calculations.workingHours,
           formattedDuration: calculations.formattedDuration,
-          status: calculations.status
-        }
+          status: calculations.status,
+        },
       }
     );
 
@@ -219,26 +233,21 @@ export async function GET(request: Request) {
     await dbConnect();
     const { searchParams } = new URL(request.url);
 
-    const date = searchParams.get("date"); // YYYY-MM-DD
+    const date = searchParams.get("date");
     const userId = searchParams.get("userId");
-    const period = searchParams.get("period"); // "this-month" | "last-month" | "all"
+    const period = searchParams.get("period");
 
-    const serverTime = new Date();
-    const localNow = new Date(serverTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
-    const currentYear = localNow.getFullYear();
-    const currentMonth = localNow.getMonth() + 1; // 1-12
+    const todayStr = getKarachiDateString();
+    const [currentYear, currentMonth] = todayStr.split("-").map((n) => parseInt(n, 10));
 
-    // CASE A: Fetch History & Monthly aggregations for drilldown
     if (userId) {
-      // Evaluate past logs and ensure historical runs are up to date before fetching
-      // (getActiveSettings creates the CompanyDetails doc if missing, so the call must stay)
       await getActiveSettings();
 
       const query: Record<string, unknown> = { userId };
 
       if (period === "this-month") {
         const monthStr = String(currentMonth).padStart(2, "0");
-        query.date = { $regex: `^${currentYear}-${monthStr}` };
+        query.date = { $gte: `${currentYear}-${monthStr}-01`, $lte: `${currentYear}-${monthStr}-31` };
       } else if (period === "last-month") {
         let lastMonth = currentMonth - 1;
         let lastYear = currentYear;
@@ -247,7 +256,7 @@ export async function GET(request: Request) {
           lastYear = currentYear - 1;
         }
         const lastMonthStr = String(lastMonth).padStart(2, "0");
-        query.date = { $regex: `^${lastYear}-${lastMonthStr}` };
+        query.date = { $gte: `${lastYear}-${lastMonthStr}-01`, $lte: `${lastYear}-${lastMonthStr}-31` };
       }
 
       const logs = await Attendance.find(query).sort({ date: -1 }).lean();
@@ -261,7 +270,8 @@ export async function GET(request: Request) {
       const presenceCount = onTimeDays + lateDays;
       const attendanceRate = totalDays > 0 ? Math.round((presenceCount / totalDays) * 100) : 0;
 
-      const targetMonth = period === "this-month" ? currentMonth : period === "last-month" ? (currentMonth === 1 ? 12 : currentMonth - 1) : null;
+      const targetMonth =
+        period === "this-month" ? currentMonth : period === "last-month" ? (currentMonth === 1 ? 12 : currentMonth - 1) : null;
       const targetYear = period === "last-month" && currentMonth === 1 ? currentYear - 1 : currentYear;
 
       let isLocked = false;
@@ -270,32 +280,34 @@ export async function GET(request: Request) {
         isLocked = lockObj ? lockObj.isLocked : false;
       }
 
-      return NextResponse.json({
-        logs,
-        isLocked,
-        stats: {
-          totalDays,
-          onTimeDays,
-          lateDays,
-          absentDays,
-          totalHours: Number(totalHours.toFixed(2)),
-          attendanceRate,
-        }
-      }, { status: 200 });
+      return NextResponse.json(
+        {
+          logs,
+          isLocked,
+          stats: {
+            totalDays,
+            onTimeDays,
+            lateDays,
+            absentDays,
+            totalHours: Number(totalHours.toFixed(2)),
+            attendanceRate,
+          },
+        },
+        { status: 200 }
+      );
     }
 
-    // CASE B: Standard Daily Timesheets Load
     if (!date) {
       return NextResponse.json({ error: "Date parameter is required" }, { status: 400 });
     }
 
     const parts = date.split("-");
-    const year = parseInt(parts[0]) || currentYear;
-    const month = parseInt(parts[1]) || currentMonth;
+    const year = parseInt(parts[0], 10) || currentYear;
+    const month = parseInt(parts[1], 10) || currentMonth;
 
     const settings = await getActiveSettings();
-    
-    // Evaluate if auto check-outs are needed on this day prior to loading the data payload
+
+    // Check and execute pending checkouts on page view as fallback
     await runAutoCheckOutIfNeeded(date, settings);
 
     const [employees, logs, monthlyRecords] = await Promise.all([
@@ -304,8 +316,8 @@ export async function GET(request: Request) {
       MonthlyAttendance.find({ year, month }).lean(),
     ]);
 
-    const shiftStart = settings?.shiftStart || "12:00";
-    const shiftEnd = settings?.shiftEnd || "20:00";
+    const shiftStart = settings?.shiftStart || "09:00";
+    const shiftEnd = settings?.shiftEnd || "17:00";
     const shiftTimeLabel = `${shiftStart}-${shiftEnd}`;
 
     type LeanEmployeeDoc = Record<string, unknown> & { shiftTime?: string };
@@ -314,14 +326,16 @@ export async function GET(request: Request) {
       shiftTime: e?.shiftTime || shiftTimeLabel,
     }));
 
-    return NextResponse.json({ 
-      employees: enrichedEmployees, 
-      logs, 
-      monthlyRecords, 
-      shiftTimeLabel,
-      companySettings: settings
-    }, { status: 200 });
-
+    return NextResponse.json(
+      {
+        employees: enrichedEmployees,
+        logs,
+        monthlyRecords,
+        shiftTimeLabel,
+        companySettings: settings,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Attendance API GET Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -344,16 +358,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields: userId and date" }, { status: 400 });
     }
 
-    const serverTime = new Date();
-    const localNow = new Date(serverTime.toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
-    const todayStr = localNow.toISOString().slice(0, 10);
+    const todayStr = getKarachiDateString();
     if (date > todayStr) {
       return NextResponse.json({ error: "Cannot register attendance for future dates." }, { status: 400 });
     }
 
     const parts = date.split("-");
-    const year = parseInt(parts[0]) || localNow.getFullYear();
-    const month = parseInt(parts[1]) || (localNow.getMonth() + 1);
+    const year = parseInt(parts[0], 10) || parseInt(todayStr.split("-")[0], 10);
+    const month = parseInt(parts[1], 10) || parseInt(todayStr.split("-")[1], 10);
 
     const monthlyLockCheck = await MonthlyAttendance.findOne({ userId, year, month }).lean();
     if (monthlyLockCheck?.isLocked) {
@@ -407,7 +419,6 @@ export async function POST(request: Request) {
     await syncMonthlyAttendanceAggregates(userId, year, month);
 
     return NextResponse.json({ success: true, record: updatedRecord }, { status: 200 });
-
   } catch (error) {
     console.error("Attendance API POST Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

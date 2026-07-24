@@ -13,7 +13,6 @@ import AttendanceSettings from "@/app/components/admin/settings/AttendanceSettin
 import ManualAttendanceModal from "@/app/components/admin/attendance/ManualAttendanceModal";
 import EditAttendanceModal from "@/app/components/admin/attendance/EditAttendanceModal";
 
-
 function todayISO(): string {
   const d = new Date();
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -82,7 +81,7 @@ interface CompanySettings {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutTime: string;
+  autoCheckOutBuffer: number;
   departments?: string[];
 }
 
@@ -103,7 +102,6 @@ export default function AdminAttendancePage() {
   const [activeTab, setActiveTab] = useState<"directory" | "history-drill" | "rules">("directory");
   
   const [filterDate] = useState<string>(() => todayISO());
-
 
   // Filter criteria
   const [searchQuery, setSearchQuery] = useState("");
@@ -162,19 +160,35 @@ export default function AdminAttendancePage() {
   }, [filterDate]);
 
   useEffect(() => {
-    async function loadDailyLogs() {
-      fetchDailyLogs();
-    }
-    loadDailyLogs();
+    fetchDailyLogs();
   }, [fetchDailyLogs]);
 
-  const shiftTimeLabel = useMemo(() => {
+  const formatTo12Hour = (timeStr: string): string => {
+    if (!timeStr) return "";
+    const [h, m] = timeStr.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return timeStr;
+    const period = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 || 12;
+    return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+  };
 
+  const shiftTimeLabel = useMemo(() => {
     if (companySettings) {
-      return `${companySettings.shiftStart}-${companySettings.shiftEnd}`;
+      return `${formatTo12Hour(companySettings.shiftStart)} - ${formatTo12Hour(companySettings.shiftEnd)}`;
     }
-    return "09:00-17:00";
+    return "09:00 AM - 05:00 PM";
   }, [companySettings]);
+
+  const formatShiftTime = (shift: string): string => {
+    if (!shift) return "";
+    const parts = shift.split(/\s*[-–—to]\s*/);
+    if (parts.length >= 2) {
+      const start = formatTo12Hour(parts[0].trim());
+      const end = formatTo12Hour(parts[1].trim());
+      return `${start} - ${end}`;
+    }
+    return formatTo12Hour(shift.trim());
+  };
 
   const mergedRecords = useMemo(() => {
     return employees.map((emp) => {
@@ -188,13 +202,13 @@ export default function AdminAttendancePage() {
         department: emp.department,
         designation: emp.designation,
         profilePhotoUrl: emp.profilePhotoUrl || emp.profilePhotoURL || emp.profilePicture || emp.image || "",
-        shiftTime: emp.shiftTime || shiftTimeLabel, 
+        shiftTime: emp.shiftTime ? formatShiftTime(emp.shiftTime) : shiftTimeLabel,
 
         checkIn: log?.checkIn
-          ? new Date(log.checkIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" })
+          ? formatTo12Hour(new Date(log.checkIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" }))
           : "",
         checkOut: log?.checkOut
-          ? new Date(log.checkOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" })
+          ? formatTo12Hour(new Date(log.checkOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" }))
           : "", 
         rawCheckIn: log?.checkIn || null,
         rawCheckOut: log?.checkOut || null,
@@ -260,7 +274,7 @@ export default function AdminAttendancePage() {
     if (res.ok) {
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
-      triggerToast("Timesheet adjusted and recalculated successfully.");
+      triggerToast("Timesheet adjusted successfully.");
       setIsLoading(true);
       fetchDailyLogs();
     } else {
@@ -312,7 +326,7 @@ export default function AdminAttendancePage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">On-Site Attendance</h1>
           <p className="mt-1 text-xs text-content-secondary">
-            Review today&apos;s biometric entries, log retro punch logs, and handle dynamic configurations.
+            Review biometric entries, log retro punch logs, and handle dynamic configurations.
           </p>
         </div>
 
@@ -387,16 +401,16 @@ export default function AdminAttendancePage() {
             onDeptChange={setFilterDept}
             filterStatus={filterStatus}
             onStatusChange={setFilterStatus}
-          departments={[
-            "All",
-            ...Array.from(
-              new Set<string>(
-                (companySettings?.departments || [])
-                  .filter((d) => typeof d === "string" && d.trim().length > 0)
-                  .map((d) => d.trim())
-              )
-            ),
-          ]}
+            departments={[
+              "All",
+              ...Array.from(
+                new Set<string>(
+                  (companySettings?.departments || [])
+                    .filter((d) => typeof d === "string" && d.trim().length > 0)
+                    .map((d) => d.trim())
+                )
+              ),
+            ]}
             statuses={["All", "On Time", "Late", "Absent"]}
             onClear={() => {
               setSearchQuery("");

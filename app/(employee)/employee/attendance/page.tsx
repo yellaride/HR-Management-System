@@ -29,33 +29,33 @@ interface ActiveSettings {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
+  autoCheckOutBuffer: number;
   autoCheckOutTime: string;
 }
 
 function ClockWidget() {
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [currentTime, setCurrentTime] = useState<string>("--:--:--");
 
   useEffect(() => {
-    const initial = setTimeout(() => setCurrentTime(new Date()), 0);
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(timer);
+    const updateTime = () => {
+      const nowStr = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Karachi",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }).format(new Date());
+      setCurrentTime(nowStr);
     };
-  }, []);
 
-  if (!currentTime) {
-    return <span className="text-sm font-bold text-content-main tabular-nums">--:--:--</span>;
-  }
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <span className="text-sm font-bold text-content-main tabular-nums">
-      {currentTime.toLocaleTimeString([], { 
-        hour: "2-digit", 
-        minute: "2-digit", 
-        second: "2-digit", 
-        hour12: true 
-      })}
+      {currentTime}
     </span>
   );
 }
@@ -68,9 +68,10 @@ export default function EmployeeAttendancePage() {
     shiftEnd: "17:00",
     gracePeriod: 15,
     checkInDisplayBefore: 30,
-    checkOutDisplayAfter: 0,
+    checkOutDisplayAfter: 30,
     autoCheckOut: false,
-    autoCheckOutTime: "18:00"
+    autoCheckOutBuffer: 30,
+    autoCheckOutTime: "17:30"
   });
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -86,19 +87,35 @@ export default function EmployeeAttendancePage() {
   const [isWithinWindow, setIsWithinWindow] = useState<boolean>(false);
   const [isPastAutoCheckOut, setIsPastAutoCheckOut] = useState<boolean>(false);
 
+  // Timezone-safe evaluation using Asia/Karachi timezone
   const evaluateTimeConstraints = useCallback(() => {
     const now = new Date();
-    const day = now.getDay();
-    
-    if (day === 0) {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Karachi",
+      hour: "numeric",
+      minute: "numeric",
+      weekday: "short",
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(now);
+    let hours = 0;
+    let minutes = 0;
+    let dayStr = "";
+
+    for (const part of parts) {
+      if (part.type === "hour") hours = parseInt(part.value, 10) % 24;
+      if (part.type === "minute") minutes = parseInt(part.value, 10);
+      if (part.type === "weekday") dayStr = part.value;
+    }
+
+    if (dayStr === "Sun") {
       setIsSunday(true);
       setIsWithinWindow(false);
       return;
     }
-    
+
     setIsSunday(false);
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
     const currentMins = hours * 60 + minutes;
 
     const [startH, startM] = settings.shiftStart.split(":").map(Number);
@@ -107,17 +124,27 @@ export default function EmployeeAttendancePage() {
     const shiftStartMin = startH * 60 + startM;
     const shiftEndMin = endH * 60 + endM;
 
-    const checkInOffset = settings.checkInDisplayBefore || 30;
-    const checkOutOffset = settings.checkOutDisplayAfter || 0;
+    const checkInOffset = settings.checkInDisplayBefore ?? 30;
+    const checkOutOffset = settings.checkOutDisplayAfter ?? 30;
 
-    const startLimit = shiftStartMin - checkInOffset; 
-    const endLimit = shiftEndMin + checkOutOffset; 
+    const isNightShift = shiftEndMin < shiftStartMin;
 
-    setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
+    if (!isNightShift) {
+      const startLimit = shiftStartMin - checkInOffset;
+      const endLimit = shiftEndMin + checkOutOffset;
+      setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
+    } else {
+      const startLimit = shiftStartMin - checkInOffset;
+      const endLimit = shiftEndMin + checkOutOffset;
+      setIsWithinWindow(currentMins >= startLimit || currentMins <= endLimit);
+    }
 
     if (settings.autoCheckOut) {
-      const [autoH, autoM] = settings.autoCheckOutTime.split(":").map(Number);
-      const autoMins = autoH * 60 + autoM;
+      let autoMins = shiftEndMin + (settings.autoCheckOutBuffer ?? 30);
+      if (settings.autoCheckOutTime) {
+        const [autoH, autoM] = settings.autoCheckOutTime.split(":").map(Number);
+        autoMins = autoH * 60 + autoM;
+      }
       setIsPastAutoCheckOut(currentMins >= autoMins);
     } else {
       setIsPastAutoCheckOut(false);
@@ -159,8 +186,12 @@ export default function EmployeeAttendancePage() {
     };
   }, [settings, evaluateTimeConstraints]);
 
+  // Total accumulated working hours excluding Absent days
   const totalAccumulatedHours = useMemo(() => {
-    const total = history.reduce((sum, record) => sum + (record.workingHours || 0), 0);
+    const total = history.reduce((sum, record) => {
+      if (record.status === "Absent") return sum;
+      return sum + (record.workingHours || 0);
+    }, 0);
     return Math.round(total * 100) / 100;
   }, [history]);
 
@@ -203,22 +234,26 @@ export default function EmployeeAttendancePage() {
 
   const formatTimeStr = (isoString?: string) => {
     if (!isoString) return "--:--";
-    return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Karachi",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(isoString));
   };
 
   const getReadableTime = (timeStr: string, minutesOffset: number) => {
+    if (!timeStr) return "--:--";
     const [h, m] = timeStr.split(":").map(Number);
     let total = h * 60 + m + minutesOffset;
     if (total < 0) total += 24 * 60;
     total = total % (24 * 60);
     const finalH = Math.floor(total / 60);
     const finalM = total % 60;
-    const finalHPadded = String(finalH).padStart(2, "0");
     const finalMPadded = String(finalM).padStart(2, "0");
 
-    const hourNum = parseInt(finalHPadded, 10);
-    const ampm = hourNum >= 12 ? "PM" : "AM";
-    const formattedHour = hourNum % 12 || 12;
+    const ampm = finalH >= 12 ? "PM" : "AM";
+    const formattedHour = finalH % 12 || 12;
     return `${formattedHour}:${finalMPadded} ${ampm}`;
   };
 
@@ -272,7 +307,7 @@ export default function EmployeeAttendancePage() {
         </div>
       )}
 
-      {/* Page Header */}
+      {/* Header */}
       <div className="pb-6 border-b border-line-subtle flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-content-main tracking-tight">
@@ -283,14 +318,13 @@ export default function EmployeeAttendancePage() {
           </p>
         </div>
 
-        {/* Real-time Clock Widget */}
         <div className="flex items-center gap-3 bg-surface-card border border-line-subtle py-2 px-4 rounded-xl shadow-xs shrink-0 self-start sm:self-auto">
           <Clock className="w-4 h-4 text-brand-accent animate-pulse" />
           <ClockWidget />
         </div>
       </div>
 
-      {/* Dynamic Alerts */}
+      {/* Alerts */}
       {isSunday && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -312,7 +346,6 @@ export default function EmployeeAttendancePage() {
         </div>
       )}
 
-      {/* Rule Alerts Box */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-brand-subtle/50 border border-brand-subtle text-xs text-content-main leading-relaxed">
         <div className="flex gap-2">
           <AlertCircle className="w-4 h-4 text-brand-accent shrink-0 mt-0.5" />
@@ -325,12 +358,11 @@ export default function EmployeeAttendancePage() {
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <strong className="font-semibold block text-content-main">Operational Limits:</strong>
-            Working hours count only between {settings.shiftStart} and {settings.shiftEnd}. Hours worked outside this interval will not accumulate, and are capped at 8 hours maximum.
+            Working hours count up to 8 hours max per day. Absent statuses will not count toward working hours.
           </div>
         </div>
       </div>
 
-      {/* Error Output Banner */}
       {errorMessage && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -338,10 +370,9 @@ export default function EmployeeAttendancePage() {
         </div>
       )}
 
-      {/* Action Cards Grid */}
+      {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-        
-        {/* Check-In Card */}
+        {/* Check-In */}
         <div className="p-5 sm:p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-xs flex flex-col justify-between gap-6">
           <div className="space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Entrance Check-In</span>
@@ -368,7 +399,7 @@ export default function EmployeeAttendancePage() {
           </button>
         </div>
 
-        {/* Check-Out Card */}
+        {/* Check-Out */}
         <div className="p-5 sm:p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-xs flex flex-col justify-between gap-6">
           <div className="space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Departure Check-Out</span>
@@ -395,7 +426,7 @@ export default function EmployeeAttendancePage() {
           </button>
         </div>
 
-        {/* Status Metrics Card */}
+        {/* Diagnostics */}
         <div className="p-5 sm:p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-xs flex flex-col justify-between gap-6">
           <div className="space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Session Diagnostics</span>
@@ -407,7 +438,7 @@ export default function EmployeeAttendancePage() {
                 <Timer className="w-3.5 h-3.5 text-content-muted" /> Today&apos;s Session
               </span>
               <span className="text-xs font-bold text-content-main">
-                {todayRecord?.formattedDuration || "0 hrs 0 mins"}
+                {todayRecord?.status === "Absent" ? "0 hrs 0 mins" : todayRecord?.formattedDuration || "0 hrs 0 mins"}
               </span>
             </div>
             <div className="flex items-center justify-between border-b border-line-subtle pb-2.5">
@@ -432,13 +463,12 @@ export default function EmployeeAttendancePage() {
             </div>
           </div>
           <div className="text-[10px] leading-normal text-content-muted text-center pt-2">
-            Status calculations adapt instantly based on when daily checkpoints are saved.
+            Status calculations adapt instantly based on daily checkpoints saved.
           </div>
         </div>
-
       </div>
 
-      {/* Recent History Table */}
+      {/* History Table */}
       <div className="space-y-3">
         <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
           <History className="w-3.5 h-3.5" /> Recent Attendance History
@@ -476,7 +506,7 @@ export default function EmployeeAttendancePage() {
                         {record.checkOut ? formatTimeStr(record.checkOut) : "Ongoing"}
                       </td>
                       <td className="px-6 py-4 font-bold text-content-main">
-                        {record.formattedDuration || "--"}
+                        {record.status === "Absent" ? "--" : record.formattedDuration || "--"}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex items-center justify-center">

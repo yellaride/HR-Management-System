@@ -10,7 +10,7 @@ interface AttendanceData {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutTime: string;
+  autoCheckOutBuffer: number;
 }
 
 interface AttendanceSettingsProps {
@@ -19,22 +19,43 @@ interface AttendanceSettingsProps {
   readOnly?: boolean;
 }
 
+/** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
+function formatTo12Hour(timeStr: string): string {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+}
 
 export default function AttendanceSettings({ data, onSave, readOnly = false }: AttendanceSettingsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tempData, setTempData] = useState<AttendanceData>({ ...data });
 
+  // Raw string values for number inputs to preserve leading zeros during editing
+  const [rawStringValues, setRawStringValues] = useState<Record<string, string>>({
+    gracePeriod: String(data.gracePeriod),
+    checkInDisplayBefore: String(data.checkInDisplayBefore),
+    checkOutDisplayAfter: String(data.checkOutDisplayAfter),
+    autoCheckOutBuffer: String(data.autoCheckOutBuffer ?? 30),
+  });
+
   // Simulator Time state is purely local client-side state (never sent to backend)
   const [simulatedTime, setSimulatedTime] = useState(data.shiftStart || "08:45");
 
-  // Sync local editing state from props during render when the data prop
-  // changes (official "adjust state when a prop changes" pattern).
-  // Sentinel `null` ensures the first render syncs, matching mount-effect semantics.
+  // Sync local editing state from props when data prop changes
   const [prevData, setPrevData] = useState<AttendanceData | null>(null);
   if (data !== prevData) {
     setPrevData(data);
     setTempData({ ...data });
+    setRawStringValues({
+      gracePeriod: String(data.gracePeriod),
+      checkInDisplayBefore: String(data.checkInDisplayBefore),
+      checkOutDisplayAfter: String(data.checkOutDisplayAfter),
+      autoCheckOutBuffer: String(data.autoCheckOutBuffer ?? 30),
+    });
     setSimulatedTime(data.shiftStart);
   }
 
@@ -52,7 +73,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
     }
   };
 
-  // Visibility logic calculations based on active database values
+  // Visibility logic calculations based on active values
   const checkButtonsVisibility = (timeStr: string) => {
     const [simH, simM] = timeStr.split(":").map(Number);
     const [startH, startM] = data.shiftStart.split(":").map(Number);
@@ -62,11 +83,9 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
     const startMin = startH * 60 + startM;
     const endMin = endH * 60 + endM;
 
-    // Check-in button display uses the DB configuration parameter 'checkInDisplayBefore'
     const checkInOffset = data.checkInDisplayBefore || 30;
     const canCheckIn = simMin >= (startMin - checkInOffset) && simMin < endMin;
 
-    // Check-out button display uses the DB configuration parameter 'checkOutDisplayAfter'
     const checkOutOffset = data.checkOutDisplayAfter || 0;
     const canCheckOut = simMin >= (endMin + checkOutOffset);
 
@@ -82,7 +101,8 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
     total = total % (24 * 60);
     const finalH = Math.floor(total / 60);
     const finalM = total % 60;
-    return `${String(finalH).padStart(2, "0")}:${String(finalM).padStart(2, "0")}`;
+    const raw = `${String(finalH).padStart(2, "0")}:${String(finalM).padStart(2, "0")}`;
+    return formatTo12Hour(raw);
   };
 
   return (
@@ -122,12 +142,12 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                 <X className="w-3.5 h-3.5" />
                 <span>Cancel</span>
               </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={saving || readOnly}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
-                  >
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={saving || readOnly}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-accent hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+              >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 <span>{saving ? "Saving..." : "Save Changes"}</span>
               </button>
@@ -166,13 +186,15 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   type="number"
                   min={0}
                   required
-                  value={tempData.gracePeriod}
-                  onChange={(e) => setTempData({ ...tempData, gracePeriod: Number(e.target.value) || 0 })}
+                  value={rawStringValues.gracePeriod}
+                  onChange={(e) => {
+                    setRawStringValues({ ...rawStringValues, gracePeriod: e.target.value });
+                    setTempData({ ...tempData, gracePeriod: Number(e.target.value) || 0 });
+                  }}
                   disabled={saving || readOnly}
                   className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none disabled:opacity-50"
                 />
               </div>
-
 
               {/* Persistable Visibility offsets */}
               <div className="space-y-1.5">
@@ -183,8 +205,11 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   type="number"
                   min={0}
                   required
-                  value={tempData.checkInDisplayBefore}
-                  onChange={(e) => setTempData({ ...tempData, checkInDisplayBefore: Number(e.target.value) || 0 })}
+                  value={rawStringValues.checkInDisplayBefore}
+                  onChange={(e) => {
+                    setRawStringValues({ ...rawStringValues, checkInDisplayBefore: e.target.value });
+                    setTempData({ ...tempData, checkInDisplayBefore: Number(e.target.value) || 0 });
+                  }}
                   className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
                 />
               </div>
@@ -196,8 +221,11 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   type="number"
                   min={0}
                   required
-                  value={tempData.checkOutDisplayAfter}
-                  onChange={(e) => setTempData({ ...tempData, checkOutDisplayAfter: Number(e.target.value) || 0 })}
+                  value={rawStringValues.checkOutDisplayAfter}
+                  onChange={(e) => {
+                    setRawStringValues({ ...rawStringValues, checkOutDisplayAfter: e.target.value });
+                    setTempData({ ...tempData, checkOutDisplayAfter: Number(e.target.value) || 0 });
+                  }}
                   className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
                 />
               </div>
@@ -210,20 +238,28 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                     id="autoCheckOut"
                     checked={tempData.autoCheckOut}
                     onChange={(e) => setTempData({ ...tempData, autoCheckOut: e.target.checked })}
-                    className="w-4 h-4 rounded text-brand-accent border-line-subtle"
+                    className="w-4 h-4 rounded text-brand-accent border-line-subtle cursor-pointer"
                   />
                   <label htmlFor="autoCheckOut" className="text-xs font-bold text-content-main cursor-pointer">
                     Enable Auto Check-Out
                   </label>
                 </div>
+
                 {tempData.autoCheckOut && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-content-secondary">Auto Check-Out Time</label>
+                    <label className="text-xs font-bold text-content-secondary">
+                      Auto Check-Out Buffer (Minutes after Shift End, max 30)
+                    </label>
                     <input
-                      type="time"
+                      type="number"
+                      min={0}
+                      max={30}
                       required
-                      value={tempData.autoCheckOutTime}
-                      onChange={(e) => setTempData({ ...tempData, autoCheckOutTime: e.target.value })}
+                      value={tempData.autoCheckOutBuffer ?? 30}
+                      onChange={(e) => {
+                        const val = Math.min(30, Math.max(0, Number(e.target.value) || 0));
+                        setTempData({ ...tempData, autoCheckOutBuffer: val });
+                      }}
                       className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
                     />
                   </div>
@@ -235,7 +271,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
               <div>
                 <span className="text-xs font-semibold text-content-secondary">Shift Window</span>
                 <span className="text-sm font-semibold text-content-main block mt-0.5">
-                  {data.shiftStart} to {data.shiftEnd}
+                  {formatTo12Hour(data.shiftStart)} to {formatTo12Hour(data.shiftEnd)}
                 </span>
               </div>
               <div>
@@ -260,7 +296,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                 <ShieldAlert className="w-4 h-4 text-brand-accent" />
                 <span className="text-xs font-semibold text-content-secondary">
                   Auto Check-Out is <strong className="text-content-main">{data.autoCheckOut ? "Enabled" : "Disabled"}</strong>
-                  {data.autoCheckOut && ` (Runs daily at ${data.autoCheckOutTime})`}
+                  {data.autoCheckOut && ` (${data.autoCheckOutBuffer ?? 30} mins buffer after shift end)`}
                 </span>
               </div>
             </div>
@@ -268,7 +304,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
         </div>
       </div>
 
-      {/* Simulator (Purely Client-Side UI tool; Simulator values never touch the DB) */}
+      {/* Simulator (Purely Client-Side UI tool) */}
       <div className="panel bg-surface-subtle border border-line-subtle rounded-2xl p-6">
         <div className="flex items-center gap-2 pb-4 border-b border-line-subtle">
           <Eye className="w-5 h-5 text-brand-accent" />
@@ -305,7 +341,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
 
           <div className="flex flex-col items-center justify-center p-6 bg-white border border-line-subtle rounded-xl min-h-[140px] gap-3">
             <span className="text-xs font-bold text-content-secondary tracking-wide uppercase">
-              Employee Portal Preview ({simulatedTime})
+              Employee Portal Preview ({formatTo12Hour(simulatedTime)})
             </span>
             
             <div className="flex items-center gap-4 w-full justify-center">
