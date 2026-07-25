@@ -154,6 +154,9 @@ export const authOptions: AuthOptions = {
   },
   session: {
     strategy: "jwt",
+    // Sliding 30-day session: the cookie is re-issued on every /api/auth/session
+    // poll, so active users are never logged out mid-work.
+    maxAge: 30 * 24 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
