@@ -1,60 +1,74 @@
-// app/api/employee/birthday/route.ts
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 const TIMEZONE = "Asia/Karachi";
+
+interface EmployeeBirthdayLean {
+  name?: string;
+  designation?: string;
+  department?: string;
+  dateOfBirth?: Date | null;
+}
 
 export async function GET() {
   try {
     await connectDB();
-    
-    const session = await getServerSession();
-    if (!session?.user?.email) {
+
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
 
-    const email = session.user.email.toLowerCase().trim();
+    const currentEmployee = (await Employee.findOne({
+      userId,
+      status: "Active",
+    }).lean()) as EmployeeBirthdayLean | null;
 
-    // Retrieve active employees and find the one matching the current session email
-    const employees = await Employee.find({ status: "Active" }).populate("userId", "email");
-    const currentEmployee = employees.find(
-      (emp) => emp.userId?.email?.toLowerCase().trim() === email
-    );
-
-    if (!currentEmployee || !currentEmployee.dateOfBirth) {
+    if (!currentEmployee?.dateOfBirth) {
       return NextResponse.json({ isBirthday: false });
     }
 
     const now = new Date();
-    const formatter = new Intl.DateTimeFormat("en-US", {
+    const todayParts = new Intl.DateTimeFormat("en-US", {
       timeZone: TIMEZONE,
       month: "numeric",
       day: "numeric",
-    });
-    
-    const parts = formatter.formatToParts(now);
-    const currentMonth = parseInt(parts.find((p) => p.type === "month")?.value || "0");
-    const currentDay = parseInt(parts.find((p) => p.type === "day")?.value || "0");
+    }).formatToParts(now);
 
+    const currentMonth = parseInt(
+      todayParts.find((p) => p.type === "month")?.value || "0",
+      10
+    );
+    const currentDay = parseInt(
+      todayParts.find((p) => p.type === "day")?.value || "0",
+      10
+    );
+
+    // DOB is stored as a calendar date — compare UTC date parts to avoid TZ day-shift.
     const dob = new Date(currentEmployee.dateOfBirth);
-    const birthMonth = dob.getMonth() + 1; // Convert 0-indexed month to 1-indexed
-    const birthDay = dob.getDate();
+    const birthMonth = dob.getUTCMonth() + 1;
+    const birthDay = dob.getUTCDate();
 
     const isBirthday = currentMonth === birthMonth && currentDay === birthDay;
 
-    return NextResponse.json({
-      isBirthday,
-      name: currentEmployee.name,
-      designation: currentEmployee.designation,
-      department: currentEmployee.department
-    }, { status: 200 });
-
+    return NextResponse.json(
+      {
+        isBirthday,
+        name: currentEmployee.name,
+        designation: currentEmployee.designation,
+        department: currentEmployee.department,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: message || "Failed to verify birthday status" }, 
+      { error: message || "Failed to verify birthday status" },
       { status: 500 }
     );
   }

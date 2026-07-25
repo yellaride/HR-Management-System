@@ -151,13 +151,20 @@ async function syncMonthlyAttendanceAggregates(userId: string, year: number, mon
 
   totalWorkingHours = Math.round(totalWorkingHours * 100) / 100;
 
+  // Never overwrite isLocked on update — locked payroll months must stay locked.
   await MonthlyAttendance.findOneAndUpdate(
     { userId, year, month },
     {
-      totalWorkingHours,
-      presentDays,
-      absentDays,
-      isLocked: false,
+      $set: {
+        totalWorkingHours,
+        presentDays,
+        absentDays,
+      },
+      $setOnInsert: {
+        isLocked: false,
+        leaveDays: 0,
+        onDutyDays: 0,
+      },
     },
     { upsert: true, new: true }
   );

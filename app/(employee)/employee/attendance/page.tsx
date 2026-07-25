@@ -30,7 +30,6 @@ interface ActiveSettings {
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
   autoCheckOutBuffer: number;
-  autoCheckOutTime: string;
 }
 
 function ClockWidget() {
@@ -71,7 +70,6 @@ export default function EmployeeAttendancePage() {
     checkOutDisplayAfter: 30,
     autoCheckOut: false,
     autoCheckOutBuffer: 30,
-    autoCheckOutTime: "17:30"
   });
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -140,11 +138,7 @@ export default function EmployeeAttendancePage() {
     }
 
     if (settings.autoCheckOut) {
-      let autoMins = shiftEndMin + (settings.autoCheckOutBuffer ?? 30);
-      if (settings.autoCheckOutTime) {
-        const [autoH, autoM] = settings.autoCheckOutTime.split(":").map(Number);
-        autoMins = autoH * 60 + autoM;
-      }
+      const autoMins = shiftEndMin + (settings.autoCheckOutBuffer ?? 30);
       setIsPastAutoCheckOut(currentMins >= autoMins);
     } else {
       setIsPastAutoCheckOut(false);

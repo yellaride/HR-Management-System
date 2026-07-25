@@ -95,7 +95,18 @@ export async function GET(request: Request) {
     const results = [];
 
     for (const emp of celebrants) {
-      const email = emp.userId?.email || `${emp.name.toLowerCase().replace(/\s+/g, ".")}@company.com`;
+      const email = emp.userId?.email?.trim();
+
+      if (!email) {
+        results.push({
+          id: emp._id,
+          name: emp.name,
+          status: "Skipped",
+          email: null,
+          reason: "No linked user email",
+        });
+        continue;
+      }
 
       const emailSent = await sendBirthdayEmail(
         email,

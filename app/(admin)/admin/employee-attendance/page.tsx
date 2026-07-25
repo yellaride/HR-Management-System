@@ -283,14 +283,15 @@ export default function AdminAttendancePage() {
     }
   };
 
-  const handleSyncHardware = async () => {
+  const handleRefreshAttendance = async () => {
     setIsSyncing(true);
-    setTimeout(async () => {
-      setIsSyncing(false);
-      triggerToast("Sync complete. Fresh checks fetched from hardware.");
+    try {
       setIsLoading(true);
-      fetchDailyLogs();
-    }, 1200);
+      await fetchDailyLogs();
+      triggerToast("Attendance refreshed.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSaveSettings = async (updatedData: Partial<CompanySettings>) => {
@@ -326,18 +327,18 @@ export default function AdminAttendancePage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">On-Site Attendance</h1>
           <p className="mt-1 text-xs text-content-secondary">
-            Review biometric entries, log retro punch logs, and handle dynamic configurations.
+            Review today&apos;s attendance, log retro punch entries, and manage shift rules.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={handleSyncHardware}
+            onClick={handleRefreshAttendance}
             disabled={isSyncing}
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-content-main border border-line-subtle rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-brand-accent" : ""}`} />
-            <span>{isSyncing ? "Syncing Biometrics..." : "Sync Biometric Devices"}</span>
+            <span>{isSyncing ? "Refreshing..." : "Refresh Attendance"}</span>
           </button>
 
           <button

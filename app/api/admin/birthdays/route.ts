@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       return {
         id: emp.employeeId || emp._id.toString(),
         name: emp.name,
-        email: emp.userId?.email || `${emp.name.toLowerCase().replace(/\s+/g, ".")}@company.com`,
+        email: emp.userId?.email || "",
         department: emp.department,
         designation: emp.designation,
         // profile photo fields (used by EmployeeRow avatar)

@@ -18,7 +18,27 @@ interface AttendanceSettings {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutTime: string;
+  autoCheckOutBuffer: number;
+}
+
+interface CompanySettingsLean {
+  shiftStart?: string;
+  shiftEnd?: string;
+  gracePeriod?: number;
+  checkInDisplayBefore?: number;
+  checkOutDisplayAfter?: number;
+  autoCheckOut?: boolean;
+  autoCheckOutBuffer?: number;
+}
+
+interface MonthlyAttendanceLean {
+  presentDays?: number;
+  absentDays?: number;
+  lateDays?: number;
+  leaveDays?: number;
+  onDutyDays?: number;
+  totalWorkingHours?: number;
+  isLocked?: boolean;
 }
 
 // Extract exact local date/time parts without server timezone pollution
@@ -81,7 +101,11 @@ function zonedTimeToUtcDate(dateStr: string, timeStr: string): Date {
 
 // Fetch DB Configurations safely with complete type casting and fallbacks
 async function getActiveSettings(): Promise<AttendanceSettings> {
-  const settings = (await CompanyDetails.findOne().lean()) as Record<string, any> | null;
+  const settings = (await CompanyDetails.findOne().lean()) as CompanySettingsLean | null;
+  const buffer =
+    typeof settings?.autoCheckOutBuffer === "number"
+      ? Math.min(30, Math.max(0, settings.autoCheckOutBuffer))
+      : 30;
 
   return {
     shiftStart: settings?.shiftStart ?? "09:00",
@@ -90,8 +114,52 @@ async function getActiveSettings(): Promise<AttendanceSettings> {
     checkInDisplayBefore: settings?.checkInDisplayBefore ?? 30,
     checkOutDisplayAfter: settings?.checkOutDisplayAfter ?? 0,
     autoCheckOut: settings?.autoCheckOut ?? false,
-    autoCheckOutTime: settings?.autoCheckOutTime ?? "18:00",
+    autoCheckOutBuffer: buffer,
   };
+}
+
+/** Recalculate monthly totals without unlocking a locked month */
+async function syncEmployeeMonthlyAggregates(userId: string, year: number, month: number) {
+  const monthStr = String(month).padStart(2, "0");
+  const startDate = `${year}-${monthStr}-01`;
+  const endDate = `${year}-${monthStr}-31`;
+
+  const allMonthlyLogs = await Attendance.find({
+    userId,
+    date: { $gte: startDate, $lte: endDate },
+  }).lean();
+
+  let totalWorkingHours = 0;
+  let presentDays = 0;
+  let absentDays = 0;
+
+  for (const log of allMonthlyLogs) {
+    if (log.status === "On Time" || log.status === "Late") {
+      presentDays += 1;
+    } else if (log.status === "Absent") {
+      absentDays += 1;
+    }
+    totalWorkingHours += log.workingHours || 0;
+  }
+
+  totalWorkingHours = Math.round(totalWorkingHours * 100) / 100;
+
+  await MonthlyAttendance.findOneAndUpdate(
+    { userId, year, month },
+    {
+      $set: {
+        totalWorkingHours,
+        presentDays,
+        absentDays,
+      },
+      $setOnInsert: {
+        isLocked: false,
+        leaveDays: 0,
+        onDutyDays: 0,
+      },
+    },
+    { upsert: true, new: true }
+  );
 }
 
 // Calculates working hours bounded strictly by configured shift bounds
@@ -123,117 +191,78 @@ function calculateBoundedWorkingHours(
   return { decimalHours, formattedDuration };
 }
 
-// Resolves unclosed records (past days & today if past cutoff time)
+/**
+ * Auto-closes open shifts when company auto-checkout is enabled.
+ * Aligned with admin cron: trigger at shiftEnd + buffer, checkout stamped at shiftEnd.
+ * When auto-checkout is off, open shifts are left for admin/manual correction (no corruption).
+ */
 async function processUnclosedAttendance(userId: string, settings: AttendanceSettings) {
+  if (!settings.autoCheckOut) return;
+
   const now = new Date();
   const zonedNow = getZonedParts(now);
   const todayDateStr = zonedNow.dateStr;
   const currentMins = zonedNow.hour * 60 + zonedNow.minute;
 
-  const autoCheckOutMins = timeToMinutes(settings.autoCheckOutTime);
   const shiftEndMins = timeToMinutes(settings.shiftEnd);
-  const checkOutDisplayOffset = settings.checkOutDisplayAfter;
-  const unclosedThresholdMins = Math.max(autoCheckOutMins, shiftEndMins + checkOutDisplayOffset);
+  const triggerMins = shiftEndMins + settings.autoCheckOutBuffer;
 
-  // Find all open/unclosed attendance records for this user
   const unclosedRecords = await Attendance.find({
     userId,
     $or: [{ checkOut: { $exists: false } }, { checkOut: null }],
   });
 
   for (const record of unclosedRecords) {
-    const isPastDate = record.date < todayDateStr;
-    const isToday = record.date === todayDateStr;
-
-    let shouldProcess = false;
-    if (isPastDate) {
-      shouldProcess = true;
-    } else if (isToday && currentMins >= unclosedThresholdMins) {
-      shouldProcess = true;
-    }
-
-    if (!shouldProcess) continue;
+    if (record.date > todayDateStr) continue;
+    if (record.date === todayDateStr && currentMins < triggerMins) continue;
 
     const [rYear, rMonth] = record.date.split("-").map(Number);
 
-    if (settings.autoCheckOut) {
-      // AUTO CHECK-OUT IS ENABLED
-      const autoCheckOutDate = zonedTimeToUtcDate(record.date, settings.autoCheckOutTime);
-      const checkInDate = new Date(record.checkIn);
+    const monthlyLockCheck = await MonthlyAttendance.findOne({
+      userId,
+      year: rYear,
+      month: rMonth,
+    })
+      .select("isLocked")
+      .lean();
 
-      const { decimalHours, formattedDuration } = calculateBoundedWorkingHours(
-        checkInDate,
-        autoCheckOutDate,
-        record.date,
-        settings.shiftStart,
-        settings.shiftEnd
-      );
+    if (monthlyLockCheck?.isLocked) continue;
 
-      record.checkOut = autoCheckOutDate;
-      record.workingHours = decimalHours;
-      record.formattedDuration = formattedDuration;
-      record.status = "Absent";
-      await record.save();
-
-      // Adjust monthly attendance
-      await MonthlyAttendance.findOneAndUpdate(
-        { userId, year: rYear, month: rMonth, isLocked: false },
-        {
-          $inc: {
-            presentDays: -1,
-            absentDays: 1,
-            totalWorkingHours: decimalHours,
-          },
-        }
-      );
-
-      await ActivityLog.create({
-        userId,
-        activityType: "CHECK_OUT",
-        date: record.date,
-        timestamp: autoCheckOutDate,
-        description: `System auto-checkout applied: Status marked Absent, Duration: ${formattedDuration}`,
-        metadata: {
-          attendanceId: record._id,
-          workingHours: decimalHours,
-          status: "Absent",
-          isAutoCheckedOut: true,
-        },
-      });
-    } else {
-      // AUTO CHECK-OUT IS DISABLED & USER FORGOT TO CHECK OUT
-      // Status becomes "Absent" and working hours are NOT calculated (0 hrs).
-      record.workingHours = 0;
-      record.formattedDuration = "0 hrs 0 mins";
-      record.status = "Absent";
-      await record.save();
-
-      // Adjust monthly attendance
-      await MonthlyAttendance.findOneAndUpdate(
-        { userId, year: rYear, month: rMonth, isLocked: false },
-        {
-          $inc: {
-            presentDays: -1,
-            absentDays: 1,
-          },
-        }
-      );
-
-      await ActivityLog.create({
-        userId,
-        activityType: "CHECK_OUT",
-        date: record.date,
-        timestamp: now,
-        description: `Employee forgot to check out (Auto-checkout disabled). Status set to Absent, Working hours set to 0.`,
-        metadata: {
-          attendanceId: record._id,
-          workingHours: 0,
-          status: "Absent",
-          isAutoCheckedOut: false,
-          forgotCheckOut: true,
-        },
-      });
+    let checkOutDate = zonedTimeToUtcDate(record.date, settings.shiftEnd);
+    const checkInDate = new Date(record.checkIn);
+    if (checkOutDate.getTime() < checkInDate.getTime()) {
+      checkOutDate = checkInDate;
     }
+
+    const { decimalHours, formattedDuration } = calculateBoundedWorkingHours(
+      checkInDate,
+      checkOutDate,
+      record.date,
+      settings.shiftStart,
+      settings.shiftEnd
+    );
+
+    // Keep original On Time / Late from check-in; always set checkOut so this runs once.
+    record.checkOut = checkOutDate;
+    record.workingHours = decimalHours;
+    record.formattedDuration = formattedDuration;
+    await record.save();
+
+    await syncEmployeeMonthlyAggregates(userId, rYear, rMonth);
+
+    await ActivityLog.create({
+      userId,
+      activityType: "CHECK_OUT",
+      date: record.date,
+      timestamp: checkOutDate,
+      description: `System auto-checkout at shift end (${settings.shiftEnd}). Duration: ${formattedDuration}`,
+      metadata: {
+        attendanceId: record._id,
+        workingHours: decimalHours,
+        status: record.status,
+        isAutoCheckedOut: true,
+      },
+    });
   }
 }
 
@@ -281,7 +310,7 @@ export async function GET() {
       userId,
       year: currentYear,
       month: currentMonth
-    }).lean()) as Record<string, any> | null;
+    }).lean()) as MonthlyAttendanceLean | null;
 
     const monthlyStats = monthlyRecord
       ? {
