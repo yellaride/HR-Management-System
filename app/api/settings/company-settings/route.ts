@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import CompanyDetails from "@/modals/CompanyDetails";
+import { DepartmentHead } from "@/modals/DepartmentHead";
 import dbConnect from "@/lib/mongodb";
 import { getAdminUser } from "@/lib/auth";
 
@@ -121,6 +122,9 @@ async function handleUpdate(request: Request) {
         { new: true, runValidators: true }
       );
     }
+
+    // Deleted departments must not keep orphaned head assignments
+    await DepartmentHead.deleteMany({ department: { $nin: payload.departments } });
 
     return NextResponse.json(result);
   } catch (error: unknown) {

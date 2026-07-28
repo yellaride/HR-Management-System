@@ -3,6 +3,7 @@ import connectDB from "@/lib/mongodb";
 import User from "@/modals/User";
 import { Employee } from "@/modals/Employee";
 import CompanyDetails from "@/modals/CompanyDetails"; 
+import { DepartmentHead } from "@/modals/DepartmentHead";
 import { getAdminUser } from "@/lib/auth";
 
 export async function PUT(
@@ -91,6 +92,19 @@ export async function PUT(
     employee.status = status || employee.status;
     await employee.save();
 
+    // Head assignment is department-bound: drop it when the employee leaves
+    // the department or becomes inactive.
+    if (employee.userId) {
+      if (employee.status === "Inactive") {
+        await DepartmentHead.deleteMany({ userId: employee.userId });
+      } else {
+        await DepartmentHead.deleteMany({
+          userId: employee.userId,
+          department: { $ne: employee.department },
+        });
+      }
+    }
+
     const updatedEmployee = {
       id: employee._id.toString(),
       name: employee.name,
@@ -138,6 +152,8 @@ export async function DELETE(
     // 1. Remove credential entry from Users table
     if (employee.userId) {
       await User.findByIdAndDelete(employee.userId);
+      // Deleted users can no longer head a department
+      await DepartmentHead.deleteMany({ userId: employee.userId });
     }
 
     // 2. Soft-delete profile entry (keep employee record, only mark inactive)
