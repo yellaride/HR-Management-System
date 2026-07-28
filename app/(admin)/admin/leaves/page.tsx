@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import useSWR from "swr";
 import { AlertCircle } from "lucide-react";
 
 import { LeaveRequest } from "@/lib/types";
@@ -52,119 +53,86 @@ interface RawLeaveRecord extends Omit<LeaveRequest, "id" | "status" | "type" | "
 }
 
 export default function AdminLeavesPage() {
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
   
   // Modal State
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Cached listing with background revalidation — instant on revisit
+  const {
+    data: rawLeaves,
+    error: loadError,
+    isLoading: loading,
+    mutate: mutateLeaves,
+  } = useSWR<RawLeaveRecord[]>("/api/admin/leaves");
 
-    async function fetchLeaves() {
-      try {
-        setLoading(true);
-        setErrorMsg(null);
-        const res = await fetch("/api/admin/leaves", { method: "GET" });
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
-          throw new Error(data?.error || `Failed to load leaves (${res.status})`);
-        }
-        const data = await res.json();
-        
-        if (!cancelled) {
-          const rawArray: RawLeaveRecord[] = Array.isArray(data) ? data : [];
-          const cleanedData = rawArray.map((item) => ({
-            ...item,
-            id: item.id || item._id,
-            // Safe conversions of DB enums to UI formats
-            status: mapStatus(item.status),
-            type: mapType(item.type),
-            // Ensure required UI fields exist
-            designation: item.designation ?? "Internal",
-            department: item.department ?? "Internal",
-            // Fallback default values if the backend API does not serve balances yet
-            totalLeaves: item.totalLeaves ?? 30,
-            usedLeaves: item.usedLeaves ?? 12,
-            remainingLeaves: item.remainingLeaves ?? 18,
-          })) as LeaveRequest[];
+  const leaves = useMemo<LeaveRequest[]>(() => {
+    const rawArray = Array.isArray(rawLeaves) ? rawLeaves : [];
+    return rawArray.map((item) => ({
+      ...item,
+      id: item.id || item._id,
+      // Safe conversions of DB enums to UI formats
+      status: mapStatus(item.status),
+      type: mapType(item.type),
+      // Ensure required UI fields exist
+      designation: item.designation ?? "Internal",
+      department: item.department ?? "Internal",
+      // Fallback default values if the backend API does not serve balances yet
+      totalLeaves: item.totalLeaves ?? 30,
+      usedLeaves: item.usedLeaves ?? 12,
+      remainingLeaves: item.remainingLeaves ?? 18,
+    })) as LeaveRequest[];
+  }, [rawLeaves]);
 
-          setLeaves(cleanedData);
-        }
-      } catch (e) {
-        if (!cancelled) setErrorMsg(e instanceof Error ? e.message : "Failed to load leave records");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
+  const errorMsg =
+    actionError ||
+    (loadError
+      ? loadError instanceof Error
+        ? loadError.message
+        : "Failed to load leave records"
+      : null);
 
-    fetchLeaves();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleApprove = async (id: string) => {
-    setErrorMsg(null);
-    setLeaves((prev) => prev.map((item) => (item.id === id ? { ...item, status: "Approved" } : item)));
+  // Optimistic decision: UI flips instantly, rolls back automatically on failure
+  const decideLeave = async (id: string, action: "APPROVE" | "REJECT") => {
+    setActionError(null);
     setSelectedLeave(null);
 
+    const nextStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
+    const applyStatus = (list: RawLeaveRecord[] | undefined, status: string) =>
+      (list ?? []).map((item) =>
+        (item.id || item._id) === id ? { ...item, status } : item
+      );
+
     try {
-      const res = await fetch("/api/admin/leaves", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "APPROVE" }),
-      });
+      await mutateLeaves(
+        async (current) => {
+          const res = await fetch("/api/admin/leaves", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, action }),
+          });
+          if (!res.ok) throw new Error(`Failed to ${action.toLowerCase()} leave`);
 
-      if (!res.ok) throw new Error("Failed to approve leave");
-
-      const updated = (await res.json()) as { id?: string; _id?: string; status?: string };
-      const updatedId = updated.id || updated._id || id;
-      setLeaves((prev) =>
-        prev.map((item) =>
-          item.id === updatedId 
-            ? { ...item, status: mapStatus(updated.status ?? item.status) } 
-            : item
-        )
+          const updated = (await res.json()) as { status?: string };
+          return applyStatus(current, updated.status ?? nextStatus);
+        },
+        {
+          optimisticData: (current) => applyStatus(current, nextStatus),
+          rollbackOnError: true,
+          revalidate: false,
+        }
       );
     } catch {
-      setLeaves((prev) => prev.map((item) => (item.id === id ? { ...item, status: "Pending" } : item)));
-      setErrorMsg("Failed to approve leave request. Please try again.");
+      setActionError(
+        `Failed to ${action === "APPROVE" ? "approve" : "reject"} leave request. Please try again.`
+      );
     }
   };
 
-  const handleReject = async (id: string) => {
-    setErrorMsg(null);
-    setLeaves((prev) => prev.map((item) => (item.id === id ? { ...item, status: "Rejected" } : item)));
-    setSelectedLeave(null);
-
-    try {
-      const res = await fetch("/api/admin/leaves", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "REJECT" }),
-      });
-
-      if (!res.ok) throw new Error("Failed to reject leave");
-
-      const updated = (await res.json()) as { id?: string; _id?: string; status?: string };
-      const updatedId = updated.id || updated._id || id;
-      setLeaves((prev) =>
-        prev.map((item) =>
-          item.id === updatedId 
-            ? { ...item, status: mapStatus(updated.status ?? item.status) } 
-            : item
-        )
-      );
-    } catch {
-      setLeaves((prev) => prev.map((item) => (item.id === id ? { ...item, status: "Pending" } : item)));
-      setErrorMsg("Failed to reject leave request. Please try again.");
-    }
-  };
+  const handleApprove = (id: string) => decideLeave(id, "APPROVE");
+  const handleReject = (id: string) => decideLeave(id, "REJECT");
 
   // Memoized filter processing for optimized rendering
   const filteredLeaves = useMemo(() => {

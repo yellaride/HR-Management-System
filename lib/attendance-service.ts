@@ -203,13 +203,23 @@ async function runAutoCheckOutIfNeeded(date: string, settings: AttendanceSetting
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
 
+  // Batch the month-lock lookup for all pending users (1 query instead of N)
+  const pendingUserIds = Array.from(new Set(pendingLogs.map((l) => String(l.userId))));
+  const lockRecords = await MonthlyAttendance.find({
+    userId: { $in: pendingUserIds },
+    year,
+    month,
+    isLocked: true,
+  })
+    .select("userId")
+    .lean();
+  const lockedUserIds = new Set(lockRecords.map((r) => String(r.userId)));
+
+  const bulkOps: Parameters<typeof Attendance.bulkWrite>[0] = [];
+  const usersToSync: string[] = [];
+
   for (const log of pendingLogs) {
-    const monthlyLockCheck = await MonthlyAttendance.findOne({
-      userId: log.userId,
-      year,
-      month,
-    }).lean();
-    if (monthlyLockCheck?.isLocked) continue;
+    if (lockedUserIds.has(String(log.userId))) continue;
 
     const checkoutISO = `${date}T${settings.shiftEnd || "17:00"}:00+05:00`;
     let checkOutDate = new Date(checkoutISO);
@@ -220,19 +230,28 @@ async function runAutoCheckOutIfNeeded(date: string, settings: AttendanceSetting
 
     const calculations = computeDailyShiftsAndHours(log.checkIn, checkOutDate, settings);
 
-    await Attendance.updateOne(
-      { _id: log._id },
-      {
-        $set: {
-          checkOut: checkOutDate,
-          workingHours: calculations.workingHours,
-          formattedDuration: calculations.formattedDuration,
-          status: calculations.status,
+    bulkOps.push({
+      updateOne: {
+        filter: { _id: log._id },
+        update: {
+          $set: {
+            checkOut: checkOutDate,
+            workingHours: calculations.workingHours,
+            formattedDuration: calculations.formattedDuration,
+            status: calculations.status,
+          },
         },
-      }
-    );
+      },
+    });
+    usersToSync.push(String(log.userId));
+  }
 
-    await syncMonthlyAttendanceAggregates(log.userId, year, month);
+  if (bulkOps.length === 0) return;
+
+  await Attendance.bulkWrite(bulkOps);
+
+  for (const userId of usersToSync) {
+    await syncMonthlyAttendanceAggregates(userId, year, month);
   }
 }
 

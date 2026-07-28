@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import useSWR from "swr";
 import { Filter, ChevronDown } from "lucide-react";
 import PayslipList from "@/app/components/payslips/PayslipList";
 import { PayslipRecord } from "@/app/components/payslips/payslipPdf";
@@ -9,8 +10,6 @@ import { useSession } from "next-auth/react";
 export default function PayslipEmployeePage() {
   const { data: session } = useSession();
 
-  const [payslips, setPayslips] = useState<PayslipRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [isMonthOpen, setIsMonthOpen] = useState(false);
@@ -22,31 +21,16 @@ export default function PayslipEmployeePage() {
   const monthRef = useRef<HTMLDivElement>(null);
   const yearRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchPayslips = async () => {
-      if (!session?.user) return;
+  // Shares the "/api/employee/payslips" cache with the employee dashboard
+  const { data: payslipsData, isLoading } = useSWR<unknown>(
+    session?.user ? "/api/employee/payslips" : null
+  );
 
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/employee/payslips");
-        if (!response.ok) throw new Error("Failed to load payslips");
-
-        const data = await response.json();
-        const slips: PayslipRecord[] = Array.isArray(data)
-          ? data
-          : data.payslips || [];
-
-        setPayslips(slips);
-      } catch (error) {
-        console.error("Error fetching employee payslips:", error);
-        setPayslips([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPayslips();
-  }, [session?.user]);
+  const payslips = useMemo<PayslipRecord[]>(() => {
+    const data = payslipsData as PayslipRecord[] | { payslips?: PayslipRecord[] } | undefined;
+    if (Array.isArray(data)) return data;
+    return Array.isArray(data?.payslips) ? data.payslips : [];
+  }, [payslipsData]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

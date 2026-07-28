@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
+import useSWR from "swr";
 import { Plus, RefreshCw, AlertCircle } from "lucide-react";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
@@ -43,6 +44,26 @@ function formatToLocalTimeInput(dateString: string | null | undefined, defaultTi
   const hh = parts.find(p => p.type === "hour")?.value || "00";
   const mm = parts.find(p => p.type === "minute")?.value || "00";
   return `${hh}:${mm}`;
+}
+
+function formatTo12Hour(timeStr: string): string {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function formatShiftTime(shift: string): string {
+  if (!shift) return "";
+  const parts = shift.split(/\s*[-–—to]\s*/);
+  if (parts.length >= 2) {
+    const start = formatTo12Hour(parts[0].trim());
+    const end = formatTo12Hour(parts[1].trim());
+    return `${start} - ${end}`;
+  }
+  return formatTo12Hour(shift.trim());
 }
 
 type AttendanceStatus = "On Time" | "Late" | "Absent";
@@ -93,12 +114,14 @@ interface SaveAttendancePayload {
   status: AttendanceStatus;
 }
 
-export default function AdminAttendancePage() {
-  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
-  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
-  const [monthlyRecords, setMonthlyRecords] = useState<MonthlyRecord[]>([]);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+interface DaySheetResponse {
+  employees?: EmployeeRecord[];
+  logs?: AttendanceLog[];
+  monthlyRecords?: MonthlyRecord[];
+  companySettings?: CompanySettings;
+}
 
+export default function AdminAttendancePage() {
   const [activeTab, setActiveTab] = useState<"directory" | "history-drill" | "rules">("directory");
   
   const [filterDate] = useState<string>(() => todayISO());
@@ -108,8 +131,8 @@ export default function AdminAttendancePage() {
   const [filterDept, setFilterDept] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
 
-  // History states
-  const [drillEmployeeId, setDrillEmployeeId] = useState("");
+  // History states — default drill target derives from the loaded sheet
+  const [drillEmployeeIdState, setDrillEmployeeId] = useState("");
   const [drillPeriod, setDrillPeriod] = useState<"this-month" | "last-month" | "all">("this-month");
 
   // Modal triggers
@@ -117,8 +140,6 @@ export default function AdminAttendancePage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  // Loading indicator states
-  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -136,41 +157,19 @@ export default function AdminAttendancePage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const fetchDailyLogs = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/employee-attendance?date=${filterDate}`);
-      if (res.ok) {
-        const data = await res.json();
-        setEmployees(data.employees || []);
-        setAttendanceLogs(data.logs || []);
-        setMonthlyRecords(data.monthlyRecords || []);
-        if (data.companySettings) {
-          setCompanySettings(data.companySettings);
-        }
+  // Day sheet is cached + revalidated in the background — instant on revisit
+  const {
+    data: daySheet,
+    isLoading,
+    mutate: refreshDaySheet,
+  } = useSWR<DaySheetResponse>(`/api/admin/employee-attendance?date=${filterDate}`);
 
-        if (data.employees?.length > 0) {
-          setDrillEmployeeId((prev) => prev || data.employees[0].userId);
-        }
-      }
-    } catch (err) {
-      console.error("Failed fetching daily sheets:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filterDate]);
+  const employees = useMemo(() => daySheet?.employees || [], [daySheet]);
+  const attendanceLogs = useMemo(() => daySheet?.logs || [], [daySheet]);
+  const monthlyRecords = useMemo(() => daySheet?.monthlyRecords || [], [daySheet]);
+  const companySettings = daySheet?.companySettings || null;
 
-  useEffect(() => {
-    fetchDailyLogs();
-  }, [fetchDailyLogs]);
-
-  const formatTo12Hour = (timeStr: string): string => {
-    if (!timeStr) return "";
-    const [h, m] = timeStr.split(":").map(Number);
-    if (isNaN(h) || isNaN(m)) return timeStr;
-    const period = h >= 12 ? "PM" : "AM";
-    const hour12 = h % 12 || 12;
-    return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
-  };
+  const drillEmployeeId = drillEmployeeIdState || employees[0]?.userId || "";
 
   const shiftTimeLabel = useMemo(() => {
     if (companySettings) {
@@ -178,17 +177,6 @@ export default function AdminAttendancePage() {
     }
     return "09:00 AM - 05:00 PM";
   }, [companySettings]);
-
-  const formatShiftTime = (shift: string): string => {
-    if (!shift) return "";
-    const parts = shift.split(/\s*[-–—to]\s*/);
-    if (parts.length >= 2) {
-      const start = formatTo12Hour(parts[0].trim());
-      const end = formatTo12Hour(parts[1].trim());
-      return `${start} - ${end}`;
-    }
-    return formatTo12Hour(shift.trim());
-  };
 
   const mergedRecords = useMemo(() => {
     return employees.map((emp) => {
@@ -275,8 +263,7 @@ export default function AdminAttendancePage() {
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
       triggerToast("Timesheet adjusted successfully.");
-      setIsLoading(true);
-      fetchDailyLogs();
+      await refreshDaySheet();
     } else {
       const errData = await res.json();
       throw new Error(errData?.error || "Action adjustment failed.");
@@ -286,8 +273,7 @@ export default function AdminAttendancePage() {
   const handleRefreshAttendance = async () => {
     setIsSyncing(true);
     try {
-      setIsLoading(true);
-      await fetchDailyLogs();
+      await refreshDaySheet();
       triggerToast("Attendance refreshed.");
     } finally {
       setIsSyncing(false);
@@ -302,8 +288,13 @@ export default function AdminAttendancePage() {
         body: JSON.stringify(updatedData),
       });
       if (res.ok) {
-        const data = await res.json();
-        setCompanySettings(data);
+        const data = (await res.json()) as CompanySettings;
+        // Merge into the cached sheet; if the sheet never loaded, do a full
+        // revalidation instead of caching a partial object.
+        refreshDaySheet(
+          (current) => ({ ...(current ?? {}), companySettings: data }),
+          { revalidate: !daySheet }
+        );
         triggerToast("Rules modified and applied safely.");
       } else {
         triggerToast("Failed updating settings parameters.");

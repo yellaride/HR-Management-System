@@ -49,4 +49,7 @@ const EmployeeSchema = new Schema(
   { timestamps: true }
 );
 
+// Department-scoped lookups (department-head APIs, directory filters)
+EmployeeSchema.index({ department: 1, status: 1 });
+
 export const Employee = models.Employee || model("Employee", EmployeeSchema);

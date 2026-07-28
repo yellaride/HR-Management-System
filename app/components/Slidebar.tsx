@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useMemo, useState, useEf
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import useSWR from "swr";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 /* ── 1. Sidebar Context & Provider ── */
@@ -20,8 +21,15 @@ export function useSidebar() {
   return ctx;
 }
 
-export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(true);
+export function SidebarProvider({
+  children,
+  defaultOpen = true,
+}: {
+  children: React.ReactNode;
+  /** Initial state, read server-side from the sidebar_state cookie */
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
 
   const toggleSidebar = useCallback(() => {
     setOpen((prev) => {
@@ -224,7 +232,7 @@ function UnifiedHeaderCard({
   const isCollapsed = state === "collapsed";
 
   return (
-    <div className="flex items-center justify-between pb-3 border-b border-line-subtle min-h-[48px]">
+    <div className="flex items-center justify-between pb-3 border-b border-line-subtle min-h-12">
       {/* Brand + Email Combined Container */}
       <div
         className={
@@ -318,16 +326,38 @@ export default function Sidebar({ role }: SidebarProps) {
   const router = useRouter();
   const { data: session } = useSession();
 
-  useEffect(() => {
+  // Close menus when the route changes (render-time adjustment instead of an
+  // effect, per React guidance — avoids a cascading re-render).
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setIsNavOpen(false);
     setIsProfileOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (session?.error === "SessionExpired") {
       signOut({ callbackUrl: "/" });
     }
   }, [session]);
+
+  // Mobile drawer: lock page scroll while open and close on Escape
+  useEffect(() => {
+    if (!isNavOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsNavOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isNavOpen]);
 
   const sessionRole = session?.user?.role?.trim().toLowerCase();
   const isAdminFromSession = sessionRole === "admin";
@@ -342,29 +372,13 @@ export default function Sidebar({ role }: SidebarProps) {
     (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
     fallbackPathRole;
 
-  // Department-head status (server-verified) unlocks the "Team" nav items
-  const [isDepartmentHead, setIsDepartmentHead] = useState(false);
+  // Department-head status (server-verified) unlocks the "Team" nav items.
+  // Cached via SWR so route changes never re-trigger the request.
   const sessionUserId = session?.user?.id;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const headCheck: Promise<boolean> =
-      displayRole === "employee" && sessionUserId
-        ? fetch("/api/head/me")
-            .then((res) => (res.ok ? res.json() : null))
-            .then((data: { isHead?: boolean } | null) => Boolean(data?.isHead))
-            .catch(() => false)
-        : Promise.resolve(false);
-
-    headCheck.then((isHead) => {
-      if (!cancelled) setIsDepartmentHead(isHead);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [displayRole, sessionUserId]);
+  const { data: headStatus } = useSWR<{ isHead?: boolean }>(
+    displayRole === "employee" && sessionUserId ? "/api/head/me" : null
+  );
+  const isDepartmentHead = Boolean(headStatus?.isHead);
 
   const activeNavItems =
     displayRole === "employee" && isDepartmentHead
@@ -467,10 +481,10 @@ export default function Sidebar({ role }: SidebarProps) {
       {/* Main Sidebar */}
       <aside
         className={`fixed top-0 bottom-0 left-0 z-50 bg-surface-card border-r border-line-subtle p-3.5 sm:p-4 shadow-lg select-none flex flex-col justify-between transition-all duration-300 ease-in-out lg:static lg:h-screen lg:max-h-screen lg:translate-x-0 ${
-          isNavOpen ? "translate-x-0 w-72" : "-translate-x-full"
-        } ${isCollapsed ? "lg:w-[72px]" : "lg:w-[240px]"}`}
+          isNavOpen ? "translate-x-0 w-72 max-w-[85vw]" : "-translate-x-full"
+        } ${isCollapsed ? "lg:w-18" : "lg:w-60"}`}
       >
-        <div className="flex flex-col gap-5 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-col gap-5 overflow-y-auto scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Unified Brand + Role + Email Header Div */}
           <UnifiedHeaderCard
             displayRole={displayRole}

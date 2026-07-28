@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import React, { useState, useSyncExternalStore } from "react";
+import useSWR from "swr";
 import {
   Users,
   Layers,
@@ -57,60 +58,32 @@ const getClientDate = () =>
   new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 const getServerDate = () => "";
 
+interface DashboardStatsResponse {
+  totalEmployees: number;
+  totalDepartments: number;
+  pendingLeaves: number;
+  todayAttendancePercent: number;
+  presentToday: number;
+  todayBirthdays: TodayBirthday[];
+}
+
 export default function AdminDashboardPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
   const currentDate = useSyncExternalStore(subscribeToNothing, getClientDate, getServerDate);
 
-  const [dashboardStats, setDashboardStats] = useState<{
-    totalEmployees: number;
-    totalDepartments: number;
-    pendingLeaves: number;
-    todayAttendancePercent: number;
-    presentToday: number;
-  } | null>(null);
-  
-  const [todayBirthdays, setTodayBirthdays] = useState<TodayBirthday[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
+  // Cached + background-revalidated: revisits render instantly from cache
+  const {
+    data,
+    error,
+    isLoading,
+    mutate: refreshStats,
+  } = useSWR<DashboardStatsResponse>("/api/admin/dashboard");
 
-  const loadStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load dashboard stats");
-      const data = await res.json();
-
-      setDashboardStats({
-        totalEmployees: Number(data.totalEmployees) || 0,
-        totalDepartments: Number(data.totalDepartments) || 0,
-        pendingLeaves: typeof data.pendingLeaves === "number" ? data.pendingLeaves : 0,
-        todayAttendancePercent: typeof data.todayAttendancePercent === "number" ? data.todayAttendancePercent : 0,
-        presentToday: typeof data.presentToday === "number" ? data.presentToday : 0,
-      });
-
-      setTodayBirthdays(Array.isArray(data.todayBirthdays) ? data.todayBirthdays : []);
-
-    } catch (e) {
-      setStatsError(e instanceof Error ? e.message : "Failed to load dashboard stats");
-      setDashboardStats({
-        totalEmployees: 0,
-        totalDepartments: 0,
-        pendingLeaves: 0,
-        todayAttendancePercent: 0,
-        presentToday: 0,
-      });
-      setTodayBirthdays([]);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    async function loadInitialStats() {
-      loadStats();
-    }
-    loadInitialStats();
-  }, [loadStats]);
+  const dashboardStats = data ?? null;
+  const todayBirthdays = Array.isArray(data?.todayBirthdays) ? data.todayBirthdays : [];
+  const statsLoading = isLoading;
+  const statsError = error ? (error instanceof Error ? error.message : "Failed to load dashboard stats") : null;
 
   const handleCreateEmployee = async (data: {
     name: string;
@@ -152,9 +125,7 @@ export default function AdminDashboardPage() {
       const result = await res.json();
       if (result?.employee) {
         setIsAddModalOpen(false);
-        setStatsLoading(true);
-        setStatsError(null);
-        await loadStats();
+        await refreshStats();
       }
     } catch (err) {
       setAddEmployeeError(err instanceof Error ? err.message : "An error occurred during registration.");

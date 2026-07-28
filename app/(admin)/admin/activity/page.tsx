@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import useSWR from "swr";
 import { Search, Filter, Calendar, RefreshCw, CheckSquare, User, ChevronDown } from "lucide-react";
 
 interface Activity {
@@ -13,9 +14,8 @@ interface Activity {
 }
 
 function ActivityLogPage() {
-  const [logs, setLogs] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
 
@@ -25,58 +25,54 @@ function ActivityLogPage() {
   const typeRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
 
-  const fetchLogs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (typeFilter !== "all") params.append("type", typeFilter);
-      if (search) params.append("search", search);
-
-      const res = await fetch(`/api/admin/activity?${params.toString()}`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        let fetchedLogs = data.logs || [];
-
-        if (typeFilter !== "all") {
-          fetchedLogs = fetchedLogs.filter((log: Activity) => log.type === typeFilter);
-        }
-
-        if (dateFilter !== "all") {
-          const now = new Date();
-          const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-
-          fetchedLogs = fetchedLogs.filter((log: Activity) => {
-            const logDate = new Date(log.createdAt);
-            if (dateFilter === "today") {
-              return logDate >= startOfToday;
-            } else if (dateFilter === "week") {
-              const sevenDaysAgo = new Date();
-              sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-              return logDate >= sevenDaysAgo;
-            } else if (dateFilter === "month") {
-              const thirtyDaysAgo = new Date();
-              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-              return logDate >= thirtyDaysAgo;
-            }
-            return true;
-          });
-        }
-
-        setLogs(fetchedLogs);
-      }
-    } catch (e) {
-      console.error("Error fetching logs database:", e);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, typeFilter, dateFilter]);
-
+  // Debounce search typing before it becomes part of the SWR key
   useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      fetchLogs();
-    }, 300);
+    const delayDebounce = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(delayDebounce);
-  }, [fetchLogs]);
+  }, [search]);
+
+  const params = new URLSearchParams();
+  if (typeFilter !== "all") params.append("type", typeFilter);
+  if (debouncedSearch) params.append("search", debouncedSearch);
+  const queryString = params.toString();
+
+  // Each filter combination is cached; switching back is instant
+  const { data, isLoading, mutate: refreshLogs } = useSWR<{ logs?: Activity[] }>(
+    `/api/admin/activity${queryString ? `?${queryString}` : ""}`
+  );
+
+  const logs = useMemo(() => {
+    let fetchedLogs = data?.logs || [];
+
+    if (typeFilter !== "all") {
+      fetchedLogs = fetchedLogs.filter((log) => log.type === typeFilter);
+    }
+
+    if (dateFilter !== "all") {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      fetchedLogs = fetchedLogs.filter((log) => {
+        const logDate = new Date(log.createdAt);
+        if (dateFilter === "today") {
+          return logDate >= startOfToday;
+        } else if (dateFilter === "week") {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return logDate >= sevenDaysAgo;
+        } else if (dateFilter === "month") {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return logDate >= thirtyDaysAgo;
+        }
+        return true;
+      });
+    }
+
+    return fetchedLogs;
+  }, [data, typeFilter, dateFilter]);
+
+  const loading = isLoading;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -203,7 +199,7 @@ function ActivityLogPage() {
         </div>
 
         <button
-          onClick={fetchLogs}
+          onClick={() => refreshLogs()}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-card hover:bg-surface-main border border-line-subtle rounded-xl text-xs font-bold text-content-secondary hover:text-content-main hover:border-brand-accent shadow-xs transition duration-150 active:scale-95 cursor-pointer shrink-0"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Refresh Logs

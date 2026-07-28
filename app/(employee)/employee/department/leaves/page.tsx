@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
+import useSWR from "swr";
 import Swal from "sweetalert2";
 import { Loader2, ShieldAlert, CheckCircle2, XCircle, CalendarDays, Crown } from "lucide-react";
+import { ApiError } from "@/lib/api-client";
 
 interface TeamLeave {
   id: string;
@@ -36,41 +38,23 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function TeamLeavesPage() {
-  const [loading, setLoading] = useState(true);
-  const [notHead, setNotHead] = useState(false);
-  const [department, setDepartment] = useState("");
-  const [leaves, setLeaves] = useState<TeamLeave[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const refreshLeaves = useCallback(() => setReloadKey((k) => k + 1), []);
+  const {
+    data,
+    error,
+    isLoading: loading,
+    mutate: refreshLeaves,
+  } = useSWR<{ department?: string; leaves?: TeamLeave[] }>("/api/head/leaves");
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/head/leaves")
-      .then(async (res) => {
-        if (cancelled) return;
-        if (res.status === 403) {
-          setNotHead(true);
-          return;
-        }
-        if (!res.ok) throw new Error("Failed to load department leaves.");
-        const data = (await res.json()) as { department?: string; leaves?: TeamLeave[] };
-        if (cancelled) return;
-        setDepartment(data.department || "");
-        setLeaves(Array.isArray(data.leaves) ? data.leaves : []);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
+  // A 403 means the signed-in employee is not a department head
+  const notHead = error instanceof ApiError && error.status === 403;
+  const department = data?.department || "";
+  const leaves = useMemo(
+    () => (Array.isArray(data?.leaves) ? data.leaves : []),
+    [data]
+  );
 
   const handleAction = async (leave: TeamLeave, action: "APPROVE" | "REJECT") => {
     const confirm = await Swal.fire({
@@ -94,7 +78,7 @@ export default function TeamLeavesPage() {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || "Failed to update leave.");
 
-      refreshLeaves();
+      await refreshLeaves();
       Toast.fire({
         icon: "success",
         title: `Leave ${action === "APPROVE" ? "approved" : "rejected"}`,
@@ -113,7 +97,7 @@ export default function TeamLeavesPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-3">
         <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
         <span className="text-sm font-semibold text-content-secondary">Loading department leaves...</span>
       </div>
@@ -122,7 +106,7 @@ export default function TeamLeavesPage() {
 
   if (notHead) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-center px-4">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-3 text-center px-4">
         <ShieldAlert className="w-10 h-10 text-rose-500" />
         <h2 className="text-sm font-bold text-content-main">Department head access required</h2>
         <p className="text-xs text-content-secondary max-w-sm">
@@ -207,7 +191,7 @@ export default function TeamLeavesPage() {
                         {leave.startDate} → {leave.endDate}
                       </td>
                       <td className="px-4 py-3 font-bold">{leave.days}</td>
-                      <td className="px-4 py-3 max-w-[220px]">
+                      <td className="px-4 py-3 max-w-55">
                         <span className="line-clamp-2">{leave.reason}</span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">

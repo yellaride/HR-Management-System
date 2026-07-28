@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import useSWR from "swr";
 import Swal from "sweetalert2";
 import { 
   CalendarCheck, 
@@ -85,24 +86,11 @@ export default function EmployeeDashboardPage() {
   const { data: session } = useSession();
   const leaveTypeRef = useRef<HTMLDivElement>(null);
 
-  const [presentDays, setPresentDays] = useState(0);
-  const [absentDays, setAbsentDays] = useState(0);
-  const [totalWorkedHours, setTotalWorkedHours] = useState(0);
-  const [pendingLeaves, setPendingLeaves] = useState(0);
-  
-  const [payslips, setPayslips] = useState<PayslipRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-
-  const [todayRecord, setTodayRecord] = useState<TodayAttendanceRecord | null>(null);
-  const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
   const [isSunday, setIsSunday] = useState(false);
   const [isWithinWindow, setIsWithinWindow] = useState(false);
-
-  const [isBirthday, setIsBirthday] = useState(false);
-  const [birthdayName, setBirthdayName] = useState("");
 
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isLeaveTypeDropdownOpen, setIsLeaveTypeDropdownOpen] = useState(false);
@@ -136,40 +124,81 @@ export default function EmployeeDashboardPage() {
     setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
   }, []);
 
-  const fetchAttendanceStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/employee/attendance");
-      if (res.ok) {
-        const data = await res.json();
-        setTodayRecord(data.todayRecord || null);
-        
-        if (data.monthlyRecord) {
-          setPresentDays(data.monthlyRecord.presentDays ?? 0);
-          setAbsentDays(data.monthlyRecord.absentDays ?? 0);
-          setTotalWorkedHours(data.monthlyRecord.totalWorkingHours ?? 0);
-        } else if (data.history && data.history.length > 0) {
-          const actualPresents = data.history.filter(
-            (r: AttendanceHistoryEntry) => r.status === "On Time" || r.status === "Late"
-          ).length;
-          setPresentDays(actualPresents);
-          
-          const actualAbsents = data.history.filter(
-            (r: AttendanceHistoryEntry) => r.status === "Absent"
-          ).length;
-          setAbsentDays(actualAbsents);
+  // All dashboard data comes through SWR: fetched in parallel, cached across
+  // employee pages (attendance / leaves / payslips reuse the same keys), and
+  // revalidated in the background — revisits render instantly.
+  const {
+    data: attendanceData,
+    isLoading: attendanceLoading,
+    mutate: refreshAttendance,
+  } = useSWR<{
+    todayRecord?: TodayAttendanceRecord | null;
+    monthlyRecord?: { presentDays?: number; absentDays?: number; totalWorkingHours?: number } | null;
+    history?: AttendanceHistoryEntry[];
+  }>("/api/employee/attendance");
 
-          const totalHours = data.history.reduce((acc: number, curr: AttendanceHistoryEntry) => {
-            return acc + (curr.workedHours || 0);
-          }, 0);
-          setTotalWorkedHours(totalHours || actualPresents * 8); 
-        }
-      }
-    } catch (err) {
-      console.error("Failed to sync attendance status", err);
-    } finally {
-      setAttendanceLoading(false);
+  const { data: payslipsData, isLoading } = useSWR<unknown>(
+    session?.user?.email ? "/api/employee/payslips" : null
+  );
+
+  const { data: leavesData, mutate: refreshLeaves } = useSWR<unknown>(
+    "/api/employee/leaves-request"
+  );
+
+  const { data: birthdayData } = useSWR<{ isBirthday?: boolean; name?: string }>(
+    "/api/employee/my-birthday"
+  );
+
+  const todayRecord = attendanceData?.todayRecord || null;
+  const isBirthday = Boolean(birthdayData?.isBirthday);
+  const birthdayName = birthdayData?.name || "";
+
+  const { presentDays, absentDays, totalWorkedHours } = useMemo(() => {
+    if (attendanceData?.monthlyRecord) {
+      return {
+        presentDays: attendanceData.monthlyRecord.presentDays ?? 0,
+        absentDays: attendanceData.monthlyRecord.absentDays ?? 0,
+        totalWorkedHours: attendanceData.monthlyRecord.totalWorkingHours ?? 0,
+      };
     }
-  }, []);
+
+    const history = attendanceData?.history || [];
+    if (history.length === 0) {
+      return { presentDays: 0, absentDays: 0, totalWorkedHours: 0 };
+    }
+
+    const actualPresents = history.filter(
+      (r) => r.status === "On Time" || r.status === "Late"
+    ).length;
+    const actualAbsents = history.filter((r) => r.status === "Absent").length;
+    const totalHours = history.reduce((acc, curr) => acc + (curr.workedHours || 0), 0);
+
+    return {
+      presentDays: actualPresents,
+      absentDays: actualAbsents,
+      totalWorkedHours: totalHours || actualPresents * 8,
+    };
+  }, [attendanceData]);
+
+  const payslips = useMemo<PayslipRecord[]>(() => {
+    const data = payslipsData as
+      | PayslipRecord[]
+      | { payslips?: PayslipRecord[]; data?: PayslipRecord[] }
+      | undefined;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.payslips)) return data.payslips;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  }, [payslipsData]);
+
+  const pendingLeaves = useMemo(() => {
+    const data = leavesData as
+      | EmployeeLeaveSummary[]
+      | { leaves?: EmployeeLeaveSummary[] }
+      | undefined;
+    const leaves = Array.isArray(data) ? data : Array.isArray(data?.leaves) ? data.leaves : [];
+    return leaves.filter((l) => String(l?.status || "").toUpperCase() === "PENDING").length;
+  }, [leavesData]);
 
   const handleAttendanceAction = async (actionType: "check-in" | "check-out") => {
     try {
@@ -184,85 +213,24 @@ export default function EmployeeDashboardPage() {
       if (!res.ok) {
         setAttendanceError(data.error || "Action execution failed.");
       } else {
-        setAttendanceLoading(true);
-        await fetchAttendanceStatus();
+        await refreshAttendance();
       }
     } catch {
       setAttendanceError("A communication error occurred with the server.");
     }
   };
 
-  const fetchEmployeePayslips = useCallback(async () => {
-    if (!session?.user?.email) return;
-
-    try {
-      const res = await fetch("/api/employee/payslips");
-      if (!res.ok) {
-        throw new Error(`Failed to load payslips (status: ${res.status})`);
-      }
-
-      const data = await res.json();
-      let slips: PayslipRecord[] = [];
-      if (Array.isArray(data)) {
-        slips = data;
-      } else if (Array.isArray(data.payslips)) {
-        slips = data.payslips;
-      } else if (Array.isArray(data.data)) {
-        slips = data.data;
-      }
-
-      setPayslips(slips);
-    } catch (error) {
-      console.error("Error fetching employee payslips:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [session]);
-
-  const fetchPendingLeaves = useCallback(async () => {
-    try {
-      const res = await fetch("/api/employee/leaves-request");
-      if (!res.ok) return;
-      const data = await res.json();
-      const leaves = Array.isArray(data?.leaves) ? data.leaves : (Array.isArray(data) ? data : []);
-      const pendingCount = leaves.filter((l: EmployeeLeaveSummary) => String(l?.status || "").toUpperCase() === "PENDING").length;
-      setPendingLeaves(pendingCount);
-    } catch (e) {
-      console.error("Failed to fetch pending leaves", e);
-    }
-  }, []);
-
-  const fetchBirthdayStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/employee/my-birthday");
-      if (res.ok) {
-        const data = await res.json();
-        setIsBirthday(!!data.isBirthday);
-        setBirthdayName(data.name || "");
-      }
-    } catch (e) {
-      console.error("Failed to fetch birthday validation values:", e);
-    }
-  }, []);
-
   useEffect(() => {
-    const initialLoad = setTimeout(() => {
-      fetchEmployeePayslips();
-      fetchAttendanceStatus();
-      fetchPendingLeaves();
-      fetchBirthdayStatus();
-      evaluateTimeConstraints();
-    }, 0);
-
+    const initial = setTimeout(evaluateTimeConstraints, 0);
     const timer = setInterval(() => {
       evaluateTimeConstraints();
     }, 15000);
 
     return () => {
-      clearTimeout(initialLoad);
+      clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [fetchEmployeePayslips, fetchAttendanceStatus, fetchPendingLeaves, fetchBirthdayStatus, evaluateTimeConstraints]);
+  }, [evaluateTimeConstraints]);
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -306,7 +274,7 @@ export default function EmployeeDashboardPage() {
       setIsLeaveModalOpen(false);
       setLeaveAppliedNotice(true);
 
-      await fetchPendingLeaves();
+      await refreshLeaves();
 
       setLeaveForm({
         type: "Annual Leave",

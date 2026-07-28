@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
+import useSWR from "swr";
 import { CheckSquare, Calendar, FileText, Heart, User } from "lucide-react";
 
 interface Activity {
@@ -12,27 +13,11 @@ interface Activity {
 }
 
 export function RecentActivityPanel() {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Shares the SWR cache with the Activity page — instant on revisit
+  const { data, isLoading } = useSWR<{ logs?: Activity[] }>("/api/admin/activity");
 
-  useEffect(() => {
-    const fetchRecentActivity = async () => {
-      try {
-        const res = await fetch("/api/admin/activity", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          // Display the top 4 activities
-          setActivities(data.logs?.slice(0, 4) || []);
-        }
-      } catch (e) {
-        console.error("Failed to load recent activities:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRecentActivity();
-  }, []);
+  const activities = (data?.logs || []).slice(0, 4);
+  const loading = isLoading;
 
   const getInitials = (name: string) => {
     return name
@@ -96,9 +81,16 @@ export function RecentActivityPanel() {
 
   if (loading) {
     return (
-      <div className="py-12 flex flex-col items-center justify-center space-y-2">
-        <span className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-        <span className="text-xs text-slate-400">Loading dynamic activities...</span>
+      <div className="divide-y divide-slate-100">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="py-4 flex items-center gap-3 animate-pulse">
+            <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 bg-slate-100 rounded w-1/3" />
+              <div className="h-2.5 bg-slate-100 rounded w-2/3" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

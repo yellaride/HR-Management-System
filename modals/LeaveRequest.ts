@@ -30,6 +30,9 @@ const LeaveSchema = new Schema(
   { timestamps: true }
 );
 
+// Admin Leave Manager listing: filter by status, newest first
+LeaveSchema.index({ status: 1, createdAt: -1 });
+
 const Leave = models.Leave || model("Leave", LeaveSchema);
 export default Leave;
 

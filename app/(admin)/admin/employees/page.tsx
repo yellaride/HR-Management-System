@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import Swal from "sweetalert2";
 // Updated import to resolve the new default-exported EmployeeTable
 import EmployeeTable, { Employee } from "../../../components/admin/employees/EmployeeTable";
 
@@ -8,6 +10,8 @@ import AddEmployeeModal from "../../../components/admin/employees/AddEmployeeMod
 import EditEmployeeModal from "../../../components/admin/employees/EditEmployeeModal";
 import ViewEmployeeModal from "../../../components/admin/employees/ViewEmployeeModal";
 import EmptyState from "../../../components/admin/employees/EmptyState";
+import { FilterSelect } from "@/app/components/ui/FilterSelect";
+import { Building2, X } from "lucide-react";
 
 /**
  * Translates raw backend errors, database codes, or network issues 
@@ -38,9 +42,8 @@ function getFriendlyErrorMessage(error: string | null): string | null {
 }
 
 export default function AdminEmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]); // State to hold fetched departments
   const [searchQuery, setSearchQuery] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("All");
   
   // Modal triggers
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -50,51 +53,32 @@ export default function AdminEmployeesPage() {
   // Selected employee data
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  // Loading & system page states
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
   // Local state containers for safe modal form validation errors
   const [addEmployeeError, setAddEmployeeError] = useState<string | null>(null);
   const [editEmployeeError, setEditEmployeeError] = useState<string | null>(null);
 
-  const fetchEmployees = async () => {
-    try {
-      const res = await fetch("/api/admin/employees");
-      if (!res.ok) throw new Error("Failed to load database profiles.");
-      const data = await res.json();
-      setEmployees(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Cached directory + settings: parallel fetch, instant on revisit
+  const {
+    data: employeesData,
+    error: employeesError,
+    isLoading,
+    mutate: mutateEmployees,
+  } = useSWR<Employee[]>("/api/admin/employees");
 
-  // New function to fetch departments from your company settings API
-  const fetchDepartments = async () => {
-    try {
-      // NOTE: Ensure this URL matches the path of your company-settings API.
-      // E.g., "/api/admin/company-settings" or "/api/company-settings"
-      const res = await fetch("/api/settings/company-settings"); 
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.departments)) {
-          setDepartments(data.departments);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load departments:", err);
-    }
-  };
+  const { data: settingsData } = useSWR<{ departments?: string[] }>(
+    "/api/settings/company-settings"
+  );
 
-  useEffect(() => {
-    async function loadInitialData() {
-      fetchEmployees();
-      fetchDepartments(); // Fetching company settings departments on component mount
-    }
-    loadInitialData();
-  }, []);
+  const employees = useMemo(() => employeesData ?? [], [employeesData]);
+  const departments = useMemo(
+    () => (Array.isArray(settingsData?.departments) ? settingsData.departments : []),
+    [settingsData]
+  );
+  const error = employeesError
+    ? employeesError instanceof Error
+      ? employeesError.message
+      : "An unexpected error occurred."
+    : null;
 
   // CREATE profile handler
   const handleCreateEmployee = async (
@@ -139,7 +123,7 @@ export default function AdminEmployeesPage() {
 
       const result = await res.json();
       if (result.employee) {
-        setEmployees((prev) => [result.employee, ...prev]);
+        mutateEmployees((prev) => [result.employee, ...(prev ?? [])], { revalidate: false });
         setAddEmployeeError(null);
         setIsAddModalOpen(false);
       }
@@ -175,8 +159,9 @@ export default function AdminEmployeesPage() {
 
       const result = await res.json();
       if (result.employee) {
-        setEmployees((prev) => 
-          prev.map((emp) => (emp.id === id ? result.employee : emp))
+        mutateEmployees(
+          (prev) => (prev ?? []).map((emp) => (emp.id === id ? result.employee : emp)),
+          { revalidate: false }
         );
         setEditEmployeeError(null);
         setIsEditModalOpen(false);
@@ -198,11 +183,19 @@ export default function AdminEmployeesPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to delete employee profile");
 
-      setEmployees((prev) => prev.filter((emp) => emp.id !== id));
+      mutateEmployees((prev) => (prev ?? []).filter((emp) => emp.id !== id), {
+        revalidate: false,
+      });
       setIsViewModalOpen(false);
       setSelectedEmployee(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete database records.");
+      console.error("Delete employee failed:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Delete failed",
+        text: getFriendlyErrorMessage(err instanceof Error ? err.message : null) ?? undefined,
+        confirmButtonColor: "#7c3aed",
+      });
     }
   };
 
@@ -217,12 +210,36 @@ export default function AdminEmployeesPage() {
     setIsViewModalOpen(true);
   };
 
-  const filteredEmployees = employees.filter(
-    (emp) =>
-      emp.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.department?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const departmentOptions = useMemo(() => {
+    const fromEmployees = employees
+      .map((emp) => emp.department)
+      .filter((dept): dept is string => Boolean(dept?.trim()));
+    const unique = Array.from(new Set([...departments, ...fromEmployees])).sort((a, b) =>
+      a.localeCompare(b)
+    );
+
+    return [
+      { value: "All", label: "All Departments" },
+      ...unique.map((dept) => ({ value: dept, label: dept })),
+    ];
+  }, [departments, employees]);
+
+  const filteredEmployees = employees.filter((emp) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      emp.name?.toLowerCase().includes(query) ||
+      emp.role?.toLowerCase().includes(query) ||
+      emp.department?.toLowerCase().includes(query) ||
+      emp.email?.toLowerCase().includes(query);
+
+    const matchesDepartment =
+      departmentFilter === "All" || emp.department === departmentFilter;
+
+    return matchesSearch && matchesDepartment;
+  });
+
+  const hasActiveFilters = searchQuery.trim().length > 0 || departmentFilter !== "All";
 
   return (
     <div className="space-y-6 pb-12">
@@ -236,9 +253,9 @@ export default function AdminEmployeesPage() {
           </p>
         </div>
 
-        {/* Action Panel with Unified Theme Colors */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative w-full sm:w-64">
+        {/* Toolbar: search + department filter + actions, all one height */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5">
+          <div className="relative w-full sm:w-56">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className="h-4 w-4 text-content-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -253,12 +270,36 @@ export default function AdminEmployeesPage() {
             />
           </div>
 
+          <FilterSelect
+            ariaLabel="Filter by department"
+            icon={<Building2 className="w-3.5 h-3.5" />}
+            options={departmentOptions}
+            value={departmentFilter}
+            onChange={setDepartmentFilter}
+            className="w-full sm:w-48"
+          />
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setDepartmentFilter("All");
+              }}
+              title="Clear all filters"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-content-secondary hover:text-content-main bg-surface-card border border-line-subtle rounded-xl shadow-sm transition cursor-pointer whitespace-nowrap"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               setAddEmployeeError(null);
               setIsAddModalOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -275,18 +316,24 @@ export default function AdminEmployeesPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-surface-card rounded-2xl border border-line-subtle shadow-sm">
-            <span className="text-content-secondary text-xs animate-pulse">Loading employee data...</span>
+          <div className="bg-surface-card rounded-2xl border border-line-subtle shadow-sm p-4 space-y-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-4 animate-pulse py-2">
+                <div className="w-9 h-9 rounded-full bg-surface-main shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-surface-main rounded w-1/4" />
+                  <div className="h-2.5 bg-surface-main rounded w-1/3" />
+                </div>
+                <div className="h-3 bg-surface-main rounded w-20 hidden sm:block" />
+                <div className="h-3 bg-surface-main rounded w-16 hidden md:block" />
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center p-12 bg-amber-50/50 rounded-2xl border border-amber-100/80 text-amber-800 shadow-sm">
             <span className="text-xs font-semibold text-center">{getFriendlyErrorMessage(error)}</span>
             <button 
-              onClick={() => {
-                setIsLoading(true);
-                setError(null);
-                fetchEmployees();
-              }}
+              onClick={() => mutateEmployees()}
               className="mt-3 px-3.5 py-1.5 bg-brand-accent hover:bg-brand-hover text-white text-[10px] font-bold rounded-lg shadow-sm transition-all duration-150 active:scale-[0.95]"
             >
               Retry Loading Directory
@@ -296,7 +343,21 @@ export default function AdminEmployeesPage() {
           <EmptyState onAddClick={() => setIsAddModalOpen(true)} />
         ) : filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 bg-surface-card rounded-2xl border border-dashed border-line-subtle">
-            <span className="text-content-secondary text-xs">No employees match your search query.</span>
+            <span className="text-content-secondary text-xs">
+              No employees match your {hasActiveFilters ? "filters" : "search query"}.
+            </span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setDepartmentFilter("All");
+                }}
+                className="mt-3 px-3.5 py-1.5 bg-brand-accent hover:bg-brand-hover text-white text-[10px] font-bold rounded-lg shadow-sm transition-all duration-150 active:scale-[0.95] cursor-pointer"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <EmployeeTable

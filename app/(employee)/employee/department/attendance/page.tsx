@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
+import useSWR from "swr";
 import Swal from "sweetalert2";
 import { Loader2, ShieldAlert, Clock, Pencil, Lock, Crown, X, CheckCircle2 } from "lucide-react";
+import { ApiError } from "@/lib/api-client";
 
 interface TeamEmployee {
   _id: string;
@@ -90,40 +92,20 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function TeamAttendancePage() {
-  const [loading, setLoading] = useState(true);
-  const [notHead, setNotHead] = useState(false);
   const [date, setDate] = useState(todayInKarachi());
-  const [sheet, setSheet] = useState<DaySheet | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const refreshSheet = useCallback(() => setReloadKey((k) => k + 1), []);
+  // Each date is its own cached key — moving between dates is instant
+  const {
+    data: sheet,
+    error,
+    isLoading: loading,
+    mutate: refreshSheet,
+  } = useSWR<DaySheet>(`/api/head/attendance?date=${date}`);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch(`/api/head/attendance?date=${date}`)
-      .then(async (res) => {
-        if (cancelled) return;
-        if (res.status === 403) {
-          setNotHead(true);
-          return;
-        }
-        if (!res.ok) throw new Error("Failed to load attendance.");
-        const data = (await res.json()) as DaySheet;
-        if (cancelled) return;
-        setSheet(data);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [date, reloadKey]);
+  // A 403 means the signed-in employee is not a department head
+  const notHead = error instanceof ApiError && error.status === 403;
 
   const isMonthLocked = (userId: string): boolean => {
     const record = sheet?.monthlyRecords.find((r) => String(r.userId) === userId);
@@ -173,7 +155,7 @@ export default function TeamAttendancePage() {
       if (!res.ok) throw new Error(data.error || "Failed to save attendance.");
 
       setEdit(null);
-      refreshSheet();
+      await refreshSheet();
       Toast.fire({ icon: "success", title: "Attendance updated" });
     } catch (err) {
       Swal.fire({
@@ -189,7 +171,7 @@ export default function TeamAttendancePage() {
 
   if (loading && !sheet) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-3">
         <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
         <span className="text-sm font-semibold text-content-secondary">Loading team attendance...</span>
       </div>
@@ -198,7 +180,7 @@ export default function TeamAttendancePage() {
 
   if (notHead) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-center px-4">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-3 text-center px-4">
         <ShieldAlert className="w-10 h-10 text-rose-500" />
         <h2 className="text-sm font-bold text-content-main">Department head access required</h2>
         <p className="text-xs text-content-secondary max-w-sm">

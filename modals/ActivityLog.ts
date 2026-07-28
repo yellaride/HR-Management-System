@@ -57,6 +57,8 @@ const ActivityLogSchema = new Schema<IActivityLog>(
 
 // Fetch history for a specific user ordered by time
 ActivityLogSchema.index({ userId: 1, timestamp: -1 });
+// Global admin activity feed: newest first
+ActivityLogSchema.index({ createdAt: -1 });
 
 export const ActivityLog: Model<IActivityLog> =
   mongoose.models.ActivityLog || mongoose.model<IActivityLog>("ActivityLog", ActivityLogSchema);

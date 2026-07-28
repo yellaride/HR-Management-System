@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
@@ -75,14 +76,31 @@ export async function GET(request: Request) {
       .limit(100)
       .lean();
 
-    // 3. Retrieve all employees to map activityLog.userId to employee name + designation
+    // 3. Resolve names only for users that actually appear in the fetched logs
+    // (previously the entire employee table was loaded on every request)
     interface LeanEmployee {
       _id?: { toString(): string };
       userId?: { toString(): string };
       name: string;
       designation: string;
     }
-    const employees = (await Employee.find({}).lean()) as unknown as LeanEmployee[];
+
+    const logUserIds = Array.from(
+      new Set(
+        (dbLogs as unknown as Array<{ userId?: string | { toString(): string } }>)
+          .map((log) => log.userId?.toString() || "")
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      )
+    );
+
+    const employees =
+      logUserIds.length > 0
+        ? ((await Employee.find({
+            $or: [{ _id: { $in: logUserIds } }, { userId: { $in: logUserIds } }],
+          })
+            .select("userId name designation")
+            .lean()) as unknown as LeanEmployee[])
+        : [];
 
     const employeeIdToName = new Map<string, string>();
     const employeeIdToDesignation = new Map<string, string>();

@@ -72,6 +72,9 @@ function formatDateString(value: unknown): string {
 /**
  * Lists leaves with employee info + live balance metrics.
  * Pass userIds to scope results (department-head view); omit for all (admin).
+ *
+ * Uses 3 batched queries total (leaves, employees, balances) instead of
+ * 2 queries per leave — critical for admin panel load time.
  */
 export async function listFormattedLeaves(userIds?: string[]): Promise<FormattedLeave[]> {
   await dbConnect();
@@ -92,90 +95,105 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
     query.userId = { $in: userIds };
   }
 
-  const leaves = await Leave.find(query).sort({ createdAt: -1 }).lean();
+  const leaves = (await Leave.find(query)
+    .sort({ createdAt: -1 })
+    .lean()) as unknown as LeanLeave[];
 
-  return Promise.all(
-    (leaves as unknown as LeanLeave[]).map(async (leave) => {
-      // Safe ObjectId resolution to prevent casting crashes
-      let employeeDoc: LeanEmployeeInfo | null = null;
-      if (leave.userId && mongoose.Types.ObjectId.isValid(leave.userId)) {
-        employeeDoc = (await Employee.findOne({
-          userId: new mongoose.Types.ObjectId(leave.userId),
-        }).lean()) as LeanEmployeeInfo | null;
-      } else {
-        employeeDoc = (await Employee.findOne({ userId: leave.userId }).lean()) as LeanEmployeeInfo | null;
-      }
+  if (leaves.length === 0) return [];
 
-      const balanceDoc = await LeaveBalance.findOne({ userId: leave.userId }).lean();
-      const balance = balanceDoc as LeanLeaveBalance | null;
-
-      const rawType = String(leave.type || "").toUpperCase();
-      const rawStatus = String(leave.status || "PENDING").toUpperCase();
-
-      const isAnnual = rawType.includes("ANNUAL");
-      const isSick = rawType.includes("SICK");
-      const isCasual = rawType.includes("CASUAL");
-      const isUnpaid = rawType.includes("UNPAID");
-
-      let totalLeaves = 0;
-      let usedLeaves = 0;
-      let remainingLeaves = 0;
-
-      let matchedKey: TrackedLeaveType | null = null;
-      if (isAnnual) matchedKey = "ANNUAL";
-      else if (isSick) matchedKey = "SICK";
-      else if (isCasual) matchedKey = "CASUAL";
-
-      const trackedBalance = matchedKey && balance ? balance[matchedKey] : undefined;
-      if (trackedBalance) {
-        totalLeaves = Number(trackedBalance.allocated ?? 15);
-        usedLeaves = Number(trackedBalance.used ?? 0);
-        remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
-      }
-
-      const typeTitle = isAnnual
-        ? "Annual Leave"
-        : isSick
-          ? "Sick Leave"
-          : isCasual
-            ? "Casual Leave"
-            : isUnpaid
-              ? "Unpaid Leave"
-              : leave.type || "Other Leave";
-
-      const statusTitle =
-        rawStatus === "APPROVED" ? "Approved" : rawStatus === "REJECTED" ? "Rejected" : "Pending";
-
-      const resolvedName = employeeDoc?.name || leave.employeeName || "Employee";
-      const resolvedDesignation = employeeDoc?.designation || leave.designation || "Staff Member";
-      const resolvedProfilePhotoUrl =
-        employeeDoc?.profilePhotoUrl ||
-        employeeDoc?.profilePhotoURL ||
-        employeeDoc?.profilePicture ||
-        employeeDoc?.image ||
-        employeeDoc?.picture ||
-        "";
-
-      return {
-        id: String(leave._id),
-        userId: String(leave.userId || ""),
-        employeeName: resolvedName,
-        profilePhotoUrl: resolvedProfilePhotoUrl,
-        designation: resolvedDesignation,
-        type: typeTitle,
-        typeUpper: matchedKey || "UNPAID",
-        startDate: formatDateString(leave.startDate),
-        endDate: formatDateString(leave.endDate),
-        days: Number(leave.days || 0),
-        reason: leave.reason || "No reason provided",
-        status: statusTitle,
-        statusUpper: rawStatus,
-        totalLeaves,
-        usedLeaves,
-        remainingLeaves,
-      };
-    })
+  // Batch-load employees and balances for all distinct leave owners at once
+  const distinctUserIds = Array.from(new Set(leaves.map((l) => String(l.userId || "")))).filter(
+    Boolean
   );
+  const objectIdUserIds = distinctUserIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  const [employeeDocs, balanceDocs] = await Promise.all([
+    Employee.find({ userId: { $in: objectIdUserIds } })
+      .select("userId name designation profilePhotoUrl profilePhotoURL profilePicture image picture")
+      .lean<(LeanEmployeeInfo & { userId?: { toString(): string } })[]>(),
+    LeaveBalance.find({ userId: { $in: distinctUserIds } }).lean<
+      (LeanLeaveBalance & { userId?: string })[]
+    >(),
+  ]);
+
+  const employeeByUserId = new Map(
+    employeeDocs.map((doc) => [doc.userId ? doc.userId.toString() : "", doc])
+  );
+  const balanceByUserId = new Map(balanceDocs.map((doc) => [String(doc.userId || ""), doc]));
+
+  return leaves.map((leave) => {
+    const leaveUserId = String(leave.userId || "");
+    const employeeDoc: LeanEmployeeInfo | null = employeeByUserId.get(leaveUserId) || null;
+    const balance: LeanLeaveBalance | null = balanceByUserId.get(leaveUserId) || null;
+
+    const rawType = String(leave.type || "").toUpperCase();
+    const rawStatus = String(leave.status || "PENDING").toUpperCase();
+
+    const isAnnual = rawType.includes("ANNUAL");
+    const isSick = rawType.includes("SICK");
+    const isCasual = rawType.includes("CASUAL");
+    const isUnpaid = rawType.includes("UNPAID");
+
+    let totalLeaves = 0;
+    let usedLeaves = 0;
+    let remainingLeaves = 0;
+
+    let matchedKey: TrackedLeaveType | null = null;
+    if (isAnnual) matchedKey = "ANNUAL";
+    else if (isSick) matchedKey = "SICK";
+    else if (isCasual) matchedKey = "CASUAL";
+
+    const trackedBalance = matchedKey && balance ? balance[matchedKey] : undefined;
+    if (trackedBalance) {
+      totalLeaves = Number(trackedBalance.allocated ?? 15);
+      usedLeaves = Number(trackedBalance.used ?? 0);
+      remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
+    }
+
+    const typeTitle = isAnnual
+      ? "Annual Leave"
+      : isSick
+        ? "Sick Leave"
+        : isCasual
+          ? "Casual Leave"
+          : isUnpaid
+            ? "Unpaid Leave"
+            : leave.type || "Other Leave";
+
+    const statusTitle =
+      rawStatus === "APPROVED" ? "Approved" : rawStatus === "REJECTED" ? "Rejected" : "Pending";
+
+    const resolvedName = employeeDoc?.name || leave.employeeName || "Employee";
+    const resolvedDesignation = employeeDoc?.designation || leave.designation || "Staff Member";
+    const resolvedProfilePhotoUrl =
+      employeeDoc?.profilePhotoUrl ||
+      employeeDoc?.profilePhotoURL ||
+      employeeDoc?.profilePicture ||
+      employeeDoc?.image ||
+      employeeDoc?.picture ||
+      "";
+
+    return {
+      id: String(leave._id),
+      userId: leaveUserId,
+      employeeName: resolvedName,
+      profilePhotoUrl: resolvedProfilePhotoUrl,
+      designation: resolvedDesignation,
+      type: typeTitle,
+      typeUpper: matchedKey || "UNPAID",
+      startDate: formatDateString(leave.startDate),
+      endDate: formatDateString(leave.endDate),
+      days: Number(leave.days || 0),
+      reason: leave.reason || "No reason provided",
+      status: statusTitle,
+      statusUpper: rawStatus,
+      totalLeaves,
+      usedLeaves,
+      remainingLeaves,
+    };
+  });
 }
 
 export type LeaveDecisionResult =

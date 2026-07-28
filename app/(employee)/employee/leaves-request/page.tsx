@@ -1,50 +1,45 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
+import useSWR from "swr";
 import { AlertCircle, CheckCircle2, Plus } from "lucide-react";
 import LeaveHistoryTable, { LeaveRecord } from "@/app/components/employee/LeaveHistoryTable";
 import { LeaveDetailsModal } from "@/app/components/admin/leaves/LeaveDetailsModal";
 import ApplyLeaveModal from "@/app/components/employee/ApplyLeaveModal";
 import { LeaveRequest, LeaveBalances } from "@/lib/types";
 
+type LeavesResponse =
+  | { leaves?: LeaveRecord[]; balances?: LeaveBalances }
+  | LeaveRecord[];
+
 export default function EmployeeLeavesPage() {
-  const [history, setHistory] = useState<LeaveRecord[]>([]);
-  const [balances, setBalances] = useState<LeaveBalances | null>(null);
-  const [loading, setLoading] = useState(true);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
 
-  useEffect(() => {
-    async function fetchEmployeeData() {
-      try {
-        setLoading(true);
-        setMessage(null);
-        const res = await fetch("/api/employee/leaves-request");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.leaves && data.balances) {
-            setHistory(data.leaves);
-            setBalances(data.balances);
-          } else if (Array.isArray(data)) {
-            setHistory(data);
-          } else {
-            setHistory([]);
-          }
-        } else {
-          const errorData = await res.json().catch(() => ({}));
-          setMessage({ type: "error", text: errorData.error || "Failed to load leave records" });
-        }
-      } catch {
-        setMessage({ type: "error", text: "Failed to load leave records" });
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchEmployeeData();
-  }, []);
+  // Shares the "/api/employee/leaves-request" cache with the employee dashboard
+  const {
+    data,
+    error: loadError,
+    isLoading: loading,
+    mutate: refreshLeaves,
+  } = useSWR<LeavesResponse>("/api/employee/leaves-request");
+
+  const history = useMemo<LeaveRecord[]>(() => {
+    if (Array.isArray(data)) return data;
+    return Array.isArray(data?.leaves) ? data.leaves : [];
+  }, [data]);
+
+  const balances = useMemo<LeaveBalances | null>(() => {
+    if (data && !Array.isArray(data) && data.balances) return data.balances;
+    return null;
+  }, [data]);
+
+  const displayMessage =
+    message ||
+    (loadError ? { type: "error" as const, text: "Failed to load leave records" } : null);
 
   const handleRowClick = (record: LeaveRecord) => {
     const mappedType: LeaveRequest["type"] =
@@ -104,35 +99,14 @@ export default function EmployeeLeavesPage() {
         throw new Error(data.error || "Failed to submit leave request");
       }
 
-      if (data.updatedBalances) {
-        setBalances(data.updatedBalances);
-      }
-
       setMessage({
         type: "success",
         text: `Leave request submitted successfully! ${data.newRequest?.days || ""} days requested.`,
       });
 
-      setTimeout(() => {
-        const fetchUpdated = async () => {
-          try {
-            const historyRes = await fetch("/api/employee/leaves-request");
-            if (historyRes.ok) {
-              const historyData = await historyRes.json();
-              if (historyData.leaves && historyData.balances) {
-                setHistory(historyData.leaves);
-                setBalances(historyData.balances);
-              } else if (Array.isArray(historyData)) {
-                setHistory(historyData);
-              }
-            }
-          } catch {
-            // Retain last known state on refresh error
-          }
-        };
-        fetchUpdated();
-        setIsApplyModalOpen(false);
-      }, 1000);
+      // Refresh the shared cache (history + balances) and close the modal
+      await refreshLeaves();
+      setIsApplyModalOpen(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to submit leave request";
       setMessage({
@@ -167,20 +141,20 @@ export default function EmployeeLeavesPage() {
       </div>
 
       {/* Success/Error Alerts */}
-      {message && (
+      {displayMessage && (
         <div
           className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2.5 ${
-            message.type === "success"
+            displayMessage.type === "success"
               ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
               : "bg-rose-50 text-rose-800 border border-rose-200"
           }`}
         >
-          {message.type === "success" ? (
+          {displayMessage.type === "success" ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           ) : (
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           )}
-          <span>{message.text}</span>
+          <span>{displayMessage.text}</span>
         </div>
       )}
 

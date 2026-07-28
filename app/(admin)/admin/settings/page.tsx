@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
+import useSWR from "swr";
 import Swal from "sweetalert2";
 import { Loader2 } from "lucide-react";
 
@@ -46,61 +47,38 @@ const Toast = Swal.mixin({
 });
 
 export default function AdminSettingsPage() {
-  const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<CompanySettingsState>({
-    companyName: "",
-    location: "",
-    phone: "",
-    email: "",
-    standardWorkingHours: 160,
-    departments: [],
-    shiftStart: "09:00",
-    shiftEnd: "17:00",
-    gracePeriod: 15,
-    checkInDisplayBefore: 30,
-    checkOutDisplayAfter: 0,
-    autoCheckOut: false,
-    autoCheckOutBuffer: 30,
-  });
+  // Shares the "/api/settings/company-settings" cache with the Employees page
+  const {
+    data,
+    error: loadError,
+    isLoading: loading,
+    mutate: mutateSettings,
+  } = useSWR<Partial<CompanySettingsState>>("/api/settings/company-settings");
 
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch("/api/settings/company-settings");
-      if (!res.ok) throw new Error("Could not load configurations.");
-      const data = await res.json();
-
-      setSettings({
-        companyName: data.companyName || "",
-        location: data.location || "",
-        phone: data.phone || "",
-        email: data.email || "",
-        standardWorkingHours: typeof data.standardWorkingHours === "number" ? data.standardWorkingHours : 160,
-        departments: Array.isArray(data.departments) ? data.departments : [],
-        shiftStart: data.shiftStart || "09:00",
-        shiftEnd: data.shiftEnd || "17:00",
-        gracePeriod: typeof data.gracePeriod === "number" ? data.gracePeriod : 15,
-        checkInDisplayBefore: typeof data.checkInDisplayBefore === "number" ? data.checkInDisplayBefore : 30,
-        checkOutDisplayAfter: typeof data.checkOutDisplayAfter === "number" ? data.checkOutDisplayAfter : 0,
-        autoCheckOut: typeof data.autoCheckOut === "boolean" ? data.autoCheckOut : false,
-        autoCheckOutBuffer: typeof data.autoCheckOutBuffer === "number" ? Math.min(30, Math.max(0, data.autoCheckOutBuffer)) : 30,
-      });
-    } catch (error) {
-      console.error(error);
-      Swal.fire({
-        icon: "error",
-        title: "Retrieval Failed",
-        text: error instanceof Error ? error.message : "Could not retrieve system configurations.",
-        confirmButtonColor: "#7c3aed",
-        customClass: swalCustomClass,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  const settings = useMemo<CompanySettingsState>(
+    () => ({
+      companyName: data?.companyName || "",
+      location: data?.location || "",
+      phone: data?.phone || "",
+      email: data?.email || "",
+      standardWorkingHours:
+        typeof data?.standardWorkingHours === "number" ? data.standardWorkingHours : 160,
+      departments: Array.isArray(data?.departments) ? data.departments : [],
+      shiftStart: data?.shiftStart || "09:00",
+      shiftEnd: data?.shiftEnd || "17:00",
+      gracePeriod: typeof data?.gracePeriod === "number" ? data.gracePeriod : 15,
+      checkInDisplayBefore:
+        typeof data?.checkInDisplayBefore === "number" ? data.checkInDisplayBefore : 30,
+      checkOutDisplayAfter:
+        typeof data?.checkOutDisplayAfter === "number" ? data.checkOutDisplayAfter : 0,
+      autoCheckOut: typeof data?.autoCheckOut === "boolean" ? data.autoCheckOut : false,
+      autoCheckOutBuffer:
+        typeof data?.autoCheckOutBuffer === "number"
+          ? Math.min(30, Math.max(0, data.autoCheckOutBuffer))
+          : 30,
+    }),
+    [data]
+  );
 
   const handleUpdateSettings = async (updatedFields: Partial<CompanySettingsState>) => {
     const payload = { ...settings, ...updatedFields };
@@ -117,7 +95,8 @@ export default function AdminSettingsPage() {
       }
 
       const updatedData = await res.json();
-      setSettings(updatedData);
+      // Push the server response straight into the shared cache
+      mutateSettings(updatedData, { revalidate: false });
 
       Toast.fire({
         icon: "success",
@@ -163,11 +142,30 @@ export default function AdminSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 bg-surface-main">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-3 bg-surface-main">
         <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
         <span className="text-sm font-semibold text-content-secondary">
           Retrieving configuration parameters...
         </span>
+      </div>
+    );
+  }
+
+  // Inline error (instead of a blocking modal) — background revalidation
+  // failures never interrupt the admin mid-edit.
+  if (loadError && !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-100 gap-3 bg-surface-main text-center px-4">
+        <span className="text-sm font-semibold text-content-secondary">
+          Could not retrieve system configurations.
+        </span>
+        <button
+          type="button"
+          onClick={() => mutateSettings()}
+          className="px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer"
+        >
+          Retry
+        </button>
       </div>
     );
   }

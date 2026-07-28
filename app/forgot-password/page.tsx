@@ -302,7 +302,7 @@ function ForgotPasswordForm() {
             onClick={() => setSuccess(false)}
             className="text-[13px] font-bold text-[#0093c4] hover:underline cursor-pointer pt-[4px]"
           >
-            Didn't receive email? Try again
+            Didn&apos;t receive email? Try again
           </button>
         </div>
       ) : (

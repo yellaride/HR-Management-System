@@ -16,7 +16,6 @@ export async function GET() {
 
     await connectDB();
 
-    // DEBUG: verify numeric values exist
     interface EmployeeDoc {
       _id: { toString(): string };
       name: string;
@@ -30,10 +29,11 @@ export async function GET() {
       profilePhotoURL?: string;
       userId?: { email?: string } | null;
     }
-    const employees = (await Employee.find({ status: { $ne: "Inactive" } }).populate(
-      "userId",
-      "email"
-    )) as unknown as EmployeeDoc[];
+    // lean + select: return only the fields the directory actually renders
+    const employees = (await Employee.find({ status: { $ne: "Inactive" } })
+      .select("name department status designation joinDate salary hourlyRate profilePhotoUrl profilePhotoURL userId")
+      .populate("userId", "email")
+      .lean()) as unknown as EmployeeDoc[];
 
 
     // Map backend properties so frontend gets consistent keys for dates + compensation

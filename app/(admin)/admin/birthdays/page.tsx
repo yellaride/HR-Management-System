@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
+import useSWR from "swr";
 import { Search, Filter, Calendar, RefreshCw } from "lucide-react";
 
 import { EmployeeBirthday } from "@/lib/types";
@@ -46,12 +47,6 @@ export default function BirthdayDashboard() {
   const currentMonthIdx = todayDate.getMonth();
   const currentDayNum = todayDate.getDate();
 
-  // API Data states
-  const [employees, setEmployees] = useState<EmployeeBirthday[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
-  const [metrics, setMetrics] = useState({ todayCount: 0, monthCount: 0, upcomingCount: 0 });
-  const [loading, setLoading] = useState(true);
-
   // Filters
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -61,48 +56,27 @@ export default function BirthdayDashboard() {
 
   const monthLabelTab = getMonthLabel(monthFilter);
 
-  // Show the loading indicator as soon as any filter changes (render-time adjustment,
-  // avoids calling setState synchronously inside the fetch effect below).
-  const [prevFilters, setPrevFilters] = useState({ monthFilter, deptFilter, search });
-  if (
-    prevFilters.monthFilter !== monthFilter ||
-    prevFilters.deptFilter !== deptFilter ||
-    prevFilters.search !== search
-  ) {
-    setPrevFilters({ monthFilter, deptFilter, search });
-    setLoading(true);
-  }
+  // Every filter combination is its own cached key — switching back is instant
+  const queryParams = new URLSearchParams({
+    month: monthFilter,
+    department: deptFilter,
+    search: search,
+  });
+  const {
+    data,
+    isLoading,
+    isValidating,
+    mutate: refreshBirthdays,
+  } = useSWR<{
+    employees?: EmployeeBirthday[];
+    departments?: string[];
+    metrics?: { todayCount: number; monthCount: number; upcomingCount: number };
+  }>(`/api/admin/birthdays?${queryParams.toString()}`);
 
-  // Fetch from route.ts api
-  const fetchBirthdayRecords = useCallback(async () => {
-    try {
-      const queryParams = new URLSearchParams({
-        month: monthFilter,
-        department: deptFilter,
-        search: search
-      });
-      const res = await fetch(`/api/admin/birthdays?${queryParams.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setEmployees(data.employees || []);
-        setMetrics(data.metrics || { todayCount: 0, monthCount: 0, upcomingCount: 0 });
-        if (data.departments) {
-          setDepartments(data.departments);
-        }
-      }
-    } catch (error) {
-      console.error("Error retrieving birthday records:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [monthFilter, deptFilter, search]);
-
-  useEffect(() => {
-    async function loadRecords() {
-      fetchBirthdayRecords();
-    }
-    loadRecords();
-  }, [fetchBirthdayRecords]);
+  const employees = useMemo(() => data?.employees || [], [data]);
+  const departments = useMemo(() => data?.departments || [], [data]);
+  const metrics = data?.metrics || { todayCount: 0, monthCount: 0, upcomingCount: 0 };
+  const loading = isLoading || (isValidating && !data);
 
   // Map dynamic departments from CompanyDetails schema for selection
   const deptOptions = useMemo(() => {
@@ -149,8 +123,7 @@ export default function BirthdayDashboard() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                setLoading(true);
-                fetchBirthdayRecords();
+                refreshBirthdays();
               }}
               className="btn-outline px-4 py-2 text-xs font-bold w-auto inline-flex items-center gap-2 cursor-pointer"
             >
@@ -188,7 +161,7 @@ export default function BirthdayDashboard() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search employee name or designation..."
-              className="form-input !pl-10 w-full text-xs py-3"
+              className="form-input pl-10! w-full text-xs py-3"
             />
           </div>
 

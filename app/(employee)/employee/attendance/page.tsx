@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import useSWR from "swr";
 import { 
   LogIn, 
   LogOut, 
@@ -59,20 +60,17 @@ function ClockWidget() {
   );
 }
 
-export default function EmployeeAttendancePage() {
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
-  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
-  const [settings, setSettings] = useState<ActiveSettings>({
-    shiftStart: "09:00",
-    shiftEnd: "17:00",
-    gracePeriod: 15,
-    checkInDisplayBefore: 30,
-    checkOutDisplayAfter: 30,
-    autoCheckOut: false,
-    autoCheckOutBuffer: 30,
-  });
+const DEFAULT_SETTINGS: ActiveSettings = {
+  shiftStart: "09:00",
+  shiftEnd: "17:00",
+  gracePeriod: 15,
+  checkInDisplayBefore: 30,
+  checkOutDisplayAfter: 30,
+  autoCheckOut: false,
+  autoCheckOutBuffer: 30,
+};
 
-  const [loading, setLoading] = useState<boolean>(true);
+export default function EmployeeAttendancePage() {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -84,6 +82,23 @@ export default function EmployeeAttendancePage() {
   const [isSunday, setIsSunday] = useState<boolean>(false);
   const [isWithinWindow, setIsWithinWindow] = useState<boolean>(false);
   const [isPastAutoCheckOut, setIsPastAutoCheckOut] = useState<boolean>(false);
+
+  // Shares the "/api/employee/attendance" cache with the employee dashboard,
+  // so switching between the two pages is instant.
+  const {
+    data: attendanceData,
+    error: loadError,
+    isLoading: loading,
+    mutate: refreshAttendance,
+  } = useSWR<{
+    todayRecord?: AttendanceRecord | null;
+    history?: AttendanceRecord[];
+    settings?: ActiveSettings;
+  }>("/api/employee/attendance");
+
+  const todayRecord = attendanceData?.todayRecord || null;
+  const history = useMemo(() => attendanceData?.history || [], [attendanceData]);
+  const settings = attendanceData?.settings || DEFAULT_SETTINGS;
 
   // Timezone-safe evaluation using Asia/Karachi timezone
   const evaluateTimeConstraints = useCallback(() => {
@@ -145,32 +160,6 @@ export default function EmployeeAttendancePage() {
     }
   }, [settings]);
 
-  const fetchAttendanceData = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = !!opts?.silent;
-    try {
-      const res = await fetch("/api/employee/attendance");
-      const data = await res.json();
-      if (res.ok) {
-        setTodayRecord(data.todayRecord || null);
-        setHistory(data.history || []);
-        if (data.settings) {
-          setSettings(data.settings);
-        }
-      } else {
-        setErrorMessage(data.error || "Failed to fetch attendance history.");
-      }
-    } catch {
-      setErrorMessage("An unexpected network error occurred.");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initialLoad = setTimeout(() => fetchAttendanceData(), 0);
-    return () => clearTimeout(initialLoad);
-  }, [fetchAttendanceData]);
-
   useEffect(() => {
     const initial = setTimeout(evaluateTimeConstraints, 0);
     const interval = setInterval(evaluateTimeConstraints, 15000);
@@ -204,7 +193,7 @@ export default function EmployeeAttendancePage() {
       if (!res.ok) {
         setErrorMessage(data.error || "Action execution failed.");
       } else {
-        await fetchAttendanceData({ silent: true }); 
+        await refreshAttendance();
       }
     } catch {
       setErrorMessage("Network error processing your request.");
@@ -253,8 +242,26 @@ export default function EmployeeAttendancePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[300px] text-xs text-content-secondary">
+      <div className="flex items-center justify-center min-h-75 text-xs text-content-secondary">
         Syncing attendance log data...
+      </div>
+    );
+  }
+
+  // Surface a hard load failure instead of rendering an empty page
+  if (loadError && !attendanceData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-75 gap-3 text-center px-4">
+        <span className="text-xs font-semibold text-content-secondary">
+          Could not load your attendance data. Please check your connection.
+        </span>
+        <button
+          type="button"
+          onClick={() => refreshAttendance()}
+          className="px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -470,7 +477,7 @@ export default function EmployeeAttendancePage() {
 
         <div className="bg-surface-card border border-line-subtle rounded-2xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px]">
+            <table className="w-full text-left border-collapse min-w-150">
               <thead>
                 <tr className="bg-surface-main/60 border-b border-line-subtle text-content-muted text-[10px] font-extrabold uppercase tracking-widest">
                   <th className="px-6 py-4">Logged Date</th>

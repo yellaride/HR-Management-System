@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
+import useSWR from "swr";
 import { Users, Plus, Trash2, Loader2, Crown, X } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -36,29 +37,22 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
   const [newDept, setNewDept] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const [heads, setHeads] = useState<DepartmentHeadInfo[]>([]);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [savingDept, setSavingDept] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const refreshHeads = useCallback(() => setReloadKey((k) => k + 1), []);
+  // Cached head/employee mapping, revalidated after every assignment change
+  const { data: headData, mutate: refreshHeads } = useSWR<{
+    heads?: DepartmentHeadInfo[];
+    employees?: EmployeeOption[];
+  }>("/api/admin/department-heads");
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/admin/department-heads")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { heads?: DepartmentHeadInfo[]; employees?: EmployeeOption[] } | null) => {
-        if (cancelled || !data) return;
-        setHeads(Array.isArray(data.heads) ? data.heads : []);
-        setEmployees(Array.isArray(data.employees) ? data.employees : []);
-      })
-      .catch((err) => console.error("Failed to load department heads:", err));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [departments, reloadKey]);
+  const heads = useMemo(
+    () => (Array.isArray(headData?.heads) ? headData.heads : []),
+    [headData]
+  );
+  const employees = useMemo(
+    () => (Array.isArray(headData?.employees) ? headData.employees : []),
+    [headData]
+  );
 
   const handleAdd = async () => {
     const name = newDept.trim();
@@ -88,7 +82,7 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
         throw new Error(data.error || "Failed to update department head.");
       }
 
-      refreshHeads();
+      await refreshHeads();
       Toast.fire({
         icon: "success",
         title: userId ? "Department head assigned" : "Department head removed",

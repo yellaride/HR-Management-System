@@ -28,9 +28,6 @@ export async function GET(request: Request) {
     const deptParam = searchParams.get("department") || "all";
     const searchParam = searchParams.get("search") || "";
 
-    const company = (await CompanyDetails.findOne().lean()) as { departments?: string[] } | null;
-    const departmentsList: string[] = company?.departments || [];
-
     const query: {
       status: string;
       dateOfBirth: Record<string, unknown>;
@@ -78,9 +75,13 @@ export async function GET(request: Request) {
       image?: string;
       picture?: string;
     }
-    const rawEmployees = (await Employee.find(query)
-      .populate("userId", "email")
-      .lean()) as unknown as BirthdayEmployee[];
+    const [company, rawEmployees] = await Promise.all([
+      CompanyDetails.findOne().lean() as Promise<{ departments?: string[] } | null>,
+      Employee.find(query)
+        .populate("userId", "email")
+        .lean() as Promise<unknown> as Promise<BirthdayEmployee[]>,
+    ]);
+    const departmentsList: string[] = company?.departments || [];
 
     const today = new Date();
     const currentMonthIdx = today.getMonth(); 

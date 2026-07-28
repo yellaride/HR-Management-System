@@ -2,8 +2,22 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
-import mongoose from "mongoose";
+import { Attendance } from "@/modals/Attendance";
+import Leave from "@/modals/LeaveRequest";
 import { getAdminUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
+
+const TIMEZONE = "Asia/Karachi";
+
+function getKarachiDateString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
 
 export async function GET() {
   try {
@@ -15,118 +29,43 @@ export async function GET() {
     await connectDB();
 
     const activeEmployeesFilter = { status: { $ne: "Inactive" } };
+    const todayDateStr = getKarachiDateString();
+    const [, monthStr, dayStr] = todayDateStr.split("-");
+    const targetMonth = parseInt(monthStr, 10);
+    const targetDay = parseInt(dayStr, 10);
 
-    // 1. Fetch total active employees
-    const totalEmployees = await Employee.countDocuments(activeEmployeesFilter);
-
-    // 2. Fetch distinct active departments count
-    const departments = await Employee.distinct("department", activeEmployeesFilter);
-    const totalDepartments = Array.isArray(departments) ? departments.filter(Boolean).length : 0;
-
-    // 3. Fetch count of pending leave requests dynamically from database
-    let pendingLeaves = 0; 
-    try {
-      const LeaveModel = mongoose.models.Leave || mongoose.models.LeaveRequest || mongoose.models.Leaves;
-      
-      if (LeaveModel) {
-        pendingLeaves = await LeaveModel.countDocuments({
-          status: { $regex: /^pending$/i } 
-        });
-      } else {
-        const db = mongoose.connection.db;
-        if (db) {
-          const collections = await db.listCollections().toArray();
-          const leaveColl = collections.find(c => c.name.toLowerCase().includes("leave"));
-          if (leaveColl) {
-            pendingLeaves = await db.collection(leaveColl.name).countDocuments({
-              status: { $regex: /^pending$/i }
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Leave count dynamic retrieval failed. Fallback applied.", e);
-    }
-
-    // 4. Fetch and calculate Today's Attendance percentage dynamically
-    let todayAttendancePercent = 0;
-    let presentToday = 0;
-
-    const TIMEZONE = "Asia/Karachi";
-    const getLocalDateString = (date: Date = new Date()): string => {
-      const tzString = date.toLocaleString("en-US", { timeZone: TIMEZONE });
-      const localDate = new Date(tzString);
-      const year = localDate.getFullYear();
-      const month = String(localDate.getMonth() + 1).padStart(2, "0");
-      const day = String(localDate.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
-
-    try {
-      const AttendanceModel = mongoose.models.Attendance || mongoose.models.Attendances;
-      const todayDateStr = getLocalDateString();
-      const presentStatuses = ["On Time", "Late"];
-
-      let presentTodayCount = 0;
-
-      if (AttendanceModel) {
-        presentTodayCount = await AttendanceModel.countDocuments({
+    // All dashboard metrics fetched in parallel — one round-trip of latency
+    const [totalEmployees, departments, pendingLeaves, presentTodayCount, todayBirthdays] =
+      await Promise.all([
+        Employee.countDocuments(activeEmployeesFilter),
+        Employee.distinct("department", activeEmployeesFilter),
+        Leave.countDocuments({ status: { $regex: /^pending$/i } }),
+        Attendance.countDocuments({
           date: todayDateStr,
-          status: { $in: presentStatuses },
-        });
-      } else {
-        const db = mongoose.connection.db;
-        if (db) {
-          const collections = await db.listCollections().toArray();
-          const attColl = collections.find((c) => c.name.toLowerCase().includes("attendance"));
-          if (attColl) {
-            presentTodayCount = await db.collection(attColl.name).countDocuments({
-              date: todayDateStr,
-              status: { $in: presentStatuses },
-            });
-          }
-        }
-      }
+          status: { $in: ["On Time", "Late"] },
+        }),
+        Employee.find({
+          status: "Active",
+          dateOfBirth: { $ne: null },
+          $expr: {
+            $and: [
+              { $eq: [{ $month: "$dateOfBirth" }, targetMonth] },
+              { $eq: [{ $dayOfMonth: "$dateOfBirth" }, targetDay] },
+            ],
+          },
+        })
+          .select("name department designation profilePhotoUrl")
+          .lean(),
+      ]);
 
-      if (totalEmployees > 0) {
-        presentToday = presentTodayCount;
-        todayAttendancePercent = Math.min(
-          100,
-          Math.round((presentTodayCount / totalEmployees) * 100)
-        );
-      }
-    } catch (e) {
-      console.warn("Attendance model dynamic query failed. Fallback applied.", e);
-    }
+    const totalDepartments = Array.isArray(departments)
+      ? departments.filter(Boolean).length
+      : 0;
 
-    // 5. Fetch Today's Birthday Celebrants dynamically (Asia/Karachi)
-    let todayBirthdays: unknown[] = [];
-    try {
-      const now = new Date();
-      const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: TIMEZONE,
-        month: "numeric",
-        day: "numeric",
-      });
-      const parts = formatter.formatToParts(now);
-      const targetMonth = parseInt(parts.find((p) => p.type === "month")?.value || "0");
-      const targetDay = parseInt(parts.find((p) => p.type === "day")?.value || "0");
-
-      todayBirthdays = await Employee.find({
-        status: "Active",
-        dateOfBirth: { $ne: null },
-        $expr: {
-          $and: [
-            { $eq: [{ $month: "$dateOfBirth" }, targetMonth] },
-            { $eq: [{ $dayOfMonth: "$dateOfBirth" }, targetDay] }
-          ]
-        }
-      })
-      .select("name department designation profilePhotoUrl")
-      .lean();
-    } catch (e) {
-      console.warn("Failed to retrieve today's birthdays for dashboard stats:", e);
-    }
+    const todayAttendancePercent =
+      totalEmployees > 0
+        ? Math.min(100, Math.round((presentTodayCount / totalEmployees) * 100))
+        : 0;
 
     return NextResponse.json(
       {
@@ -134,8 +73,8 @@ export async function GET() {
         totalDepartments,
         pendingLeaves,
         todayAttendancePercent,
-        presentToday,
-        todayBirthdays // Return birthday arrays to Admin side
+        presentToday: totalEmployees > 0 ? presentTodayCount : 0,
+        todayBirthdays,
       },
       { status: 200 }
     );
