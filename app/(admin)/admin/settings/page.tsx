@@ -9,6 +9,7 @@ import ChangePasswordSettings from "@/app/components/change-password";
 import CompanyInfoSettings from "@/app/components/admin/settings/CompanyInfoSettings";
 import DepartmentSettings from "@/app/components/admin/settings/DepartmentSettings";
 import AttendanceSettings from "@/app/components/admin/settings/AttendanceSettings";
+import PayslipBrandingSettings from "@/app/components/admin/settings/PayslipBrandingSettings";
 
 interface CompanySettingsState {
   companyName: string;
@@ -24,6 +25,11 @@ interface CompanySettingsState {
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
   autoCheckOutBuffer: number;
+  payslipHeadName: string;
+  payslipHeadTitle: string;
+  payslipSignatureUrl: string;
+  payslipStampUrl: string;
+  companyLogoUrl: string;
 }
 
 const swalCustomClass = {
@@ -76,6 +82,11 @@ export default function AdminSettingsPage() {
         typeof data?.autoCheckOutBuffer === "number"
           ? Math.min(30, Math.max(0, data.autoCheckOutBuffer))
           : 30,
+      payslipHeadName: data?.payslipHeadName || "",
+      payslipHeadTitle: data?.payslipHeadTitle || "Authorized Signatory",
+      payslipSignatureUrl: data?.payslipSignatureUrl || "",
+      payslipStampUrl: data?.payslipStampUrl || "",
+      companyLogoUrl: data?.companyLogoUrl || "",
     }),
     [data]
   );
@@ -183,6 +194,10 @@ export default function AdminSettingsPage() {
         <CompanyInfoSettings 
           data={settings} 
           onSave={handleUpdateSettings} 
+        />
+        <PayslipBrandingSettings
+          data={{ companyLogoUrl: settings.companyLogoUrl }}
+          onSave={handleUpdateSettings}
         />
         <AttendanceSettings 
           data={settings} 

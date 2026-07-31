@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { X, ChevronDown } from "lucide-react";
 import { Employee } from "./EmployeeTable";
@@ -10,10 +10,10 @@ interface EditEmployeeModalProps {
   onClose: () => void;
   employee: Employee | null;
   errorMessage?: string | null;
+  departments?: string[];
   onSave: (id: string | number, data: Omit<Employee, "id">) => Promise<void>;
 }
 
-const DEPARTMENTS = ["Engineering", "Design", "Operations", "Marketing"];
 const STATUSES = ["Active", "On Leave"];
 
 // Custom SweetAlert2 Toast configuration matching the purple design token schema
@@ -29,16 +29,33 @@ const Toast = Swal.mixin({
   },
 });
 
-export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }: EditEmployeeModalProps) {
+export default function EditEmployeeModal({
+  isOpen,
+  onClose,
+  employee,
+  departments = [],
+  onSave,
+}: EditEmployeeModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     designation: "",
     joinDate: "",
     salary: "", // Stores salary
-    department: "Engineering",
+    department: "",
     status: "Active",
   });
+
+  // Admin-configured departments; keep the employee's current value visible
+  // even if it is no longer in the list (legacy / renamed departments).
+  const departmentOptions = useMemo(() => {
+    const configured = departments.filter((dept) => dept.trim().length > 0);
+    const current = employee?.department?.trim();
+    if (current && !configured.includes(current)) {
+      return [current, ...configured];
+    }
+    return configured;
+  }, [departments, employee?.department]);
 
   // State to handle custom dropdown visibility
   const [isDeptOpen, setIsDeptOpen] = useState(false);
@@ -100,7 +117,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
         designation: employee.designation || employee.role || "",
         joinDate: formattedDate,
         salary: salaryString,
-        department: employee.department || "Engineering",
+        department: employee.department || departmentOptions[0] || "",
         status: employee.status || "Active",
       });
 
@@ -265,21 +282,27 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
 
               {isDeptOpen && (
                 <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150 max-h-40 overflow-y-auto">
-                  {DEPARTMENTS.map((dept) => (
-                    <button
-                      key={dept}
-                      type="button"
-                      onClick={() => {
-                        handleFieldChange("department", dept);
-                        setIsDeptOpen(false);
-                      }}
-                      className={`dropdown-option ${
-                        formData.department === dept ? "dropdown-option-active" : ""
-                      }`}
-                    >
-                      {dept}
-                    </button>
-                  ))}
+                  {departmentOptions.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-content-muted">
+                      No departments configured. Add departments in Settings first.
+                    </div>
+                  ) : (
+                    departmentOptions.map((dept) => (
+                      <button
+                        key={dept}
+                        type="button"
+                        onClick={() => {
+                          handleFieldChange("department", dept);
+                          setIsDeptOpen(false);
+                        }}
+                        className={`dropdown-option ${
+                          formData.department === dept ? "dropdown-option-active" : ""
+                        }`}
+                      >
+                        {dept}
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>

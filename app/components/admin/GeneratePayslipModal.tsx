@@ -49,6 +49,45 @@ const getDefaultPeriod = () => {
   return `${monthName} ${year}`;
 };
 
+function periodToMonthInputValue(period: string): string {
+  const trimmed = (period || "").trim();
+  if (!trimmed) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  const match = trimmed.match(/^([A-Za-z]+)\s+(19\d{2}|20\d{2})$/);
+  if (!match) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(`${match[1]} 1, ${match[2]}`);
+  if (Number.isNaN(parsed.getTime())) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthInputValueToPeriod(value: string): string {
+  const [yearStr, monthStr] = value.split("-");
+  const year = parseInt(yearStr, 10);
+  const monthIndex = parseInt(monthStr, 10) - 1;
+  if (Number.isNaN(year) || monthIndex < 0 || monthIndex > 11) return getDefaultPeriod();
+
+  const monthName = new Date(year, monthIndex, 1).toLocaleString("default", { month: "long" });
+  return `${monthName} ${year}`;
+}
+
+function getMonthInputBounds() {
+  const now = new Date();
+  const max = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const min = `${now.getFullYear() - 10}-01`;
+  return { min, max };
+}
+
 export default function GeneratePayslipModal({
   isOpen,
   onClose,
@@ -208,7 +247,17 @@ export default function GeneratePayslipModal({
     }));
   };
 
+  const handlePeriodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) return;
+    setFormData((prev) => ({
+      ...prev,
+      period: monthInputValueToPeriod(value),
+    }));
+  };
+
   const netPay = formData.basicSalary + formData.allowances + formData.bonus - formData.deductions;
+  const monthInputBounds = getMonthInputBounds();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -386,15 +435,18 @@ export default function GeneratePayslipModal({
                   <Calendar className="w-4 h-4" />
                 </span>
                 <input
-                  type="text"
-                  name="period"
+                  type="month"
                   required
-                  placeholder="e.g. June 2026"
-                  value={formData.period}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-brand-accent/25 focus:border-brand-accent"
+                  value={periodToMonthInputValue(formData.period)}
+                  min={monthInputBounds.min}
+                  max={monthInputBounds.max}
+                  onChange={handlePeriodChange}
+                  className="w-full pl-9 pr-3 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-brand-accent/25 focus:border-brand-accent cursor-pointer [color-scheme:light]"
                 />
               </div>
+              <p className="text-[10px] text-content-muted">
+                Pick any past month (up to 10 years) for backdated payslips.
+              </p>
             </div>
           </div>
 
@@ -424,7 +476,7 @@ export default function GeneratePayslipModal({
 
               {isPaymentMethodOpen && (
                 <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                  {["Bank Transfer", "Direct Deposit", "Check", "PayPal"].map((method) => (
+                  {["Bank Transfer", "Hand Cash", "Check"].map((method) => (
                     <button
                       key={method}
                       type="button"

@@ -3,7 +3,7 @@
 import React from "react";
 import Swal from "sweetalert2";
 import { Calendar, CheckCircle2, Download, AlertCircle } from "lucide-react";
-import { downloadPayslipPdf, PayslipRecord } from "./payslipPdf";
+import { downloadPayslipPdf, getPayslipReferenceId, PayslipRecord } from "./payslipPdf";
 
 export interface ExtendedPayslipRecord extends PayslipRecord {
   status?: string;
@@ -36,6 +36,8 @@ interface PayslipListProps {
   showEmployeeColumn?: boolean; 
   showDetailedBreakdown?: boolean;
   showVersion?: boolean;
+  showPaymentDate?: boolean;
+  showReference?: boolean;
   formatCurrency?: (amount: number) => string;
   companyDetails?: CompanyDetailsData | null; // Keep companyDetails in the prop definitions
 }
@@ -46,6 +48,17 @@ const swalCustomClass = {
   htmlContainer: "text-xs text-content-secondary",
   confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
 };
+
+function formatPaymentDate(value?: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 // Declaring ": React.JSX.Element" tells TypeScript this function must return JSX
 export default function PayslipList({
@@ -60,6 +73,8 @@ export default function PayslipList({
   showEmployeeColumn = true, 
   showDetailedBreakdown = false,
   showVersion = false,
+  showPaymentDate = false,
+  showReference = false,
   formatCurrency,
   companyDetails = null,
 }: PayslipListProps): React.JSX.Element {
@@ -110,6 +125,8 @@ export default function PayslipList({
   if (showEmployeeColumn) totalColumns += 1;
   if (showDetailedBreakdown) totalColumns += 3; 
   if (showVersion) totalColumns += 1;
+  if (showPaymentDate) totalColumns += 1;
+  if (showReference) totalColumns += 1;
 
   return (
     <div className="table-card">
@@ -143,6 +160,12 @@ export default function PayslipList({
               )}
               
               <th className="px-6 py-4 text-right">Net Take-Home</th>
+              {showPaymentDate && (
+                <th className="px-6 py-4 text-center">Payment Date</th>
+              )}
+              {showReference && (
+                <th className="px-6 py-4 text-center">Reference</th>
+              )}
               {showVersion && (
                 <th className="px-6 py-4 text-center">Version</th>
               )}
@@ -260,6 +283,20 @@ export default function PayslipList({
                       </span>
                     </td>
 
+                    {showPaymentDate && (
+                      <td className="px-6 py-4 text-center font-semibold text-content-secondary">
+                        {formatPaymentDate(slip.paymentDate)}
+                      </td>
+                    )}
+
+                    {showReference && (
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-main border border-line-subtle font-mono text-[10px] font-bold text-content-main tracking-wide">
+                          {getPayslipReferenceId(slip._id)}
+                        </span>
+                      </td>
+                    )}
+
                     {showVersion && (
                       <td className="px-6 py-4 text-center">
                         {String(slip.version ?? slip.Version ?? "").trim() ? (
@@ -277,17 +314,12 @@ export default function PayslipList({
                         {slip.status === "Suspended" ? (
                           <span className="status-pill bg-rose-50 text-rose-700 border-rose-100">
                             <AlertCircle className="w-3 h-3 text-rose-500" />
-                            Suspended
-                          </span>
-                        ) : slip.status === "Active" ? (
-                          <span className="status-pill bg-emerald-50 text-emerald-700 border-emerald-100">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            Active
+                            Void
                           </span>
                         ) : (
-                          <span className="status-pill bg-slate-50 text-slate-700 border-slate-100">
-                            <AlertCircle className="w-3 h-3 text-slate-500" />
-                            Unknown
+                          <span className="status-pill bg-emerald-50 text-emerald-700 border-emerald-100">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            Paid
                           </span>
                         )}
                       </div>
@@ -311,7 +343,7 @@ export default function PayslipList({
                         ) : (
                           <>
                             <Download className="w-3.5 h-3.5" />
-                            <span>Receipt</span>
+                            <span>Download</span>
                           </>
                         )}
                       </button>

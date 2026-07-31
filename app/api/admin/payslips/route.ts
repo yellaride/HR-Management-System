@@ -221,22 +221,8 @@ export async function POST(request: Request) {
       ? (employee.designation || employee.jobTitle || employee.role || "No Specified Title")
       : "No Specified Title";
 
-    // 1. Calculate Sequential Version (v1, v2...) matching same month, employee name, and designation
-    const existingPayslipsCount = await Payslip.countDocuments({ 
-      employeeId, 
-      period,
-      employeeName,
-      employeeRole
-    });
-    const currentVersion = `v${existingPayslipsCount + 1}`;
-
-    // 2. Suspend all previous active records matches to ensure only the latest generated is active
-    await Payslip.updateMany(
-      { employeeId, period, employeeName, employeeRole, status: "Active" },
-      { $set: { status: "Suspended" } }
-    );
-
-    // 3. Create the newest version as Active
+    // Each generation is a separate paid record — previous slips for the same
+    // employee/period stay visible in the ledger (no auto-suspend).
     const newPayslip = await Payslip.create({
       employeeId,
       employeeName,
@@ -250,7 +236,6 @@ export async function POST(request: Request) {
       paymentMethod,
       paymentDate: parsedPaymentDate,
       status: "Active",
-      version: currentVersion,
     });
 
     const populatedPayslip = await Payslip.findById(newPayslip._id)

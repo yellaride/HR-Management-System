@@ -391,8 +391,7 @@ export default function AdminEmployeesPage() {
         errorMessage={getFriendlyErrorMessage(editEmployeeError)}
         employee={selectedEmployee}
         onSave={handleEditEmployee}
-        // If EditEmployeeModal also has a department drop-down, pass the prop here:
-        // departments={departments}
+        departments={departments}
       />
 
       {/* 3. View Employee Portal Modal */}

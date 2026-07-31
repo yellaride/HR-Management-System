@@ -34,6 +34,11 @@ export async function GET() {
         checkOutDisplayAfter: 0,
         autoCheckOut: false,
         autoCheckOutBuffer: 30,
+        payslipHeadName: "",
+        payslipHeadTitle: "Authorized Signatory",
+        payslipSignatureUrl: "",
+        payslipStampUrl: "",
+        companyLogoUrl: "",
       };
     }
 
@@ -82,7 +87,12 @@ async function handleUpdate(request: Request) {
       checkInDisplayBefore,
       checkOutDisplayAfter,
       autoCheckOut,
-      autoCheckOutBuffer
+      autoCheckOutBuffer,
+      payslipHeadName,
+      payslipHeadTitle,
+      payslipSignatureUrl,
+      payslipStampUrl,
+      companyLogoUrl,
     } = body;
 
     // Ensure autoCheckOutBuffer is a number between 0 and 30 minutes
@@ -93,21 +103,53 @@ async function handleUpdate(request: Request) {
     // Find the singular active settings document
     const existing = await CompanyDetails.findOne();
 
-    // Map fields carefully and apply fallback defaults
+    // Map fields carefully and apply fallback defaults (preserve payslip branding
+    // when a partial settings update omits those keys).
     const payload = {
-      companyName: companyName ?? "",
-      location: location ?? "",
-      phone: phone ?? "",
-      email: email ?? "",
-      standardWorkingHours: typeof standardWorkingHours === "number" ? standardWorkingHours : 160,
-      departments: Array.isArray(departments) ? departments : [],
-      shiftStart: shiftStart || "09:00",
-      shiftEnd: shiftEnd || "17:00",
-      gracePeriod: typeof gracePeriod === "number" ? gracePeriod : 15,
-      checkInDisplayBefore: typeof checkInDisplayBefore === "number" ? checkInDisplayBefore : 30,
-      checkOutDisplayAfter: typeof checkOutDisplayAfter === "number" ? checkOutDisplayAfter : 0,
-      autoCheckOut: Boolean(autoCheckOut),
+      companyName: companyName ?? existing?.companyName ?? "",
+      location: location ?? existing?.location ?? "",
+      phone: phone ?? existing?.phone ?? "",
+      email: email ?? existing?.email ?? "",
+      standardWorkingHours:
+        typeof standardWorkingHours === "number"
+          ? standardWorkingHours
+          : (existing?.standardWorkingHours ?? 160),
+      departments: Array.isArray(departments) ? departments : (existing?.departments ?? []),
+      shiftStart: shiftStart || existing?.shiftStart || "09:00",
+      shiftEnd: shiftEnd || existing?.shiftEnd || "17:00",
+      gracePeriod:
+        typeof gracePeriod === "number" ? gracePeriod : (existing?.gracePeriod ?? 15),
+      checkInDisplayBefore:
+        typeof checkInDisplayBefore === "number"
+          ? checkInDisplayBefore
+          : (existing?.checkInDisplayBefore ?? 30),
+      checkOutDisplayAfter:
+        typeof checkOutDisplayAfter === "number"
+          ? checkOutDisplayAfter
+          : (existing?.checkOutDisplayAfter ?? 0),
+      autoCheckOut:
+        typeof autoCheckOut === "boolean" ? autoCheckOut : (existing?.autoCheckOut ?? false),
       autoCheckOutBuffer: bufferInMinutes,
+      payslipHeadName:
+        typeof payslipHeadName === "string"
+          ? payslipHeadName.trim()
+          : (existing?.payslipHeadName ?? ""),
+      payslipHeadTitle:
+        typeof payslipHeadTitle === "string"
+          ? payslipHeadTitle.trim()
+          : (existing?.payslipHeadTitle ?? "Authorized Signatory"),
+      payslipSignatureUrl:
+        typeof payslipSignatureUrl === "string"
+          ? payslipSignatureUrl.trim()
+          : (existing?.payslipSignatureUrl ?? ""),
+      payslipStampUrl:
+        typeof payslipStampUrl === "string"
+          ? payslipStampUrl.trim()
+          : (existing?.payslipStampUrl ?? ""),
+      companyLogoUrl:
+        typeof companyLogoUrl === "string"
+          ? companyLogoUrl.trim()
+          : (existing?.companyLogoUrl ?? ""),
     };
 
     let result;

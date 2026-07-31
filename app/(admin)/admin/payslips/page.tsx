@@ -2,9 +2,14 @@
 
 import React, { useMemo, useState } from "react";
 import useSWR from "swr";
-import { Search, Filter, Building2 } from "lucide-react";
+import { Search, Filter, Building2, Calendar, CalendarDays } from "lucide-react";
 import GeneratePayslipModal, { EmployeeOption } from "@/app/components/admin/GeneratePayslipModal";
 import PayslipList, { CompanyDetailsData } from "@/app/components/payslips/PayslipList";
+import {
+  getPayslipReferenceId,
+  isPayslipReferenceQuery,
+  matchesPayslipReferenceSearch,
+} from "@/app/components/payslips/payslipPdf";
 import { FilterSelect } from "@/app/components/ui/FilterSelect";
 
 const ExtendedGeneratePayslipModal = GeneratePayslipModal as React.ComponentType<
@@ -34,9 +39,80 @@ interface Payslip {
   version?: string;
 }
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+function getCurrentMonthYear(): { month: string; year: string } {
+  const now = new Date();
+  return {
+    month: now.toLocaleString("en-US", { month: "long" }),
+    year: String(now.getFullYear()),
+  };
+}
+
+function normalizeMonth(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/** Parse payslip period strings like "July 2026" or "Jun 2026". */
+function parsePayslipPeriod(periodRaw: string): { monthName: string | null; year: string | null } {
+  const period = (periodRaw || "").trim();
+  if (!period) return { monthName: null, year: null };
+
+  const yearMatch = period.match(/(19\d{2}|20\d{2})/);
+  const year = yearMatch ? yearMatch[1] : null;
+
+  const normalized = period.replace(/,/g, " ").replace(/[-/]/g, " ").replace(/\s+/g, " ").trim();
+
+  for (const month of MONTH_NAMES) {
+    if (normalized.toLowerCase().includes(month.toLowerCase())) {
+      return { monthName: month, year };
+    }
+  }
+
+  const shortToFull: Record<string, string> = {
+    jan: "January",
+    feb: "February",
+    mar: "March",
+    apr: "April",
+    may: "May",
+    jun: "June",
+    jul: "July",
+    aug: "August",
+    sep: "September",
+    sept: "September",
+    oct: "October",
+    nov: "November",
+    dec: "December",
+  };
+
+  for (const token of normalized.split(" ")) {
+    const key = token.slice(0, 4).toLowerCase();
+    if (shortToFull[key]) return { monthName: shortToFull[key], year };
+    if (shortToFull[token.toLowerCase()]) return { monthName: shortToFull[token.toLowerCase()], year };
+  }
+
+  return { monthName: null, year };
+}
+
 export default function AdminPayslipsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All");
+  // Default: current calendar month + year so admins land on this month's payroll
+  const [monthFilter, setMonthFilter] = useState(() => getCurrentMonthYear().month);
+  const [yearFilter, setYearFilter] = useState(() => getCurrentMonthYear().year);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -100,6 +176,31 @@ export default function AdminPayslipsPage() {
     ];
   }, [employees]);
 
+  const monthOptions = useMemo(
+    () => [
+      { value: "All", label: "All Months" },
+      ...MONTH_NAMES.map((m) => ({ value: m, label: m })),
+    ],
+    []
+  );
+
+  const yearOptions = useMemo(() => {
+    const years = new Set<string>([String(new Date().getFullYear())]);
+    payslips.forEach((slip) => {
+      const { year } = parsePayslipPeriod(slip.period || "");
+      if (year) years.add(year);
+    });
+
+    return [
+      { value: "All", label: "All Years" },
+      ...Array.from(years)
+        .sort((a, b) => b.localeCompare(a))
+        .map((y) => ({ value: y, label: y })),
+    ];
+  }, [payslips]);
+
+  const defaultPeriod = useMemo(() => getCurrentMonthYear(), []);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-PK", {
       style: "currency",
@@ -143,15 +244,9 @@ export default function AdminPayslipsPage() {
         throw new Error(errorMessage);
       }
 
-      const savedPayslip: Payslip = await response.json();
-      mutatePayslips(
-        (current: unknown) => {
-          if (Array.isArray(current)) return [savedPayslip, ...current];
-          const obj = (current ?? {}) as { payslips?: Payslip[] };
-          return { ...obj, payslips: [savedPayslip, ...(obj.payslips || [])] };
-        },
-        { revalidate: false }
-      );
+      await response.json();
+      // Revalidate so re-generated slips for the same employee/period all appear
+      await mutatePayslips();
       setIsModalOpen(false);
     } catch (err) {
       console.error("Submission failed:", err);
@@ -167,11 +262,17 @@ export default function AdminPayslipsPage() {
     const name = employeeObj?.name || slip.employeeName || "";
     const role = employeeObj?.jobTitle || slip.employeeRole || "";
     const period = slip.period || "";
+    const refId = getPayslipReferenceId(slip._id);
+    const q = searchQuery.trim().toLowerCase();
+    const refSearch = isPayslipReferenceQuery(searchQuery);
 
     const matchesSearch =
-      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      period.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      name.toLowerCase().includes(q) ||
+      role.toLowerCase().includes(q) ||
+      period.toLowerCase().includes(q) ||
+      refId.toLowerCase().includes(q) ||
+      matchesPayslipReferenceSearch(slip._id, searchQuery);
 
     const slipDepartment = employeeObj?._id
       ? departmentByEmployeeId.get(String(employeeObj._id))
@@ -179,57 +280,105 @@ export default function AdminPayslipsPage() {
     const matchesDepartment =
       departmentFilter === "All" || slipDepartment === departmentFilter;
 
-    return matchesSearch && matchesDepartment;
+    const { monthName, year } = parsePayslipPeriod(period);
+    // Reference lookup ignores month/year so PAY-xxx finds across all periods
+    const matchesMonth =
+      refSearch ||
+      monthFilter === "All" ||
+      (monthName ? normalizeMonth(monthName) === normalizeMonth(monthFilter) : false);
+    const matchesYear =
+      refSearch || yearFilter === "All" || (year ? year === yearFilter : false);
+
+    return matchesSearch && matchesDepartment && matchesMonth && matchesYear;
   });
 
-  const hasActiveFilters = searchQuery.trim().length > 0 || departmentFilter !== "All";
+  const isDefaultPeriod =
+    monthFilter === defaultPeriod.month && yearFilter === defaultPeriod.year;
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
+    departmentFilter !== "All" ||
+    !isDefaultPeriod;
+
+  const resetFilters = () => {
+    const current = getCurrentMonthYear();
+    setSearchQuery("");
+    setDepartmentFilter("All");
+    setMonthFilter(current.month);
+    setYearFilter(current.year);
+  };
+
+  const periodSummary =
+    monthFilter === "All" && yearFilter === "All"
+      ? ""
+      : monthFilter === "All"
+        ? ` in ${yearFilter}`
+        : yearFilter === "All"
+          ? ` in ${monthFilter}`
+          : ` for ${monthFilter} ${yearFilter}`;
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Page Header Area */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-line-subtle">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-line-subtle">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-content-main tracking-tight">
             Paid Payslips Ledger
           </h1>
           <p className="mt-1 text-xs text-content-secondary leading-relaxed">
-            Monitor compensations and download generated PDF receipt summaries for completed payments.
+            Monitor compensations and download official PDF salary statements.
           </p>
         </div>
 
-        {/* Toolbar: search + department filter + action, all one height */}
-        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
-          {/* Search Input */}
-          <div className="relative w-full sm:w-64">
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-xs transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <span>Record Payment</span>
+        </button>
+      </div>
+
+      {/* Filter bar — full width, aligned grid */}
+      <div className="bg-surface-card border border-line-subtle rounded-2xl p-3.5 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-2.5 items-center">
+          <div className="relative xl:col-span-4">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-content-muted" />
             </div>
             <input
               type="text"
-              placeholder="Search paid payroll history..."
+              placeholder="Search name, role, period, or ref (PAY-...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-9 pr-3.5 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent transition duration-150 shadow-xs"
+              className="block w-full pl-9 pr-3 py-2 bg-surface-main border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent transition duration-150"
             />
           </div>
 
-          {/* Department Filter */}
           <FilterSelect
             ariaLabel="Filter by department"
             icon={<Building2 className="w-3.5 h-3.5" />}
             options={departmentOptions}
             value={departmentFilter}
             onChange={setDepartmentFilter}
-            className="w-full sm:w-48"
+            className="xl:col-span-3"
           />
 
-          {/* Record Payment Button */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-xs transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
-          >
-            <span>Record Payment</span>
-          </button>
+          <FilterSelect
+            ariaLabel="Filter by month"
+            icon={<Calendar className="w-3.5 h-3.5" />}
+            options={monthOptions}
+            value={monthFilter}
+            onChange={setMonthFilter}
+            className="xl:col-span-3"
+          />
+
+          <FilterSelect
+            ariaLabel="Filter by year"
+            icon={<CalendarDays className="w-3.5 h-3.5" />}
+            options={yearOptions}
+            value={yearFilter}
+            onChange={setYearFilter}
+            className="xl:col-span-2"
+          />
         </div>
       </div>
 
@@ -239,17 +388,15 @@ export default function AdminPayslipsPage() {
           <Filter className="w-3.5 h-3.5 text-content-muted" />
           <span>
             Showing {filteredPayslips.length} paid entries
-            {departmentFilter !== "All" ? ` in ${departmentFilter}` : ""}
+            {periodSummary}
+            {departmentFilter !== "All" ? ` · ${departmentFilter}` : ""}
           </span>
         </div>
 
         {hasActiveFilters && (
           <button
             type="button"
-            onClick={() => {
-              setSearchQuery("");
-              setDepartmentFilter("All");
-            }}
+            onClick={resetFilters}
             className="text-[11px] font-bold text-brand-accent hover:text-brand-hover transition cursor-pointer"
           >
             Clear filters
@@ -265,8 +412,15 @@ export default function AdminPayslipsPage() {
         onDownloadStart={(id) => setDownloadingId(id)}
         onDownloadEnd={() => setDownloadingId(null)}
         title="Paid Records"
+        emptyMessage={
+          isDefaultPeriod && !searchQuery.trim() && departmentFilter === "All"
+            ? `No payslips recorded for ${defaultPeriod.month} ${defaultPeriod.year} yet.`
+            : "No payslips match your current filters."
+        }
         showAdminControls
-        showVersion={true}
+        showVersion={false}
+        showPaymentDate
+        showReference
         formatCurrency={formatCurrency}
         companyDetails={companyDetails}
       />

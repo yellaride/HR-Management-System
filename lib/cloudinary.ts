@@ -48,6 +48,36 @@ export function getEmployeePhotoFolder(): string {
   return process.env.CLOUDINARY_UPLOAD_FOLDER?.trim() || "hr-system/employees";
 }
 
+export function getPayslipBrandingFolder(): string {
+  return process.env.CLOUDINARY_PAYSLIP_FOLDER?.trim() || "hr-system/payslip-branding";
+}
+
+export async function uploadPayslipBrandingAsset(buffer: Buffer): Promise<string> {
+  ensureCloudinaryConfigured();
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: getPayslipBrandingFolder(),
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        if (!result?.secure_url) {
+          reject(new Error("Cloudinary upload succeeded but no secure_url was returned"));
+          return;
+        }
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(buffer);
+  });
+}
+
 export async function uploadEmployeePhoto(buffer: Buffer): Promise<string> {
   ensureCloudinaryConfigured();
 

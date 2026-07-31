@@ -20,10 +20,19 @@ function SwrIdentityGuard() {
 
   useEffect(() => {
     if (status === "loading") return;
-    if (prevUserIdRef.current !== userId) {
+
+    const prev = prevUserIdRef.current;
+    if (prev === userId) return;
+
+    // First session resolution after mount — record the user without wiping cache.
+    // Wiping here cleared in-flight payslips (and other HR) data on every hard reload.
+    if (prev === null && userId !== null) {
       prevUserIdRef.current = userId;
-      mutate(() => true, undefined, { revalidate: false });
+      return;
     }
+
+    prevUserIdRef.current = userId;
+    mutate(() => true, undefined, { revalidate: false });
   }, [userId, status, mutate]);
 
   return null;
