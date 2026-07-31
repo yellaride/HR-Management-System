@@ -30,6 +30,9 @@ interface CompanySettingsState {
   payslipSignatureUrl: string;
   payslipStampUrl: string;
   companyLogoUrl: string;
+  companyLogoScale: number;
+  companyLogoOffsetX: number;
+  companyLogoOffsetY: number;
 }
 
 const swalCustomClass = {
@@ -87,6 +90,9 @@ export default function AdminSettingsPage() {
       payslipSignatureUrl: data?.payslipSignatureUrl || "",
       payslipStampUrl: data?.payslipStampUrl || "",
       companyLogoUrl: data?.companyLogoUrl || "",
+      companyLogoScale: typeof data?.companyLogoScale === "number" ? data.companyLogoScale : 1,
+      companyLogoOffsetX: typeof data?.companyLogoOffsetX === "number" ? data.companyLogoOffsetX : 0,
+      companyLogoOffsetY: typeof data?.companyLogoOffsetY === "number" ? data.companyLogoOffsetY : 0,
     }),
     [data]
   );
@@ -151,6 +157,28 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleRenameDepartment = async (oldName: string, newName: string) => {
+    const res = await fetch("/api/admin/departments/rename", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldName, newName }),
+    });
+
+    const body = (await res.json().catch(() => ({}))) as {
+      departments?: string[];
+      error?: string;
+    };
+
+    if (!res.ok || !Array.isArray(body.departments)) {
+      throw new Error(body.error || "Failed to rename department.");
+    }
+
+    mutateSettings(
+      (prev) => ({ ...(prev || settings), departments: body.departments }),
+      { revalidate: false }
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-100 gap-3 bg-surface-main">
@@ -196,7 +224,12 @@ export default function AdminSettingsPage() {
           onSave={handleUpdateSettings} 
         />
         <PayslipBrandingSettings
-          data={{ companyLogoUrl: settings.companyLogoUrl }}
+          data={{
+            companyLogoUrl: settings.companyLogoUrl,
+            companyLogoScale: settings.companyLogoScale,
+            companyLogoOffsetX: settings.companyLogoOffsetX,
+            companyLogoOffsetY: settings.companyLogoOffsetY,
+          }}
           onSave={handleUpdateSettings}
         />
         <AttendanceSettings 
@@ -206,7 +239,8 @@ export default function AdminSettingsPage() {
 
         <DepartmentSettings 
           departments={settings.departments} 
-          onAdd={handleAddDepartment} 
+          onAdd={handleAddDepartment}
+          onRename={handleRenameDepartment}
           onDelete={handleDeleteDepartment} 
         />
 

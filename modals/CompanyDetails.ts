@@ -23,6 +23,9 @@ const CompanyDetailsSchema = new Schema(
     payslipSignatureUrl: { type: String, default: "" },
     payslipStampUrl: { type: String, default: "" },
     companyLogoUrl: { type: String, default: "" },
+    companyLogoScale: { type: Number, default: 1 },
+    companyLogoOffsetX: { type: Number, default: 0 },
+    companyLogoOffsetY: { type: Number, default: 0 },
   },
   {
     timestamps: true,

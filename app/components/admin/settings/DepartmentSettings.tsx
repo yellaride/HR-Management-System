@@ -2,12 +2,13 @@
 
 import React, { useMemo, useState } from "react";
 import useSWR from "swr";
-import { Users, Plus, Trash2, Loader2, Crown, X } from "lucide-react";
+import { Users, Plus, Trash2, Loader2, Crown, X, Pencil, Check } from "lucide-react";
 import Swal from "sweetalert2";
 
 interface DepartmentSettingsProps {
   departments: string[];
   onAdd: (name: string) => Promise<void>;
+  onRename: (oldName: string, newName: string) => Promise<void>;
   onDelete: (name: string) => Promise<void>;
 }
 
@@ -33,11 +34,14 @@ const Toast = Swal.mixin({
   timerProgressBar: true,
 });
 
-export default function DepartmentSettings({ departments, onAdd, onDelete }: DepartmentSettingsProps) {
+export default function DepartmentSettings({ departments, onAdd, onRename, onDelete }: DepartmentSettingsProps) {
   const [newDept, setNewDept] = useState("");
   const [adding, setAdding] = useState(false);
 
   const [savingDept, setSavingDept] = useState<string | null>(null);
+  const [editingDept, setEditingDept] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   // Cached head/employee mapping, revalidated after every assignment change
   const { data: headData, mutate: refreshHeads } = useSWR<{
@@ -65,6 +69,45 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
       console.error(err);
     } finally {
       setAdding(false);
+    }
+  };
+
+  const startEdit = (dept: string) => {
+    setEditingDept(dept);
+    setEditName(dept);
+  };
+
+  const cancelEdit = () => {
+    setEditingDept(null);
+    setEditName("");
+  };
+
+  const handleRename = async (oldName: string) => {
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    if (trimmed === oldName) {
+      cancelEdit();
+      return;
+    }
+
+    try {
+      setRenaming(true);
+      await onRename(oldName, trimmed);
+      cancelEdit();
+      await refreshHeads();
+      Toast.fire({
+        icon: "success",
+        title: "Department renamed",
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Rename failed",
+        text: err instanceof Error ? err.message : "Could not rename department.",
+        confirmButtonColor: "#7c3aed",
+      });
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -189,25 +232,79 @@ export default function DepartmentSettings({ departments, onAdd, onDelete }: Dep
                 >
                   {/* Card header */}
                   <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-surface-subtle border-b border-line-subtle">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="size-7 rounded-lg bg-brand-subtle flex items-center justify-center shrink-0">
                         <Users className="w-3.5 h-3.5 text-brand-accent" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-content-main truncate leading-tight">{dept}</p>
-                        <p className="text-[10px] text-content-secondary leading-tight">
-                          {deptEmployees.length} member{deptEmployees.length !== 1 ? "s" : ""}
-                        </p>
-                      </div>
+                      {editingDept === dept ? (
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <input
+                            type="text"
+                            value={editName}
+                            autoFocus
+                            disabled={renaming}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void handleRename(dept);
+                              }
+                              if (e.key === "Escape") cancelEdit();
+                            }}
+                            className="form-input text-xs flex-1 min-w-0 p-1.5 border border-brand-accent/40 rounded-lg outline-none focus:ring-2 focus:ring-brand-accent/25"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleRename(dept)}
+                            disabled={renaming || !editName.trim() || editName.trim() === dept}
+                            title="Save name"
+                            className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded-lg transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                          >
+                            {renaming ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            disabled={renaming}
+                            title="Cancel"
+                            className="p-1.5 hover:bg-surface-main text-content-secondary rounded-lg transition cursor-pointer disabled:opacity-40 shrink-0"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="min-w-0">
+                          <p className="font-bold text-content-main truncate leading-tight">{dept}</p>
+                          <p className="text-[10px] text-content-secondary leading-tight">
+                            {deptEmployees.length} member{deptEmployees.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(dept)}
-                      title="Delete department"
-                      className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition cursor-pointer shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {editingDept !== dept && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(dept)}
+                          title="Edit department name"
+                          className="p-1.5 hover:bg-brand-subtle text-gray-400 hover:text-brand-accent rounded-lg transition cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(dept)}
+                          title="Delete department"
+                          className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Head section */}

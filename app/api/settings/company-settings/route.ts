@@ -39,6 +39,9 @@ export async function GET() {
         payslipSignatureUrl: "",
         payslipStampUrl: "",
         companyLogoUrl: "",
+        companyLogoScale: 1,
+        companyLogoOffsetX: 0,
+        companyLogoOffsetY: 0,
       };
     }
 
@@ -93,6 +96,9 @@ async function handleUpdate(request: Request) {
       payslipSignatureUrl,
       payslipStampUrl,
       companyLogoUrl,
+      companyLogoScale,
+      companyLogoOffsetX,
+      companyLogoOffsetY,
     } = body;
 
     // Ensure autoCheckOutBuffer is a number between 0 and 30 minutes
@@ -150,6 +156,18 @@ async function handleUpdate(request: Request) {
         typeof companyLogoUrl === "string"
           ? companyLogoUrl.trim()
           : (existing?.companyLogoUrl ?? ""),
+      companyLogoScale:
+        typeof companyLogoScale === "number"
+          ? Math.min(3, Math.max(0.5, companyLogoScale))
+          : (existing?.companyLogoScale ?? 1),
+      companyLogoOffsetX:
+        typeof companyLogoOffsetX === "number"
+          ? Math.min(80, Math.max(-80, companyLogoOffsetX))
+          : (existing?.companyLogoOffsetX ?? 0),
+      companyLogoOffsetY:
+        typeof companyLogoOffsetY === "number"
+          ? Math.min(40, Math.max(-40, companyLogoOffsetY))
+          : (existing?.companyLogoOffsetY ?? 0),
     };
 
     let result;

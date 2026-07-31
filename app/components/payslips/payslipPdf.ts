@@ -1,4 +1,9 @@
-// Populated employee sub-document (may carry any of several photo field names)
+import {
+  parsePayslipLogoAdjust,
+  PAYSLIP_LOGO_FRAME_MM,
+  PAYSLIP_LOGO_PDF_RENDER_PX,
+  renderAdjustedPayslipLogo,
+} from "@/lib/payslipLogoAdjust";
 export interface PayslipEmployee {
   _id?: string;
   name?: string;
@@ -36,6 +41,9 @@ export interface PayslipCompanyDetails {
   brandAccent?: string;
   brand_accent?: string;
   companyLogoUrl?: string;
+  companyLogoScale?: number;
+  companyLogoOffsetX?: number;
+  companyLogoOffsetY?: number;
   payslipHeadName?: string;
   payslipHeadTitle?: string;
   payslipSignatureUrl?: string;
@@ -217,6 +225,11 @@ export async function downloadPayslipPdf({
   const companyEmail = companyDetails?.email?.trim() || "hr@mail.yalaride.com";
   const companyPhone = companyDetails?.phone?.trim() || "";
   const logoUrl = companyDetails?.companyLogoUrl?.trim() || "";
+  const logoAdjust = parsePayslipLogoAdjust({
+    scale: companyDetails?.companyLogoScale,
+    offsetX: companyDetails?.companyLogoOffsetX,
+    offsetY: companyDetails?.companyLogoOffsetY,
+  });
 
   const refId = getPayslipReferenceId(slip._id);
   const paymentDate = formatPaymentDate(slip.paymentDate);
@@ -224,6 +237,15 @@ export async function downloadPayslipPdf({
   const grossDeductions = slip.deductions || 0;
 
   const logoImg = logoUrl ? await loadImageDataUrl(logoUrl) : null;
+  const adjustedLogoDataUrl =
+    logoUrl && logoImg
+      ? await renderAdjustedPayslipLogo(
+          logoUrl,
+          logoAdjust,
+          PAYSLIP_LOGO_PDF_RENDER_PX.width,
+          PAYSLIP_LOGO_PDF_RENDER_PX.height
+        )
+      : null;
 
   // Header — light surface + brand accent stripe (SyncUp theme)
   doc.setFillColor(primary[0], primary[1], primary[2]);
@@ -235,9 +257,11 @@ export async function downloadPayslipPdf({
 
   if (logoImg) {
     try {
-      const logoH = 14;
-      const logoW = 42;
-      doc.addImage(logoImg.dataUrl, logoImg.format, headerLeftX, y - 4, logoW, logoH);
+      const logoH = PAYSLIP_LOGO_FRAME_MM.height;
+      const logoW = PAYSLIP_LOGO_FRAME_MM.width;
+      const logoData = adjustedLogoDataUrl || logoImg.dataUrl;
+      const logoFormat = adjustedLogoDataUrl ? "PNG" : logoImg.format;
+      doc.addImage(logoData, logoFormat, headerLeftX, y - 4, logoW, logoH);
       headerTextY = y + logoH + 1;
     } catch {
       doc.setFont("helvetica", "bold");
