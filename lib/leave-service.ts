@@ -200,6 +200,74 @@ export type LeaveDecisionResult =
   | { ok: true; id: string; status: "Approved" | "Rejected" }
   | { ok: false; status: number; error: string };
 
+export type LeaveDeleteResult =
+  | { ok: true; id: string; refundedDays: number }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Permanently deletes a leave request and refunds the employee's balance.
+ * Used by admins to remove test/mistaken leaves so the used-days count is
+ * restored (e.g. an approved leave the employee never actually took).
+ *
+ * Refund rules mirror the reject flow: REJECTED leaves were already refunded
+ * and UNPAID leaves never consume tracked balance, so neither refunds again.
+ */
+export async function deleteLeaveRequest(id: string): Promise<LeaveDeleteResult> {
+  await dbConnect();
+
+  if (!id) {
+    return { ok: false, status: 400, error: "Missing leave id." };
+  }
+
+  const leaveRequest = await Leave.findById(id);
+  if (!leaveRequest) {
+    return { ok: false, status: 404, error: "Leave request not found." };
+  }
+
+  const currentStatus = String(leaveRequest.status).toUpperCase();
+  const leaveType = String(leaveRequest.type).toUpperCase();
+  const days = Number(leaveRequest.days || 0);
+  let refundedDays = 0;
+
+  if (currentStatus !== "REJECTED" && !leaveType.includes("UNPAID")) {
+    const balanceDoc = await LeaveBalance.findOne({ userId: leaveRequest.userId });
+    const balance = balanceDoc as LeanLeaveBalance | null;
+
+    const matchedKey: TrackedLeaveType = leaveType.includes("ANNUAL")
+      ? "ANNUAL"
+      : leaveType.includes("SICK")
+        ? "SICK"
+        : "CASUAL";
+
+    const balanceEntry = balance ? balance[matchedKey] : undefined;
+    if (balanceEntry && balanceDoc) {
+      const currentUsed = Number(balanceEntry.used || 0);
+      balanceEntry.used = Math.max(0, currentUsed - days);
+      refundedDays = currentUsed - Number(balanceEntry.used);
+
+      const allocated = Number(balanceEntry.allocated ?? 0);
+      balanceEntry.remaining = Math.max(0, allocated - balanceEntry.used);
+
+      balanceDoc.markModified(matchedKey);
+      await balanceDoc.save();
+    }
+  }
+
+  await Leave.findByIdAndDelete(id);
+
+  await ActivityLog.create({
+    userId: leaveRequest.userId,
+    activityType: "LEAVE_DELETED",
+    date: formatDateString(new Date()),
+    timestamp: new Date(),
+    description: `Leave request for ${days} day(s) of ${leaveRequest.type} was deleted by admin${
+      refundedDays > 0 ? ` (${refundedDays} day(s) restored to balance)` : ""
+    }.`,
+  });
+
+  return { ok: true, id: String(leaveRequest._id), refundedDays };
+}
+
 /**
  * Approves or rejects a leave request (includes balance refund on reject).
  * decidedByNote is appended to the activity log, e.g. "by department head Ali".

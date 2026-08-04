@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import useSWR from "swr";
+import Swal from "sweetalert2";
 import { AlertCircle } from "lucide-react";
 
 import { LeaveRequest } from "@/lib/types";
@@ -134,6 +135,77 @@ export default function AdminLeavesPage() {
   const handleApprove = (id: string) => decideLeave(id, "APPROVE");
   const handleReject = (id: string) => decideLeave(id, "REJECT");
 
+  // Delete a leave entirely — the API refunds used days so the employee's
+  // balance is restored (e.g. test entries or approved leaves never taken).
+  const [deletingLeaveId, setDeletingLeaveId] = useState<string | null>(null);
+
+  const handleDeleteLeave = async (leave: LeaveRequest) => {
+    const isRefundable =
+      String(leave.status).toUpperCase() !== "REJECTED" &&
+      !String(leave.type || "").toUpperCase().includes("UNPAID");
+
+    const result = await Swal.fire({
+      title: "Delete Leave Request?",
+      html: `The ${leave.days}-day <b>${leave.type}</b> entry for <b>${leave.employeeName}</b> will be permanently removed.${
+        isRefundable
+          ? `<br/><b>${leave.days} day(s)</b> will be restored to their leave balance.`
+          : ""
+      }<br/>This cannot be undone.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
+        title: "text-base font-bold text-content-main",
+        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
+        actions: "flex gap-2 justify-center mt-5 w-full",
+        confirmButton:
+          "px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
+        cancelButton:
+          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
+      },
+    });
+
+    if (!result.isConfirmed) return;
+
+    setActionError(null);
+    setDeletingLeaveId(leave.id);
+    try {
+      const res = await fetch(`/api/admin/leaves?id=${leave.id}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as {
+        refundedDays?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(body.error || "Failed to delete leave request.");
+      }
+
+      // Revalidate so refreshed balance metrics show for remaining leaves
+      await mutateLeaves();
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title:
+          body.refundedDays && body.refundedDays > 0
+            ? `Leave deleted — ${body.refundedDays} day(s) restored`
+            : "Leave deleted",
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+      });
+    } catch (err) {
+      console.error("Leave deletion failed:", err);
+      setActionError(err instanceof Error ? err.message : "Failed to delete leave request.");
+    } finally {
+      setDeletingLeaveId(null);
+    }
+  };
+
   // Memoized filter processing for optimized rendering
   const filteredLeaves = useMemo(() => {
     return leaves.filter((leave) => {
@@ -185,6 +257,8 @@ export default function AdminLeavesPage() {
           leaves={filteredLeaves} 
           loading={loading} 
           onSelect={(leave) => setSelectedLeave(leave)} 
+          onDelete={handleDeleteLeave}
+          deletingId={deletingLeaveId}
         />
       </div>
 

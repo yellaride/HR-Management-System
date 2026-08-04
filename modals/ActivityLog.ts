@@ -8,6 +8,7 @@ export interface IActivityLog extends Document {
     | "LEAVE_REQUEST"
     | "LEAVE_APPROVED"
     | "LEAVE_REJECTED"
+    | "LEAVE_DELETED"
     | "BIRTHDAY_EMAIL"
     | "PAYSLIP";
   date: string; // YYYY-MM-DD
@@ -36,6 +37,7 @@ const ActivityLogSchema = new Schema<IActivityLog>(
         "LEAVE_REQUEST",
         "LEAVE_APPROVED",
         "LEAVE_REJECTED",
+        "LEAVE_DELETED",
         "BIRTHDAY_EMAIL",
         "PAYSLIP"
       ],

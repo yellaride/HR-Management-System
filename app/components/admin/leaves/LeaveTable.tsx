@@ -8,7 +8,9 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock, 
-  Eye 
+  Eye,
+  Trash2,
+  Loader2
 } from "lucide-react";
 
 // Import the centralized LeaveRequest type. 
@@ -25,11 +27,15 @@ interface LeaveTableProps {
   leaves: LeaveRequest[];
   loading: boolean;
   onSelect: (leave: LeaveRequest) => void;
+  onDelete?: (leave: LeaveRequest) => void;
+  deletingId?: string | null;
 }
 export const LeaveTable: React.FC<LeaveTableProps> = ({
   leaves,
   loading,
   onSelect,
+  onDelete,
+  deletingId = null,
 }) => {
   // Case-insensitive status mapping to support fallback values
   const getStatusBadgeStyles = (status?: string) => {
@@ -221,13 +227,29 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
 
                 {/* Actions Column */}
                 <td className="table-cell text-right">
-                  <button
-                    onClick={() => onSelect(leave)}
-                    className="p-1.5 rounded-lg text-brand-accent hover:text-brand-hover hover:bg-brand-subtle border border-transparent hover:border-brand-accent/20 transition inline-flex items-center gap-1 ml-auto cursor-pointer"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span className="text-[10px] font-bold">Review</span>
-                  </button>
+                  <div className="inline-flex items-center justify-end gap-1 ml-auto">
+                    <button
+                      onClick={() => onSelect(leave)}
+                      className="p-1.5 rounded-lg text-brand-accent hover:text-brand-hover hover:bg-brand-subtle border border-transparent hover:border-brand-accent/20 transition inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span className="text-[10px] font-bold">Review</span>
+                    </button>
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(leave)}
+                        disabled={deletingId === leave.id}
+                        title="Delete leave request (restores balance)"
+                        className="p-1.5 rounded-lg text-content-muted hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition inline-flex items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {deletingId === leave.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             );

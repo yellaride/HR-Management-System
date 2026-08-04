@@ -104,16 +104,19 @@ const navItems = {
         </svg>
       ),
     },
-    {
-      href: "/admin/activity",
-      label: "Activity",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v8z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h6" />
-        </svg>
-      ),
-    },
+    // Activity (System Activity Logs) — temporarily hidden from the admin
+    // sidebar per request. Page/route still exists at /admin/activity;
+    // restore by re-adding this entry.
+    // {
+    //   href: "/admin/activity",
+    //   label: "Activity",
+    //   icon: (
+    //     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v8z" />
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h6" />
+    //     </svg>
+    //   ),
+    // },
     {
       href: "/admin/employee-attendance",
       label: "Attendance Record",
