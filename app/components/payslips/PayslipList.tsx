@@ -2,7 +2,7 @@
 
 import React from "react";
 import Swal from "sweetalert2";
-import { Calendar, CheckCircle2, Download, AlertCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Download, AlertCircle, Trash2, Loader2 } from "lucide-react";
 import { downloadPayslipPdf, getPayslipReferenceId, PayslipRecord } from "./payslipPdf";
 
 export interface ExtendedPayslipRecord extends PayslipRecord {
@@ -40,6 +40,9 @@ interface PayslipListProps {
   showReference?: boolean;
   formatCurrency?: (amount: number) => string;
   companyDetails?: CompanyDetailsData | null; // Keep companyDetails in the prop definitions
+  /** When provided (admin), a delete button appears next to Download */
+  onDelete?: (slip: ExtendedPayslipRecord) => void;
+  deletingId?: string | null;
 }
 
 const swalCustomClass = {
@@ -77,6 +80,8 @@ export default function PayslipList({
   showReference = false,
   formatCurrency,
   companyDetails = null,
+  onDelete,
+  deletingId = null,
 }: PayslipListProps): React.JSX.Element {
   
   const handleDownload = async (slip: PayslipRecord) => {
@@ -205,6 +210,7 @@ export default function PayslipList({
                   .toUpperCase();
 
                 const isCurrentlyDownloading = downloadingId === slip._id;
+                const isCurrentlyDeleting = deletingId === slip._id;
 
                 return (
                   <tr key={slip._id} className="table-row-hover">
@@ -326,27 +332,44 @@ export default function PayslipList({
                     </td>
 
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleDownload(slip)}
-                        disabled={isCurrentlyDownloading}
-                        className={`btn-table-download ${
-                          isCurrentlyDownloading
-                            ? "bg-surface-main text-content-muted border-line-subtle cursor-not-allowed"
-                            : "bg-brand-subtle hover:bg-brand-accent hover:text-white text-brand-accent border-brand-subtle cursor-pointer"
-                        }`}
-                      >
-                        {isCurrentlyDownloading ? (
-                          <>
-                            <div className="w-3.5 h-3.5 border-2 border-content-muted border-t-transparent rounded-full animate-spin" />
-                            <span>Compiling...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Download</span>
-                          </>
+                      <div className="inline-flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleDownload(slip)}
+                          disabled={isCurrentlyDownloading || isCurrentlyDeleting}
+                          className={`btn-table-download ${
+                            isCurrentlyDownloading
+                              ? "bg-surface-main text-content-muted border-line-subtle cursor-not-allowed"
+                              : "bg-brand-subtle hover:bg-brand-accent hover:text-white text-brand-accent border-brand-subtle cursor-pointer"
+                          }`}
+                        >
+                          {isCurrentlyDownloading ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-content-muted border-t-transparent rounded-full animate-spin" />
+                              <span>Compiling...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Download</span>
+                            </>
+                          )}
+                        </button>
+
+                        {onDelete && (
+                          <button
+                            onClick={() => onDelete(slip)}
+                            disabled={isCurrentlyDeleting || isCurrentlyDownloading}
+                            title="Delete payslip"
+                            className="p-2 rounded-lg border border-transparent text-content-muted hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isCurrentlyDeleting ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                         )}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 );

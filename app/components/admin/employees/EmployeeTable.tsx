@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Mail, Calendar, ExternalLink, Edit, DollarSign } from "lucide-react";
+import { Mail, Calendar, ExternalLink, Edit, DollarSign, Trash2, Loader2 } from "lucide-react";
 
 export interface Employee {
   id: number | string;
@@ -33,9 +33,17 @@ interface EmployeeTableProps {
   employees: Employee[];
   onEdit?: (employee: Employee) => void;
   onViewPortal?: (employee: Employee) => void;
+  onDelete?: (employee: Employee) => void;
+  deletingId?: string | number | null;
 }
 
-export default function EmployeeTable({ employees, onEdit, onViewPortal }: EmployeeTableProps) {
+export default function EmployeeTable({
+  employees,
+  onEdit,
+  onViewPortal,
+  onDelete,
+  deletingId = null,
+}: EmployeeTableProps) {
   const getInitials = (name: string) => {
     return (name || "Employee")
       .split(" ")
@@ -190,18 +198,33 @@ export default function EmployeeTable({ employees, onEdit, onViewPortal }: Emplo
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => onEdit?.(emp)}
-                          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition inline-flex items-center gap-1"
+                          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Edit className="w-3.5 h-3.5" />
                           <span className="text-[10px] font-bold">Edit</span>
                         </button>
                         <button
                           onClick={() => onViewPortal?.(emp)}
-                          className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition inline-flex items-center gap-1"
+                          className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                           <span className="text-[10px] font-bold">Portal</span>
                         </button>
+                        {onDelete && (
+                          <button
+                            onClick={() => onDelete(emp)}
+                            disabled={deletingId === emp.id}
+                            title="Delete employee"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-100 transition inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {deletingId === emp.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            <span className="text-[10px] font-bold">Delete</span>
+                          </button>
+                        )}
                       </div>
                     </td>
 

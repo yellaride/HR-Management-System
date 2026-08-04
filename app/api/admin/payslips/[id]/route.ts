@@ -60,3 +60,30 @@ export async function GET(
     );
   }
 }
+
+// DELETE: permanently remove a payslip record (admin only) — used to clean up
+// duplicate generations for the same employee/period.
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser || sessionUser.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    }
+
+    await connectDB();
+    const { id } = await params;
+
+    const deleted = await Payslip.findByIdAndDelete(id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Payslip record not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "Payslip deleted successfully" }, { status: 200 });
+  } catch (error) {
+    console.error("Failed to delete payslip:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}

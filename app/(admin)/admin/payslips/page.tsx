@@ -2,9 +2,13 @@
 
 import React, { useMemo, useState } from "react";
 import useSWR from "swr";
+import Swal from "sweetalert2";
 import { Search, Filter, Building2, Calendar, CalendarDays } from "lucide-react";
 import GeneratePayslipModal, { EmployeeOption } from "@/app/components/admin/GeneratePayslipModal";
-import PayslipList, { CompanyDetailsData } from "@/app/components/payslips/PayslipList";
+import PayslipList, {
+  CompanyDetailsData,
+  ExtendedPayslipRecord,
+} from "@/app/components/payslips/PayslipList";
 import {
   getPayslipReferenceId,
   isPayslipReferenceQuery,
@@ -115,6 +119,7 @@ export default function AdminPayslipsPage() {
   const [yearFilter, setYearFilter] = useState(() => getCurrentMonthYear().year);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Both requests run in parallel and are cached — the employees key is
   // shared with the admin Employees page.
@@ -251,6 +256,67 @@ export default function AdminPayslipsPage() {
     } catch (err) {
       console.error("Submission failed:", err);
       alert(err instanceof Error ? err.message : "Failed to record payment. Please check parameters and try again.");
+    }
+  };
+
+  const handleDeletePayslip = async (slip: ExtendedPayslipRecord) => {
+    const employeeObj =
+      typeof slip.employeeId === "object" && slip.employeeId !== null ? slip.employeeId : null;
+    const employeeName = employeeObj?.name || slip.employeeName || "this employee";
+    const refId = getPayslipReferenceId(slip._id);
+
+    const result = await Swal.fire({
+      title: "Delete Payslip?",
+      html: `Payslip <b>${refId}</b> for <b>${employeeName}</b> (${slip.period}) will be permanently removed.<br/>This cannot be undone.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
+        title: "text-base font-bold text-content-main",
+        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
+        actions: "flex gap-2 justify-center mt-5 w-full",
+        confirmButton:
+          "px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
+        cancelButton:
+          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
+      },
+    });
+
+    if (!result.isConfirmed) return;
+
+    setDeletingId(slip._id);
+    try {
+      const res = await fetch(`/api/admin/payslips/${slip._id}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(body.error || "Failed to delete payslip.");
+      }
+
+      await mutatePayslips();
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Payslip deleted",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+    } catch (err) {
+      console.error("Payslip deletion failed:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Delete failed",
+        text: err instanceof Error ? err.message : "Could not delete the payslip. Try again.",
+        confirmButtonColor: "#7c3aed",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -423,6 +489,8 @@ export default function AdminPayslipsPage() {
         showReference
         formatCurrency={formatCurrency}
         companyDetails={companyDetails}
+        onDelete={handleDeletePayslip}
+        deletingId={deletingId}
       />
 
       {/* Generate Payslip Modal */}

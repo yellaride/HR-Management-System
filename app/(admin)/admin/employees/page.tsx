@@ -199,6 +199,50 @@ export default function AdminEmployeesPage() {
     }
   };
 
+  // Table row delete — confirm first, then reuse the shared delete handler
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | number | null>(null);
+
+  const handleTableDelete = async (emp: Employee) => {
+    const result = await Swal.fire({
+      title: "Delete Employee?",
+      html: `<b>${emp.name}</b> will be permanently removed along with their login credentials.<br/>This cannot be undone.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete employee",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
+        title: "text-base font-bold text-content-main",
+        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
+        actions: "flex gap-2 justify-center mt-5 w-full",
+        confirmButton:
+          "px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
+        cancelButton:
+          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
+      },
+    });
+
+    if (!result.isConfirmed) return;
+
+    setDeletingEmployeeId(emp.id);
+    try {
+      await handleDeleteEmployee(emp.id);
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Employee deleted",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+    } finally {
+      setDeletingEmployeeId(null);
+    }
+  };
+
   const handleOpenEdit = (emp: Employee) => {
     setSelectedEmployee(emp);
     setEditEmployeeError(null);
@@ -364,6 +408,8 @@ export default function AdminEmployeesPage() {
             employees={filteredEmployees}
             onEdit={handleOpenEdit}
             onViewPortal={handleOpenView}
+            onDelete={handleTableDelete}
+            deletingId={deletingEmployeeId}
           />
         )}
       </div>

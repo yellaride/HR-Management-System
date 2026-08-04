@@ -11,9 +11,12 @@ import {
   X,
   MapPin,
   HeartHandshake,
-  ChevronDown
+  ChevronDown,
+  Check,
+  AlertCircle
 } from "lucide-react";
 import ProfilePhotoUploader from "./ProfilePhotoUploader";
+import PasswordInputWithToggle from "@/app/components/PasswordInputWithToggle";
 
 type ProfileState = {
   fullName: string;
@@ -100,6 +103,7 @@ export default function ProfileClient() {
     confirmPassword: "",
   });
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -335,6 +339,7 @@ export default function ProfileClient() {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCurrentPasswordError(null);
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       Toast.fire({ icon: "warning", title: "Fill in all fields." });
       return;
@@ -364,10 +369,11 @@ export default function ProfileClient() {
 
     try {
       setPasswordSaving(true);
-      const res = await fetch("/api/auth/change-password", {
+      const res = await fetch("/api/settings/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          role: "employee",
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword,
         }),
@@ -375,7 +381,14 @@ export default function ProfileClient() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error || "Failed to update password.");
+        const message = errData?.message || errData?.error || "Failed to update password.";
+
+        // Wrong old password → inline error on the field instead of only a popup
+        if (res.status === 400 && /current password/i.test(message)) {
+          setCurrentPasswordError("Current password is incorrect. Please try again.");
+          return;
+        }
+        throw new Error(message);
       }
 
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -729,47 +742,81 @@ export default function ProfileClient() {
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Current Password</label>
-                    <input
-                      type="password"
-                      placeholder="Enter current password"
-                      value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData((p) => ({ ...p, currentPassword: e.target.value }))}
-                      className="form-input text-xs"
-                      required
-                    />
-                  </div>
+                  <PasswordInputWithToggle
+                    label="Current Password"
+                    placeholder="Enter current password"
+                    value={passwordData.currentPassword}
+                    onChange={(val) => {
+                      setCurrentPasswordError(null);
+                      setPasswordData((p) => ({ ...p, currentPassword: val }));
+                    }}
+                    disabled={passwordSaving}
+                    inputClassName={`form-input text-xs ${
+                      currentPasswordError ? "border-rose-400 focus:border-rose-400 focus:ring-rose-200" : ""
+                    }`}
+                  />
+                  {currentPasswordError && (
+                    <p className="flex items-center gap-1 text-[10px] font-semibold text-rose-600">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {currentPasswordError}
+                    </p>
+                  )}
+                </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">New Password</label>
-                    <input
-                      type="password"
-                      placeholder="Min. 8 characters"
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData((p) => ({ ...p, newPassword: e.target.value }))}
-                      className="form-input text-xs"
-                      required
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <PasswordInputWithToggle
+                    label="New Password"
+                    placeholder="Min. 8 characters"
+                    value={passwordData.newPassword}
+                    onChange={(val) => setPasswordData((p) => ({ ...p, newPassword: val }))}
+                    disabled={passwordSaving}
+                    inputClassName="form-input text-xs"
+                  />
+                  {passwordData.newPassword.length > 0 && passwordData.newPassword.length < 8 && (
+                    <p className="flex items-center gap-1 text-[10px] font-semibold text-amber-600">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      At least 8 characters required
+                    </p>
+                  )}
+                </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Confirm Password</label>
-                    <input
-                      type="password"
-                      placeholder="Re-enter password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData((p) => ({ ...p, confirmPassword: e.target.value }))}
-                      className="form-input text-xs"
-                      required
-                    />
+                <div className="space-y-1">
+                  <PasswordInputWithToggle
+                    label="Confirm Password"
+                    placeholder="Re-enter password"
+                    value={passwordData.confirmPassword}
+                    onChange={(val) => setPasswordData((p) => ({ ...p, confirmPassword: val }))}
+                    disabled={passwordSaving}
+                    inputClassName={`form-input text-xs ${
+                      passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword
+                        ? "border-rose-400 focus:border-rose-400 focus:ring-rose-200"
+                        : ""
+                    }`}
+                  />
+                  {passwordData.confirmPassword.length > 0 &&
+                    (passwordData.newPassword === passwordData.confirmPassword ? (
+                      <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                        <Check className="w-3 h-3 shrink-0" />
+                        Passwords match
+                      </p>
+                    ) : (
+                      <p className="flex items-center gap-1 text-[10px] font-semibold text-rose-600">
+                        <X className="w-3 h-3 shrink-0" />
+                        Passwords do not match
+                      </p>
+                    ))}
                 </div>
               </div>
 
               <div className="flex justify-end pt-2 border-t border-line-subtle">
                 <button
                   type="submit"
-                  disabled={passwordSaving}
-                  className="inline-flex items-center gap-1.5 px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  disabled={
+                    passwordSaving ||
+                    (passwordData.confirmPassword.length > 0 &&
+                      passwordData.newPassword !== passwordData.confirmPassword)
+                  }
+                  className="inline-flex items-center gap-1.5 px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {passwordSaving ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

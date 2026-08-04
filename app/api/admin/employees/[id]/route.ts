@@ -156,9 +156,10 @@ export async function DELETE(
       await DepartmentHead.deleteMany({ userId: employee.userId });
     }
 
-    // 2. Soft-delete profile entry (keep employee record, only mark inactive)
-    employee.status = "Inactive";
-    await employee.save();
+    // 2. Hard-delete the profile so mistakenly created employees are fully
+    //    removed from the directory. Payslips keep their employeeName snapshot,
+    //    so historical financial records still render correctly.
+    await Employee.findByIdAndDelete(id);
 
     return NextResponse.json({ 
       message: "Employee profile and system credentials deleted successfully" 
